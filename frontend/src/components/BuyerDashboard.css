@@ -1,0 +1,282 @@
+.buyer-dashboard {
+  width: 100%;
+  max-width: 1100px;
+  margin: 0 auto;
+  padding: 28px 20px 48px;
+  color: #172b36;
+  text-align: left;
+}
+
+.buyer-dashboard__header {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 24px;
+  padding-bottom: 28px;
+  border-bottom: 1px solid #dce5e5;
+}
+
+.buyer-dashboard__eyebrow {
+  margin: 0 0 8px;
+  color: #177b73;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.buyer-dashboard__header h1 {
+  margin: 0;
+  color: #132b35;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+  line-height: 1.15;
+}
+
+.buyer-dashboard__description {
+  margin: 10px 0 0;
+  color: #5c6f76;
+  font-size: 0.95rem;
+}
+
+.buyer-dashboard__count {
+  display: grid;
+  gap: 4px;
+  min-width: 130px;
+  padding: 12px 16px;
+  border-left: 3px solid #e2a948;
+  background: #f2f6f3;
+}
+
+.buyer-dashboard__count span {
+  color: #5c6f76;
+  font-size: 0.78rem;
+}
+
+.buyer-dashboard__count strong {
+  color: #132b35;
+  font-size: 1.5rem;
+  line-height: 1;
+}
+
+.buyer-dashboard__toolbar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 24px 0 14px;
+}
+
+.buyer-dashboard__toolbar h2 {
+  margin: 0;
+  color: #203943;
+  font-size: 1.05rem;
+  font-weight: 700;
+}
+
+.buyer-dashboard__refresh,
+.buyer-dashboard__confirm,
+.buyer-dashboard__dispute {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  min-height: 38px;
+  padding: 0 10px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+  transition: background-color 140ms ease;
+}
+
+.buyer-dashboard__refresh {
+  border-color: #c9d8d8;
+  background: #fff;
+  color: #344d55;
+}
+
+.buyer-dashboard__refresh:hover:not(:disabled) {
+  background: #edf4f3;
+}
+
+.buyer-dashboard__confirm {
+  background: #14786f;
+  color: #fff;
+  white-space: nowrap;
+}
+
+.buyer-dashboard__confirm:hover:not(:disabled) {
+  background: #105f59;
+}
+
+.buyer-dashboard__dispute {
+  border-color: #e7b7ad;
+  background: #fff4f1;
+  color: #9b392b;
+  white-space: nowrap;
+}
+
+.buyer-dashboard__dispute:hover:not(:disabled) {
+  background: #fce5df;
+}
+
+.buyer-dashboard__refresh:disabled,
+.buyer-dashboard__confirm:disabled,
+.buyer-dashboard__dispute:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.buyer-dashboard__message {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  margin: 14px 0 0;
+  padding: 11px 13px;
+  border: 1px solid;
+  font-size: 0.88rem;
+}
+
+.buyer-dashboard__message--error {
+  border-color: #e7b7ad;
+  background: #fff4f1;
+  color: #9b392b;
+}
+
+.buyer-dashboard__message--success {
+  border-color: #a8d2c4;
+  background: #eff9f4;
+  color: #17634d;
+}
+
+.buyer-dashboard__table-wrap {
+  overflow-x: auto;
+  border: 1px solid #dce5e5;
+  background: #fff;
+}
+
+.buyer-dashboard__table {
+  width: 100%;
+  min-width: 850px;
+  border-collapse: collapse;
+  text-align: left;
+}
+
+.buyer-dashboard__table th {
+  padding: 12px 16px;
+  background: #edf3f2;
+  color: #536a70;
+  font-size: 0.72rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.buyer-dashboard__table td {
+  padding: 15px 16px;
+  border-top: 1px solid #e6eded;
+  color: #344b53;
+  font-size: 0.88rem;
+  vertical-align: middle;
+}
+
+.buyer-dashboard__table tbody tr:hover {
+  background: #fbfdfc;
+}
+
+.buyer-dashboard__reference {
+  color: #1c3e48 !important;
+  font-family: "Courier New", monospace;
+  font-size: 0.82rem !important;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.buyer-dashboard__items {
+  max-width: 270px;
+}
+
+.buyer-dashboard__status {
+  display: inline-block;
+  padding: 5px 8px;
+  border: 1px solid #d4d9de;
+  border-radius: 3px;
+  background: #f1f3f5;
+  color: #53606b;
+  font-size: 0.7rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.buyer-dashboard__status--released {
+  border-color: #bddbd2;
+  background: #edf8f3;
+  color: #17634d;
+}
+
+.buyer-dashboard__status--locked {
+  border-color: #efd28a;
+  background: #fff8e6;
+  color: #805b0b;
+}
+
+.buyer-dashboard__status--disputed {
+  border-color: #e7b7ad;
+  background: #fff1ee;
+  color: #9b392b;
+}
+
+.buyer-dashboard__status--refunded {
+  border-color: #d4d9de;
+  background: #f1f3f5;
+  color: #53606b;
+}
+
+.buyer-dashboard__actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 7px;
+}
+
+.buyer-dashboard__review-note {
+  color: #9b392b;
+  font-size: 0.82rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.buyer-dashboard__empty {
+  height: 110px;
+  color: #718187 !important;
+  text-align: center;
+}
+
+.buyer-dashboard__spinning {
+  animation: buyer-dashboard-spin 900ms linear infinite;
+}
+
+@keyframes buyer-dashboard-spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@media (max-width: 640px) {
+  .buyer-dashboard {
+    padding: 20px 0 36px;
+  }
+
+  .buyer-dashboard__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .buyer-dashboard__count {
+    width: 100%;
+  }
+
+  .buyer-dashboard__header h1 {
+    font-size: 1.75rem;
+  }
+}
