@@ -20,8 +20,10 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   dateStyle: "medium",
   timeStyle: "short",
 });
+const completedStatuses = new Set(["RELEASED", "COMPLETED", "REFUNDED"]);
 const statusClassNames = {
   RELEASED: "seller-dashboard__status--released",
+  COMPLETED: "seller-dashboard__status--released",
   LOCKED: "seller-dashboard__status--locked",
   FUNDS_LOCKED: "seller-dashboard__status--locked",
   IN_DISPUTE: "seller-dashboard__status--disputed",
@@ -30,6 +32,8 @@ const statusClassNames = {
 
 const getStatusLabel = (status) =>
   status === "IN_DISPUTE" ? "In Dispute" : status.replaceAll("_", " ");
+const isCompletedContract = (contract) =>
+  completedStatuses.has(contract?.status);
 
 export default function SellerDashboard() {
   const { authFetch, login, logout, role, user } = useAuth();
@@ -82,7 +86,9 @@ export default function SellerDashboard() {
           Array.isArray(activeData.contracts) ? activeData.contracts : [],
         );
         setCompletedContracts(
-          Array.isArray(completedData.contracts) ? completedData.contracts : [],
+          Array.isArray(completedData.contracts)
+            ? completedData.contracts.filter(isCompletedContract)
+            : [],
         );
       } catch (fetchError) {
         if (fetchError.name !== "AbortError") {

@@ -48,6 +48,7 @@ const escrowContractSchema = new mongoose.Schema(
         "FUNDS_LOCKED",
         "DISPATCHED",
         "RELEASED",
+        "COMPLETED",
         "REFUNDED",
         "DISPUTED",
         "IN_DISPUTE",

@@ -397,7 +397,7 @@ router.get("/completed", async (req, res) => {
     }
 
     const filter = {
-      status: { $in: ["RELEASED", "REFUNDED"] },
+      status: { $in: ["RELEASED", "COMPLETED", "REFUNDED"] },
     };
     if (buyerId) filter.buyerId = buyerId;
 

@@ -24,6 +24,7 @@ const statusClassNames = {
   FUNDS_LOCKED: "buyer-dashboard__status--locked",
   IN_DISPUTE: "buyer-dashboard__status--disputed",
   RELEASED: "buyer-dashboard__status--released",
+  COMPLETED: "buyer-dashboard__status--released",
   REFUNDED: "buyer-dashboard__status--refunded",
 };
 
