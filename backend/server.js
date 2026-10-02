@@ -29,7 +29,7 @@ app.use("/api/escrow", escrowRoutes);
 app.use("/api/products", productsRoutes);
 app.use("/api/webhooks", webhookRoutes);
 
-const frontendDistPath = path.join(__dirname, "..", "frontend", "dist");
+const frontendDistPath = path.resolve(__dirname, "..", "frontend", "dist");
 app.use(express.static(frontendDistPath));
 app.get("/{*path}", (req, res, next) => {
   if (req.path === "/api" || req.path.startsWith("/api/")) {
