@@ -7,8 +7,9 @@ import {
 } from "lucide-react";
 import DisputeReasonDialog, { DisputeReasonNote } from "./DisputeReasonDialog";
 import "./BuyerDashboard.css";
+import { API_BASE_URL } from "../api";
 
-const ESCROW_API = "http://127.0.0.1:5000/api/escrow";
+const ESCROW_API = `${API_BASE_URL}/api/escrow`;
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",

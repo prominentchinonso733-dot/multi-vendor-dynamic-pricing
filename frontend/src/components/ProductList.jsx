@@ -1,4 +1,5 @@
 import React, { useState, useEffect } from "react";
+import { API_BASE_URL } from "../api";
 
 const ProductList = ({ onAddToCart }) => {
   const [products, setProducts] = useState([]);
@@ -6,7 +7,7 @@ const ProductList = ({ onAddToCart }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch("http://127.0.0.1:5000/api/products")
+    fetch(`${API_BASE_URL}/api/products`)
       .then((res) => {
         if (!res.ok) {
           throw new Error("Failed to fetch products from backend");
@@ -45,8 +46,7 @@ const ProductList = ({ onAddToCart }) => {
           <strong>Error:</strong> {error}
         </p>
         <p style={{ fontSize: "0.9rem", color: "#64748b" }}>
-          Make sure your Express server is running on{" "}
-          <code>http://localhost:5000</code>.
+          Check that the configured backend API is available.
         </p>
       </div>
     );

@@ -1,5 +1,6 @@
 import { useEffect, useState } from "react";
 import { useAuth } from "../context/AuthContext";
+import { API_BASE_URL } from "../api";
 
 const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
 
@@ -86,7 +87,7 @@ export default function CartDrawer({
         ),
       ];
 
-      const response = await fetch("/api/escrow/lock-funds", {
+      const response = await fetch(`${API_BASE_URL}/api/escrow/lock-funds`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -120,11 +121,14 @@ export default function CartDrawer({
 
         void (async () => {
           try {
-            const verifyResponse = await fetch("/api/escrow/verify", {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({ reference: payment.reference }),
-            });
+            const verifyResponse = await fetch(
+              `${API_BASE_URL}/api/escrow/verify`,
+              {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ reference: payment.reference }),
+              },
+            );
             const verifyData = await verifyResponse.json();
 
             if (!verifyResponse.ok || !verifyData.success) {
