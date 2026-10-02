@@ -5,6 +5,7 @@ require("dotenv").config({
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const path = require("path");
 
 const app = express();
 const PORT = process.env.PORT || 5000;
@@ -27,10 +28,21 @@ app.use("/api/auth", authRoutes);
 app.use("/api/escrow", escrowRoutes);
 app.use("/api/products", productsRoutes);
 app.use("/api/webhooks", webhookRoutes);
-// Main Root Route (for testing in browser)
-app.get("/", (req, res) => {
-  res.send("Backend Server is Running!");
-});
+
+if (process.env.NODE_ENV === "production") {
+  const frontendDistPath = path.resolve(__dirname, "../frontend/dist");
+  app.use(express.static(frontendDistPath));
+  app.get("/{*path}", (req, res, next) => {
+    if (req.path === "/api" || req.path.startsWith("/api/")) {
+      return next();
+    }
+    return res.sendFile(path.join(frontendDistPath, "index.html"));
+  });
+} else {
+  app.get("/", (_req, res) => {
+    res.send("Backend Server is Running!");
+  });
+}
 
 app.listen(PORT, () => {
   console.log(`Backend server running on http://127.0.0.1:${PORT}`);
