@@ -1,7 +1,7 @@
 import { createContext, useContext, useState } from "react";
 import { API_BASE_URL } from "../api";
 
-const AUTH_API = `${API_BASE_URL}/api/auth`;
+const AUTH_API = `${API_BASE_URL}/auth`;
 const AuthContext = createContext(null);
 
 const readStoredAuth = () => {

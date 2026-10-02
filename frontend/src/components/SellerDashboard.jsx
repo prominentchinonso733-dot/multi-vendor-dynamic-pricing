@@ -10,7 +10,7 @@ import DisputeReasonDialog, { DisputeReasonNote } from "./DisputeReasonDialog";
 import "./SellerDashboard.css";
 import { API_BASE_URL } from "../api";
 
-const ESCROW_API = `${API_BASE_URL}/api/escrow`;
+const ESCROW_API = `${API_BASE_URL}/escrow`;
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
   style: "currency",
   currency: "NGN",

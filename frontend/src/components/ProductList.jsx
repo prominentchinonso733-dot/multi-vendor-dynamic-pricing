@@ -7,7 +7,7 @@ const ProductList = ({ onAddToCart }) => {
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/api/products`)
+    fetch(`${API_BASE_URL}/products`)
       .then((res) => {
         if (!res.ok) {
           throw new Error("Failed to fetch products from backend");
