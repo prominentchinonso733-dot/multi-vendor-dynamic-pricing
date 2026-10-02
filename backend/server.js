@@ -5,6 +5,7 @@ require("dotenv").config({
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const fs = require("fs");
 const path = require("path");
 
 const app = express();
@@ -29,8 +30,8 @@ app.use("/api/escrow", escrowRoutes);
 app.use("/api/products", productsRoutes);
 app.use("/api/webhooks", webhookRoutes);
 
-if (process.env.NODE_ENV === "production") {
-  const frontendDistPath = path.resolve(__dirname, "../frontend/dist");
+const frontendDistPath = path.join(__dirname, "..", "frontend", "dist");
+if (fs.existsSync(path.join(frontendDistPath, "index.html"))) {
   app.use(express.static(frontendDistPath));
   app.get("/{*path}", (req, res, next) => {
     if (req.path === "/api" || req.path.startsWith("/api/")) {
