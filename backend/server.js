@@ -5,7 +5,6 @@ require("dotenv").config({
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
-const fs = require("fs");
 const path = require("path");
 
 const app = express();
@@ -31,19 +30,13 @@ app.use("/api/products", productsRoutes);
 app.use("/api/webhooks", webhookRoutes);
 
 const frontendDistPath = path.join(__dirname, "..", "frontend", "dist");
-if (fs.existsSync(path.join(frontendDistPath, "index.html"))) {
-  app.use(express.static(frontendDistPath));
-  app.get("/{*path}", (req, res, next) => {
-    if (req.path === "/api" || req.path.startsWith("/api/")) {
-      return next();
-    }
-    return res.sendFile(path.join(frontendDistPath, "index.html"));
-  });
-} else {
-  app.get("/", (_req, res) => {
-    res.send("Backend Server is Running!");
-  });
-}
+app.use(express.static(frontendDistPath));
+app.get("/{*path}", (req, res, next) => {
+  if (req.path === "/api" || req.path.startsWith("/api/")) {
+    return next();
+  }
+  return res.sendFile(path.join(frontendDistPath, "index.html"));
+});
 
 app.listen(PORT, () => {
   console.log(`Backend server running on http://127.0.0.1:${PORT}`);
