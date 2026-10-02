@@ -2,7 +2,9 @@
   "name": "multi-vendor-dynamic-pricing",
   "private": true,
   "scripts": {
-    "build": "npm --prefix backend ci && npm --prefix frontend ci && npm --prefix frontend run build",
+    "build": "npm --prefix backend ci && npm --prefix frontend ci && npm --prefix frontend run build && npm run verify:frontend",
+    "prestart": "npm run verify:frontend",
+    "verify:frontend": "node -e \"require('fs').accessSync('frontend/dist/index.html')\"",
     "start": "npm --prefix backend start"
   }
 }
