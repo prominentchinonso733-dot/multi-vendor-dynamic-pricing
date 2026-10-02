@@ -69,6 +69,7 @@ function App() {
           <BuyerDashboard
             buyerId={DEMO_BUYER_ID}
             refreshVersion={ordersRefreshVersion}
+            setRefreshVersion={setOrdersRefreshVersion}
           />
         ) : (
           <ProductList onAddToCart={addToCart} />

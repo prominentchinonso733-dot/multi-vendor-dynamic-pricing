@@ -20,20 +20,30 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   dateStyle: "medium",
   timeStyle: "short",
 });
-const completedStatuses = new Set(["RELEASED", "COMPLETED", "REFUNDED"]);
+const completedStatuses = new Set([
+  "RELEASED",
+  "COMPLETED",
+  "REFUNDED",
+  "CLOSED",
+]);
 const statusClassNames = {
   RELEASED: "seller-dashboard__status--released",
   COMPLETED: "seller-dashboard__status--released",
+  CLOSED: "seller-dashboard__status--released",
   LOCKED: "seller-dashboard__status--locked",
   FUNDS_LOCKED: "seller-dashboard__status--locked",
   IN_DISPUTE: "seller-dashboard__status--disputed",
   REFUNDED: "seller-dashboard__status--refunded",
 };
 
-const getStatusLabel = (status) =>
-  status === "IN_DISPUTE" ? "In Dispute" : status.replaceAll("_", " ");
+const getStatusLabel = (status) => {
+  const normalizedStatus = String(status || "").toUpperCase();
+  return normalizedStatus === "IN_DISPUTE"
+    ? "In Dispute"
+    : normalizedStatus.replaceAll("_", " ");
+};
 const isCompletedContract = (contract) =>
-  completedStatuses.has(contract?.status);
+  completedStatuses.has(String(contract?.status || "").toUpperCase());
 
 export default function SellerDashboard() {
   const { authFetch, login, logout, role, user } = useAuth();
@@ -60,7 +70,7 @@ export default function SellerDashboard() {
       try {
         const [activeResponse, completedResponse] = await Promise.all([
           fetch(`${ESCROW_API}/active`, { signal: controller.signal }),
-          fetch(`${ESCROW_API}/completed`, { signal: controller.signal }),
+          authFetch(`${ESCROW_API}/completed`, { signal: controller.signal }),
         ]);
         const [activeData, completedData] = await Promise.all([
           activeResponse.json(),
@@ -103,7 +113,7 @@ export default function SellerDashboard() {
 
     loadContracts();
     return () => controller.abort();
-  }, [refreshVersion]);
+  }, [authFetch, refreshVersion]);
 
   const releaseFunds = async (contractId) => {
     setPendingContractId(contractId);
@@ -495,7 +505,10 @@ export default function SellerDashboard() {
               </tr>
             ) : (
               completedContracts.map((contract) => {
-                const completedAt = contract.completedAt || contract.updatedAt;
+                const completedAt =
+                  contract.completedAt ||
+                  contract.updatedAt ||
+                  contract.createdAt;
 
                 return (
                   <tr key={contract._id}>
@@ -508,7 +521,9 @@ export default function SellerDashboard() {
                     <td>
                       <span
                         className={`seller-dashboard__status ${
-                          statusClassNames[contract.status] || ""
+                          statusClassNames[
+                            String(contract.status || "").toUpperCase()
+                          ] || ""
                         }`}
                       >
                         {getStatusLabel(contract.status)}

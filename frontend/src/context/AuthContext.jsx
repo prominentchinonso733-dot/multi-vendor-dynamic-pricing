@@ -1,4 +1,4 @@
-import { createContext, useContext, useState } from "react";
+import { createContext, useCallback, useContext, useState } from "react";
 import { API_BASE_URL } from "../api";
 
 const AUTH_API = `${API_BASE_URL}/auth`;
@@ -58,11 +58,14 @@ export function AuthProvider({ children }) {
     setAuth({ token: null, user: null });
   };
 
-  const authFetch = (url, options = {}) => {
-    const headers = new Headers(options.headers || {});
-    if (auth.token) headers.set("Authorization", `Bearer ${auth.token}`);
-    return fetch(url, { ...options, headers });
-  };
+  const authFetch = useCallback(
+    (url, options = {}) => {
+      const headers = new Headers(options.headers || {});
+      if (auth.token) headers.set("Authorization", `Bearer ${auth.token}`);
+      return fetch(url, { ...options, headers });
+    },
+    [auth.token],
+  );
 
   return (
     <AuthContext.Provider

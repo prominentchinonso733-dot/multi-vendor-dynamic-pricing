@@ -65,6 +65,11 @@ const authenticateToken = (req, res, next) => {
   }
 };
 
+const authenticateOptionalToken = (req, res, next) => {
+  if (!req.headers.authorization) return next();
+  return authenticateToken(req, res, next);
+};
+
 const requireAdmin = (req, res, next) => {
   if (req.user.role !== "ADMIN") {
     return res
@@ -385,11 +390,12 @@ router.get("/active", async (req, res) => {
 });
 
 // GET /api/escrow/completed
-router.get("/completed", async (req, res) => {
+router.get("/completed", authenticateOptionalToken, async (req, res) => {
   try {
     const { buyerId } = req.query;
+    const isAdmin = req.user?.role === "ADMIN";
 
-    if (buyerId && !mongoose.isValidObjectId(buyerId)) {
+    if (buyerId && !isAdmin && !mongoose.isValidObjectId(buyerId)) {
       return res.status(400).json({
         success: false,
         message: "A valid buyerId is required.",
@@ -397,13 +403,16 @@ router.get("/completed", async (req, res) => {
     }
 
     const filter = {
-      status: { $in: ["RELEASED", "COMPLETED", "REFUNDED"] },
+      status: {
+        $in: [/^RELEASED$/i, /^COMPLETED$/i, /^REFUNDED$/i, /^CLOSED$/i],
+      },
     };
-    if (buyerId) filter.buyerId = buyerId;
+    if (buyerId && !isAdmin) filter.buyerId = buyerId;
 
     const contracts = await EscrowContract.find(filter).sort({
       completedAt: -1,
       updatedAt: -1,
+      createdAt: -1,
     });
 
     return res.json({ success: true, contracts });

@@ -19,24 +19,43 @@ const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   dateStyle: "medium",
   timeStyle: "short",
 });
+const completedStatuses = new Set([
+  "RELEASED",
+  "COMPLETED",
+  "REFUNDED",
+  "CLOSED",
+]);
 const statusClassNames = {
   LOCKED: "buyer-dashboard__status--locked",
   FUNDS_LOCKED: "buyer-dashboard__status--locked",
   IN_DISPUTE: "buyer-dashboard__status--disputed",
   RELEASED: "buyer-dashboard__status--released",
   COMPLETED: "buyer-dashboard__status--released",
+  CLOSED: "buyer-dashboard__status--released",
   REFUNDED: "buyer-dashboard__status--refunded",
 };
 
-const getStatusLabel = (status) =>
-  status === "IN_DISPUTE" ? "In Dispute" : status.replaceAll("_", " ");
+const getStatusLabel = (status) => {
+  const normalizedStatus = String(status || "").toUpperCase();
+  return normalizedStatus === "IN_DISPUTE"
+    ? "In Dispute"
+    : normalizedStatus.replaceAll("_", " ");
+};
+const isCompletedOrder = (order) =>
+  completedStatuses.has(String(order?.status || "").toUpperCase());
 
 const getOrderItems = (items = []) =>
   items.map((item) => `${item.name} x${item.quantity}`).join(", ") ||
   "Order items";
 
-// eslint-disable-next-line react/prop-types
-export default function BuyerDashboard({ buyerId, refreshVersion = 0 }) {
+export default function BuyerDashboard({
+  // eslint-disable-next-line react/prop-types
+  buyerId,
+  // eslint-disable-next-line react/prop-types
+  refreshVersion = 0,
+  // eslint-disable-next-line react/prop-types
+  setRefreshVersion,
+}) {
   const [activeOrders, setActiveOrders] = useState([]);
   const [completedOrders, setCompletedOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -82,7 +101,9 @@ export default function BuyerDashboard({ buyerId, refreshVersion = 0 }) {
           Array.isArray(activeData.contracts) ? activeData.contracts : [],
         );
         setCompletedOrders(
-          Array.isArray(completedData.contracts) ? completedData.contracts : [],
+          Array.isArray(completedData.contracts)
+            ? completedData.contracts.filter(isCompletedOrder)
+            : [],
         );
       } catch (loadError) {
         if (loadError.name !== "AbortError") {
@@ -316,7 +337,8 @@ export default function BuyerDashboard({ buyerId, refreshVersion = 0 }) {
               </tr>
             ) : (
               completedOrders.map((order) => {
-                const completedAt = order.completedAt || order.updatedAt;
+                const completedAt =
+                  order.completedAt || order.updatedAt || order.createdAt;
 
                 return (
                   <tr key={order._id}>
@@ -334,7 +356,9 @@ export default function BuyerDashboard({ buyerId, refreshVersion = 0 }) {
                     <td>
                       <span
                         className={`buyer-dashboard__status ${
-                          statusClassNames[order.status] || ""
+                          statusClassNames[
+                            String(order.status || "").toUpperCase()
+                          ] || ""
                         }`}
                       >
                         {getStatusLabel(order.status)}
