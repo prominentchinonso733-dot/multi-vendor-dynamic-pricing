@@ -23,7 +23,8 @@ jobs:
       with:
         context: .
         push: true
-       tags: prominentchinonso2004/multi-vendor-app:latest
+        tags: prominentchinonso2004/multi-vendor-app:latest
+
     - name: Set up Kubernetes (Kind)
       uses: helm/kind-action@v1.8.0
       with:
