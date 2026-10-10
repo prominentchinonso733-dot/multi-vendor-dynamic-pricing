@@ -1,4 +1,5 @@
 import PropTypes from "prop-types";
+import { useNavigate } from "react-router-dom";
 
 const Navbar = ({
   cartCount,
@@ -8,6 +9,12 @@ const Navbar = ({
   isKycVerified,
   isVendor,
 }) => {
+  const navigate = useNavigate();
+  const selectTab = (tab) => {
+    setActiveTab(tab);
+    navigate("/");
+  };
+
   return (
     <nav
       style={{
@@ -30,7 +37,7 @@ const Navbar = ({
             cursor: "pointer",
             fontWeight: "bold",
           }}
-          onClick={() => setActiveTab("products")}
+          onClick={() => selectTab("products")}
         >
           Products
         </button>
@@ -42,7 +49,7 @@ const Navbar = ({
             cursor: "pointer",
             fontWeight: activeTab === "buyer" ? "bold" : "normal",
           }}
-          onClick={() => setActiveTab("buyer")}
+          onClick={() => selectTab("buyer")}
         >
           My Orders
         </button>
@@ -54,7 +61,7 @@ const Navbar = ({
             cursor: "pointer",
             fontWeight: activeTab === "seller" ? "bold" : "normal",
           }}
-          onClick={() => setActiveTab("seller")}
+          onClick={() => selectTab("seller")}
         >
           Seller Dashboard
         </button>
@@ -68,7 +75,7 @@ const Navbar = ({
               cursor: "pointer",
               fontWeight: activeTab === "vendor" ? "bold" : "normal",
             }}
-            onClick={() => setActiveTab("vendor")}
+            onClick={() => selectTab("vendor")}
           >
             Vendor Dashboard
           </button>
@@ -93,7 +100,7 @@ const Navbar = ({
             borderRadius: "4px",
             cursor: "pointer",
           }}
-          onClick={() => setActiveTab("kyc")}
+          onClick={() => selectTab("kyc")}
         >
           {isKycVerified ? "KYC Verified" : "4-Way KYC"}
         </button>

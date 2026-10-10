@@ -1,4 +1,5 @@
 import { useState, useEffect } from "react";
+import { Link } from "react-router-dom";
 import { getApiErrorMessage } from "../api";
 import { productsService } from "../services/productsService";
 
@@ -133,7 +134,31 @@ const ProductList = ({ onAddToCart }) => {
               </div>
             </div>
 
-            <div style={{ padding: "1rem", paddingTop: "0" }}>
+            <div
+              style={{
+                display: "grid",
+                gap: "0.6rem",
+                padding: "1rem",
+                paddingTop: "0",
+              }}
+            >
+              {product.vendorId && (
+                <Link
+                  to={`/store/${encodeURIComponent(product.vendorId)}`}
+                  style={{
+                    display: "block",
+                    padding: "0.65rem",
+                    border: "1px solid #2563eb",
+                    borderRadius: "6px",
+                    color: "#2563eb",
+                    fontWeight: "bold",
+                    textAlign: "center",
+                    textDecoration: "none",
+                  }}
+                >
+                  Visit Store
+                </Link>
+              )}
               <button
                 onClick={() => onAddToCart(product)}
                 style={{

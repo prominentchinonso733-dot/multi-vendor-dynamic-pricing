@@ -11,6 +11,14 @@ export const productsService = {
     return data.products;
   },
 
+  async getStore(vendorId, config = {}) {
+    const { data } = await api.get(
+      `/products/store/${encodeURIComponent(vendorId)}`,
+      config,
+    );
+    return data;
+  },
+
   async list(config = {}) {
     const { data } = await api.get("/products", config);
     return data;

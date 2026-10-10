@@ -35,6 +35,10 @@ response includes the saved `currentPrice`.
 vendor pricing dashboard. Admin accounts can use this endpoint to list all
 products.
 
+`GET /api/products/store/:vendorId` returns public store details and only the
+products owned by that vendor. The frontend storefront is available at
+`/store/:vendorId`.
+
 `POST /api/products` creates a product for the authenticated seller. Provide
 `title`, `basePrice`, `stock`, `priceFloor`, and `priceCeiling`; `description`,
 `category`, `demandScore`, and `competitorPrice` are optional. Product

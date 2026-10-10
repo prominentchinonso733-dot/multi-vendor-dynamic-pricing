@@ -1,10 +1,12 @@
 import { useState } from "react";
+import { Route, Routes } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import ProductList from "./components/ProductList";
 import CartDrawer from "./components/CartDrawer";
 import SellerDashboard from "./components/SellerDashboard";
 import VendorDashboard from "./components/VendorDashboard";
 import BuyerDashboard from "./components/BuyerDashboard";
+import VendorStorefront from "./components/VendorStorefront";
 import { useAuth } from "./context/AuthContext";
 
 const DEMO_BUYER_ID = "650000000000000000000000";
@@ -54,6 +56,20 @@ function App() {
   };
 
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  const tabContent =
+    activeTab === "vendor" && isVendor ? (
+      <VendorDashboard />
+    ) : activeTab === "seller" ? (
+      <SellerDashboard />
+    ) : activeTab === "buyer" ? (
+      <BuyerDashboard
+        buyerId={DEMO_BUYER_ID}
+        refreshVersion={ordersRefreshVersion}
+        setRefreshVersion={setOrdersRefreshVersion}
+      />
+    ) : (
+      <ProductList onAddToCart={addToCart} />
+    );
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -68,19 +84,13 @@ function App() {
       />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {activeTab === "vendor" && isVendor ? (
-          <VendorDashboard />
-        ) : activeTab === "seller" ? (
-          <SellerDashboard />
-        ) : activeTab === "buyer" ? (
-          <BuyerDashboard
-            buyerId={DEMO_BUYER_ID}
-            refreshVersion={ordersRefreshVersion}
-            setRefreshVersion={setOrdersRefreshVersion}
+        <Routes>
+          <Route
+            path="/store/:vendorId"
+            element={<VendorStorefront onAddToCart={addToCart} />}
           />
-        ) : (
-          <ProductList onAddToCart={addToCart} />
-        )}
+          <Route path="*" element={tabContent} />
+        </Routes>
       </main>
 
       <CartDrawer

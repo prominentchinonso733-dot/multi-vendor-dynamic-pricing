@@ -1,6 +1,8 @@
 const express = require("express");
 const Product = require("../models/Product");
+const User = require("../models/User");
 const authenticateToken = require("../middleware/authenticateToken");
+const mongoose = require("mongoose");
 
 const router = express.Router();
 
@@ -139,6 +141,57 @@ router.get("/mine", authenticateToken, async (req, res) => {
   }
 });
 
+router.get("/store/:vendorId", async (req, res) => {
+  const { vendorId } = req.params;
+  if (!mongoose.isValidObjectId(vendorId)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "A valid vendorId is required." });
+  }
+
+  try {
+    const vendor = await User.findById(vendorId)
+      .select("name email role vendorDetails.businessName vendorDetails.tier vendorDetails.isVerified createdAt")
+      .lean();
+    if (!vendor || !["SELLER", "ADMIN"].includes(vendor.role)) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Vendor store not found." });
+    }
+
+    const products = await Product.find({ vendor: vendor._id })
+      .sort({ createdAt: -1 })
+      .lean();
+
+    return res.json({
+      success: true,
+      vendor: {
+        id: vendor._id.toString(),
+        name: vendor.name,
+        email: vendor.email,
+        storeName: vendor.vendorDetails?.businessName || vendor.name,
+        tier: vendor.vendorDetails?.tier || null,
+        isVerified: Boolean(vendor.vendorDetails?.isVerified),
+        memberSince: vendor.createdAt,
+      },
+      products: products.map((product) => ({
+        ...product,
+        id: product._id.toString(),
+        name: product.title,
+        price: product.currentPrice,
+        vendorId: vendor._id.toString(),
+        vendor: vendor.vendorDetails?.businessName || vendor.name,
+      })),
+    });
+  } catch (error) {
+    console.error("Vendor storefront could not be loaded:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to load vendor store.",
+    });
+  }
+});
+
 router.get("/", async (_req, res) => {
   try {
     const products = await Product.find()
@@ -151,6 +204,7 @@ router.get("/", async (_req, res) => {
         id: product._id.toString(),
         name: product.title,
         price: product.currentPrice,
+        vendorId: product.vendor?._id?.toString(),
         vendor:
           product.vendor?.vendorDetails?.businessName ||
           product.vendor?.name ||
