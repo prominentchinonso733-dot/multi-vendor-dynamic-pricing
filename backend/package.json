@@ -5,7 +5,9 @@
   "scripts": {
     "start": "node server.js",
     "test": "echo \"Error: no test specified\" && exit 1",
-    "seed:admin": "node scripts/seedAdmin.js"
+    "seed:admin": "node scripts/seedAdmin.js",
+    "seed:sample-products": "node scripts/seedSampleProducts.js",
+    "reassign:products": "node scripts/reassignProductsToSeller.js"
   },
   "keywords": [],
   "author": "",

@@ -1,10 +1,12 @@
-/* eslint-disable react/prop-types */
+import PropTypes from "prop-types";
+
 const Navbar = ({
   cartCount,
   activeTab,
   setActiveTab,
   onOpenCart,
   isKycVerified,
+  isVendor,
 }) => {
   return (
     <nav
@@ -56,6 +58,21 @@ const Navbar = ({
         >
           Seller Dashboard
         </button>
+        {isVendor && (
+          <button
+            aria-current={activeTab === "vendor" ? "page" : undefined}
+            style={{
+              background: "none",
+              border: "none",
+              color: activeTab === "vendor" ? "#60a5fa" : "#fff",
+              cursor: "pointer",
+              fontWeight: activeTab === "vendor" ? "bold" : "normal",
+            }}
+            onClick={() => setActiveTab("vendor")}
+          >
+            Vendor Dashboard
+          </button>
+        )}
         <button
           style={{
             background: "none",
@@ -83,6 +100,15 @@ const Navbar = ({
       </div>
     </nav>
   );
+};
+
+Navbar.propTypes = {
+  cartCount: PropTypes.number.isRequired,
+  activeTab: PropTypes.string.isRequired,
+  setActiveTab: PropTypes.func.isRequired,
+  onOpenCart: PropTypes.func.isRequired,
+  isKycVerified: PropTypes.bool.isRequired,
+  isVendor: PropTypes.bool,
 };
 
 export default Navbar;

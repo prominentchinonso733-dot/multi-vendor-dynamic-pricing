@@ -12,6 +12,18 @@ const currencyFormatter = new Intl.NumberFormat("en-NG", {
   maximumFractionDigits: 2,
 });
 
+const initialProductDraft = {
+  title: "",
+  description: "",
+  category: "",
+  basePrice: "",
+  demandScore: "50",
+  stock: "0",
+  competitorPrice: "",
+  priceFloor: "",
+  priceCeiling: "",
+};
+
 const toDraft = (product) => ({
   basePrice: String(product.basePrice ?? ""),
   demandScore: String(product.demandScore ?? 0),
@@ -74,6 +86,11 @@ export default function VendorDashboard({ onPriceUpdated }) {
   const [loadError, setLoadError] = useState("");
   const [pendingProductId, setPendingProductId] = useState(null);
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [showCreateForm, setShowCreateForm] = useState(false);
+  const [createDraft, setCreateDraft] = useState(initialProductDraft);
+  const [createError, setCreateError] = useState("");
+  const [createNotice, setCreateNotice] = useState("");
+  const [createPending, setCreatePending] = useState(false);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -147,6 +164,80 @@ export default function VendorDashboard({ onPriceUpdated }) {
       ...currentResults,
       [productId]: null,
     }));
+  };
+
+  const updateCreateDraft = (field, value) => {
+    setCreateDraft((currentDraft) => ({ ...currentDraft, [field]: value }));
+    setCreateError("");
+    setCreateNotice("");
+  };
+
+  const createProduct = async (event) => {
+    event.preventDefault();
+    setCreateError("");
+    setCreateNotice("");
+
+    const basePrice = Number(createDraft.basePrice);
+    const demandScore = Number(createDraft.demandScore);
+    const stock = Number(createDraft.stock);
+    const priceFloor = Number(createDraft.priceFloor);
+    const priceCeiling = Number(createDraft.priceCeiling);
+    const competitorPrice =
+      createDraft.competitorPrice.trim() === ""
+        ? null
+        : Number(createDraft.competitorPrice);
+    const validationError =
+      !createDraft.title.trim()
+        ? "Product title is required."
+        : !Number.isFinite(basePrice) || basePrice <= 0
+          ? "Base price must be a positive number."
+          : !Number.isFinite(demandScore) ||
+              demandScore < 0 ||
+              demandScore > 100
+            ? "Demand score must be between 0 and 100."
+            : !Number.isInteger(stock) || stock < 0
+              ? "Stock must be a non-negative whole number."
+              : !Number.isFinite(priceFloor) || priceFloor <= 0
+                ? "Price floor must be a positive number."
+                : !Number.isFinite(priceCeiling) ||
+                    priceCeiling <= 0 ||
+                    priceCeiling < priceFloor
+                  ? "Price ceiling must be greater than or equal to the price floor."
+                  : competitorPrice !== null &&
+                      (!Number.isFinite(competitorPrice) ||
+                        competitorPrice <= 0)
+                    ? "Competitor price must be a positive number, or leave it blank."
+                    : null;
+
+    if (validationError) {
+      setCreateError(validationError);
+      return;
+    }
+
+    setCreatePending(true);
+    try {
+      await productsService.create({
+        title: createDraft.title.trim(),
+        description: createDraft.description.trim(),
+        category: createDraft.category.trim(),
+        basePrice,
+        demandScore,
+        stock,
+        competitorPrice,
+        priceFloor,
+        priceCeiling,
+      });
+      setCreateDraft(initialProductDraft);
+      setShowCreateForm(false);
+      setCreateNotice("Product created. It is now available in your pricing list.");
+      setRefreshVersion((version) => version + 1);
+    } catch (error) {
+      setCreateError(
+        getApiErrorMessage(error, "Unable to create this product."),
+      );
+    } finally {
+      setCreatePending(false);
+    }
   };
 
   const recalculatePrice = async (event, product) => {
@@ -254,7 +345,187 @@ export default function VendorDashboard({ onPriceUpdated }) {
           />
           Refresh products
         </button>
+        <button
+          className="vendor-pricing__calculate"
+          disabled={createPending || loading}
+          onClick={() => {
+            setShowCreateForm((visible) => !visible);
+            setCreateError("");
+            setCreateNotice("");
+          }}
+          type="button"
+        >
+          {showCreateForm ? "Cancel" : "Add product"}
+        </button>
       </header>
+
+      {createNotice && (
+        <div
+          className="vendor-pricing__message vendor-pricing__message--success"
+          role="status"
+        >
+          <CheckCircle2 aria-hidden="true" size={18} />
+          <span>{createNotice}</span>
+        </div>
+      )}
+
+      {showCreateForm && (
+        <form
+          className="vendor-pricing__create-form"
+          onSubmit={createProduct}
+        >
+          <div className="vendor-pricing__create-heading">
+            <div>
+              <h2>Create a product</h2>
+              <p>
+                Set the product details and initial pricing limits. You can
+                adjust them later.
+              </p>
+            </div>
+          </div>
+          <label className="vendor-pricing__field">
+            <span>Product name</span>
+            <input
+              autoComplete="off"
+              maxLength="160"
+              onChange={(event) =>
+                updateCreateDraft("title", event.target.value)
+              }
+              required
+              value={createDraft.title}
+            />
+          </label>
+          <label className="vendor-pricing__field">
+            <span>Category (optional)</span>
+            <input
+              maxLength="80"
+              onChange={(event) =>
+                updateCreateDraft("category", event.target.value)
+              }
+              value={createDraft.category}
+            />
+          </label>
+          <label className="vendor-pricing__field vendor-pricing__field--wide">
+            <span>Description (optional)</span>
+            <textarea
+              maxLength="2000"
+              onChange={(event) =>
+                updateCreateDraft("description", event.target.value)
+              }
+              rows="3"
+              value={createDraft.description}
+            />
+          </label>
+          <label className="vendor-pricing__field">
+            <span>Base price (₦)</span>
+            <input
+              min="0.01"
+              onChange={(event) =>
+                updateCreateDraft("basePrice", event.target.value)
+              }
+              required
+              step="0.01"
+              type="number"
+              value={createDraft.basePrice}
+            />
+          </label>
+          <label className="vendor-pricing__field vendor-pricing__field--demand">
+            <span>
+              Demand score <strong>{createDraft.demandScore}</strong>
+            </span>
+            <input
+              aria-label="New product demand score from 0 to 100"
+              max="100"
+              min="0"
+              onChange={(event) =>
+                updateCreateDraft("demandScore", event.target.value)
+              }
+              type="range"
+              value={createDraft.demandScore}
+            />
+            <input
+              aria-label="New product demand score number from 0 to 100"
+              max="100"
+              min="0"
+              onChange={(event) =>
+                updateCreateDraft("demandScore", event.target.value)
+              }
+              required
+              step="1"
+              type="number"
+              value={createDraft.demandScore}
+            />
+          </label>
+          <label className="vendor-pricing__field">
+            <span>Stock quantity</span>
+            <input
+              min="0"
+              onChange={(event) =>
+                updateCreateDraft("stock", event.target.value)
+              }
+              required
+              step="1"
+              type="number"
+              value={createDraft.stock}
+            />
+          </label>
+          <label className="vendor-pricing__field">
+            <span>Competitor price (₦, optional)</span>
+            <input
+              min="0.01"
+              onChange={(event) =>
+                updateCreateDraft("competitorPrice", event.target.value)
+              }
+              step="0.01"
+              type="number"
+              value={createDraft.competitorPrice}
+            />
+          </label>
+          <label className="vendor-pricing__field">
+            <span>Price floor (₦)</span>
+            <input
+              min="0.01"
+              onChange={(event) =>
+                updateCreateDraft("priceFloor", event.target.value)
+              }
+              required
+              step="0.01"
+              type="number"
+              value={createDraft.priceFloor}
+            />
+          </label>
+          <label className="vendor-pricing__field">
+            <span>Price ceiling (₦)</span>
+            <input
+              min="0.01"
+              onChange={(event) =>
+                updateCreateDraft("priceCeiling", event.target.value)
+              }
+              required
+              step="0.01"
+              type="number"
+              value={createDraft.priceCeiling}
+            />
+          </label>
+
+          {createError && (
+            <div
+              className="vendor-pricing__message vendor-pricing__message--error vendor-pricing__form-message"
+              role="alert"
+            >
+              <AlertCircle aria-hidden="true" size={18} />
+              <span>{createError}</span>
+            </div>
+          )}
+          <button
+            className="vendor-pricing__calculate vendor-pricing__create-submit"
+            disabled={createPending}
+            type="submit"
+          >
+            {createPending ? "Creating product..." : "Create product"}
+          </button>
+        </form>
+      )}
 
       {loadError && (
         <div className="vendor-pricing__message vendor-pricing__message--error" role="alert">

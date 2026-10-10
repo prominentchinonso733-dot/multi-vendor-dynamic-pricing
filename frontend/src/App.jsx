@@ -5,10 +5,13 @@ import CartDrawer from "./components/CartDrawer";
 import SellerDashboard from "./components/SellerDashboard";
 import VendorDashboard from "./components/VendorDashboard";
 import BuyerDashboard from "./components/BuyerDashboard";
+import { useAuth } from "./context/AuthContext";
 
 const DEMO_BUYER_ID = "650000000000000000000000";
 
 function App() {
+  const { isAuthenticated, role } = useAuth();
+  const isVendor = isAuthenticated && role === "SELLER";
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
@@ -61,14 +64,14 @@ function App() {
         setActiveTab={setActiveTab}
         isKycVerified={isKycVerified}
         setIsKycVerified={setIsKycVerified}
+        isVendor={isVendor}
       />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
-        {activeTab === "seller" ? (
-          <>
-            <VendorDashboard />
-            <SellerDashboard />
-          </>
+        {activeTab === "vendor" && isVendor ? (
+          <VendorDashboard />
+        ) : activeTab === "seller" ? (
+          <SellerDashboard />
         ) : activeTab === "buyer" ? (
           <BuyerDashboard
             buyerId={DEMO_BUYER_ID}

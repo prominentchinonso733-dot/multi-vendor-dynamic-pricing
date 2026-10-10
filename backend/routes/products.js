@@ -4,6 +4,120 @@ const authenticateToken = require("../middleware/authenticateToken");
 
 const router = express.Router();
 
+router.post("/", authenticateToken, async (req, res) => {
+  if (req.user.role !== "SELLER") {
+    return res
+      .status(403)
+      .json({ success: false, message: "Seller role required." });
+  }
+
+  const {
+    title,
+    description,
+    category,
+    basePrice,
+    stock,
+    demandScore = 0,
+    priceFloor,
+    priceCeiling,
+    competitorPrice,
+  } = req.body || {};
+
+  if (typeof title !== "string" || !title.trim()) {
+    return res
+      .status(400)
+      .json({ success: false, message: "A product title is required." });
+  }
+
+  const numericFields = {
+    basePrice,
+    stock,
+    demandScore,
+    priceFloor,
+    priceCeiling,
+  };
+  if (
+    Object.entries(numericFields).some(
+      ([field, value]) =>
+        typeof value !== "number" || !Number.isFinite(value),
+    )
+  ) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Base price, stock, demand score, price floor, and price ceiling must be finite numbers.",
+    });
+  }
+  if (basePrice <= 0 || priceFloor <= 0 || priceCeiling <= 0) {
+    return res.status(400).json({
+      success: false,
+      message: "Base price, price floor, and price ceiling must be positive.",
+    });
+  }
+  if (priceFloor > priceCeiling || stock < 0 || !Number.isInteger(stock)) {
+    return res.status(400).json({
+      success: false,
+      message:
+        "Price floor cannot exceed price ceiling, and stock must be a non-negative whole number.",
+    });
+  }
+  if (demandScore < 0 || demandScore > 100) {
+    return res.status(400).json({
+      success: false,
+      message: "Demand score must be between 0 and 100.",
+    });
+  }
+  if (
+    competitorPrice !== undefined &&
+    competitorPrice !== null &&
+    (typeof competitorPrice !== "number" ||
+      !Number.isFinite(competitorPrice) ||
+      competitorPrice <= 0)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Competitor price must be a positive number when provided.",
+    });
+  }
+  if (
+    (description !== undefined && typeof description !== "string") ||
+    (category !== undefined && typeof category !== "string")
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Description and category must be text.",
+    });
+  }
+
+  try {
+    const currentPrice = Math.min(
+      priceCeiling,
+      Math.max(priceFloor, basePrice),
+    );
+    const product = await Product.create({
+      vendor: req.user._id,
+      title: title.trim(),
+      description: description?.trim() || "",
+      category: category?.trim() || "",
+      basePrice,
+      currentPrice,
+      stock,
+      demandScore,
+      priceFloor,
+      priceCeiling,
+      competitorPrice: competitorPrice ?? undefined,
+    });
+
+    return res.status(201).json({ success: true, product });
+  } catch (error) {
+    console.error("Vendor product could not be created:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to create product.",
+    });
+  }
+});
+
 router.get("/mine", authenticateToken, async (req, res) => {
   if (!["SELLER", "ADMIN"].includes(req.user.role)) {
     return res
@@ -13,7 +127,7 @@ router.get("/mine", authenticateToken, async (req, res) => {
 
   try {
     const filter =
-      req.user.role === "ADMIN" ? {} : { vendor: req.user.id };
+      req.user.role === "ADMIN" ? {} : { vendor: req.user._id };
     const products = await Product.find(filter).sort({ updatedAt: -1 }).lean();
     return res.json({ success: true, products });
   } catch (error) {
@@ -25,45 +139,31 @@ router.get("/mine", authenticateToken, async (req, res) => {
   }
 });
 
-router.get("/", (_req, res) => {
-  res.json([
-    {
-      id: 1,
-      name: "Wireless Noise-Canceling Headphones",
-      vendor: "TechStore Ltd",
-      price: 45000,
-      image:
-        "https://images.unsplash.com/photo-1505740420928-5e560c06d30e?auto=format&fit=crop&w=600&q=80",
-      category: "Electronics",
-    },
-    {
-      id: 2,
-      name: "Smartwatch Series 7 (OLED)",
-      vendor: "GadgetHub",
-      price: 85000,
-      image:
-        "https://images.unsplash.com/photo-1523275335684-37898b6baf30?auto=format&fit=crop&w=600&q=80",
-      category: "Gadgets",
-    },
-    {
-      id: 3,
-      name: "Minimalist Leather Backpack",
-      vendor: "Urban Style",
-      price: 32000,
-      image:
-        "https://images.unsplash.com/photo-1553062407-98eeb64c6a62?auto=format&fit=crop&w=600&q=80",
-      category: "Fashion",
-    },
-    {
-      id: 4,
-      name: "Mechanical Gaming Keyboard",
-      vendor: "TechStore Ltd",
-      price: 28000,
-      image:
-        "https://images.unsplash.com/photo-1587829741301-dc798b83add3?auto=format&fit=crop&w=600&q=80",
-      category: "Electronics",
-    },
-  ]);
+router.get("/", async (_req, res) => {
+  try {
+    const products = await Product.find()
+      .populate("vendor", "name vendorDetails.businessName")
+      .sort({ createdAt: -1 })
+      .lean();
+    return res.json(
+      products.map((product) => ({
+        ...product,
+        id: product._id.toString(),
+        name: product.title,
+        price: product.currentPrice,
+        vendor:
+          product.vendor?.vendorDetails?.businessName ||
+          product.vendor?.name ||
+          "Marketplace seller",
+      })),
+    );
+  } catch (error) {
+    console.error("Marketplace products could not be loaded:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to load marketplace products.",
+    });
+  }
 });
 
 module.exports = router;

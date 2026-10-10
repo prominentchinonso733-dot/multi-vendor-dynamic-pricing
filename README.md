@@ -34,3 +34,19 @@ response includes the saved `currentPrice`.
 `GET /api/products/mine` returns the authenticated seller's products for the
 vendor pricing dashboard. Admin accounts can use this endpoint to list all
 products.
+
+`POST /api/products` creates a product for the authenticated seller. Provide
+`title`, `basePrice`, `stock`, `priceFloor`, and `priceCeiling`; `description`,
+`category`, `demandScore`, and `competitorPrice` are optional. Product
+ownership is assigned from the authenticated token, not from request data.
+
+To reassign all existing products to an account, configure `MONGO_URI`
+and run `npm --prefix backend run reassign:products -- <USER_ID>
+--confirm-reassign-all`. The command only proceeds when the ID belongs to an
+existing account with the `SELLER` or `ADMIN` role. This operation transfers
+ownership of every existing product document, including products currently
+assigned to other sellers.
+
+Run `npm --prefix backend run seed:sample-products` to idempotently insert the
+four example marketplace products for `prominentchinonso733@gmail.com`. The
+public `GET /api/products` endpoint reads product documents from MongoDB.
