@@ -3,6 +3,7 @@ import Navbar from "./components/Navbar";
 import ProductList from "./components/ProductList";
 import CartDrawer from "./components/CartDrawer";
 import SellerDashboard from "./components/SellerDashboard";
+import VendorDashboard from "./components/VendorDashboard";
 import BuyerDashboard from "./components/BuyerDashboard";
 
 const DEMO_BUYER_ID = "650000000000000000000000";
@@ -64,7 +65,10 @@ function App() {
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         {activeTab === "seller" ? (
-          <SellerDashboard />
+          <>
+            <VendorDashboard />
+            <SellerDashboard />
+          </>
         ) : activeTab === "buyer" ? (
           <BuyerDashboard
             buyerId={DEMO_BUYER_ID}

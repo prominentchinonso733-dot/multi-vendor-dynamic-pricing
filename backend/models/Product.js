@@ -17,6 +17,7 @@ const ProductSchema = new mongoose.Schema(
     currentPrice: { type: Number, required: true },
     priceFloor: { type: Number, required: true }, // Seller minimum limit
     priceCeiling: { type: Number, required: true }, // Seller maximum limit
+    competitorPrice: { type: Number },
 
     demandScore: { type: Number, default: 0 },
   },

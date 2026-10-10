@@ -19,8 +19,10 @@ A modern web application that enables multiple vendors to list and sell products
 
 `POST /api/pricing/calculate` recalculates and saves a seller's product price.
 Send a bearer token for a seller account (or an admin account) and a JSON body
-containing `productId` and, optionally, a positive numeric `competitorPrice`.
-Sellers can only reprice their own products.
+containing `productId` and the editable pricing values `basePrice`,
+`demandScore`, `stock`, `priceFloor`, and `priceCeiling`. A positive numeric
+`competitorPrice` is optional. Recalculation saves these values and the
+calculated `currentPrice`. Sellers can only reprice their own products.
 
 The calculation starts from `basePrice` or the lower of `basePrice` and
 `competitorPrice`, applies a demand adjustment of up to 10% based on
@@ -28,3 +30,7 @@ The calculation starts from `basePrice` or the lower of `basePrice` and
 subtracts 5% when stock is at least 50. The result is rounded to two decimal
 places and clamped to the product's `priceFloor` and `priceCeiling`. The
 response includes the saved `currentPrice`.
+
+`GET /api/products/mine` returns the authenticated seller's products for the
+vendor pricing dashboard. Admin accounts can use this endpoint to list all
+products.

@@ -1,5 +1,29 @@
 const express = require("express");
+const Product = require("../models/Product");
+const authenticateToken = require("../middleware/authenticateToken");
+
 const router = express.Router();
+
+router.get("/mine", authenticateToken, async (req, res) => {
+  if (!["SELLER", "ADMIN"].includes(req.user.role)) {
+    return res
+      .status(403)
+      .json({ success: false, message: "Seller or admin role required." });
+  }
+
+  try {
+    const filter =
+      req.user.role === "ADMIN" ? {} : { vendor: req.user.id };
+    const products = await Product.find(filter).sort({ updatedAt: -1 }).lean();
+    return res.json({ success: true, products });
+  } catch (error) {
+    console.error("Vendor products could not be loaded:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to load vendor products.",
+    });
+  }
+});
 
 router.get("/", (_req, res) => {
   res.json([

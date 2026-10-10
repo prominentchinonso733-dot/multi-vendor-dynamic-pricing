@@ -1,34 +1,9 @@
 const express = require("express");
-const jwt = require("jsonwebtoken");
 const mongoose = require("mongoose");
 const Product = require("../models/Product");
+const authenticateToken = require("../middleware/authenticateToken");
 
 const router = express.Router();
-
-const authenticateToken = (req, res, next) => {
-  const authorization = req.headers.authorization || "";
-  const [scheme, token] = authorization.split(" ");
-
-  if (scheme !== "Bearer" || !token) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Authentication required." });
-  }
-  if (!process.env.JWT_SECRET) {
-    return res
-      .status(500)
-      .json({ success: false, message: "Authentication is not configured." });
-  }
-
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    return next();
-  } catch {
-    return res
-      .status(401)
-      .json({ success: false, message: "Invalid or expired token." });
-  }
-};
 
 router.post("/calculate", authenticateToken, async (req, res) => {
   if (!["SELLER", "ADMIN"].includes(req.user.role)) {
@@ -37,17 +12,44 @@ router.post("/calculate", authenticateToken, async (req, res) => {
       .json({ success: false, message: "Seller or admin role required." });
   }
 
-  const { productId, competitorPrice } = req.body || {};
+  const {
+    productId,
+    competitorPrice,
+    basePrice: requestedBasePrice,
+    demandScore: requestedDemandScore,
+    stock: requestedStock,
+    priceFloor: requestedPriceFloor,
+    priceCeiling: requestedPriceCeiling,
+  } = req.body || {};
   if (typeof productId !== "string" || !mongoose.isValidObjectId(productId)) {
     return res
       .status(400)
       .json({ success: false, message: "A valid productId is required." });
   }
+  const optionalNumbers = {
+    competitorPrice,
+    basePrice: requestedBasePrice,
+    demandScore: requestedDemandScore,
+    stock: requestedStock,
+    priceFloor: requestedPriceFloor,
+    priceCeiling: requestedPriceCeiling,
+  };
+  const invalidNumber = Object.entries(optionalNumbers).find(
+    ([key, value]) =>
+      value !== undefined &&
+      value !== null &&
+      (typeof value !== "number" || !Number.isFinite(value)),
+  );
+  if (invalidNumber) {
+    return res.status(400).json({
+      success: false,
+      message: `${invalidNumber[0]} must be a finite number.`,
+    });
+  }
   if (
     competitorPrice !== undefined &&
-    (typeof competitorPrice !== "number" ||
-      !Number.isFinite(competitorPrice) ||
-      competitorPrice <= 0)
+    competitorPrice !== null &&
+    competitorPrice <= 0
   ) {
     return res.status(400).json({
       success: false,
@@ -68,24 +70,29 @@ router.post("/calculate", authenticateToken, async (req, res) => {
     ) {
       return res
         .status(403)
-        .json({ success: false, message: "You can only reprice your products." });
+        .json({
+          success: false,
+          message: "You can only reprice your products.",
+        });
     }
 
-    const {
-      basePrice,
-      priceFloor,
-      priceCeiling,
-      demandScore,
-      stock,
-    } = product;
+    const basePrice = requestedBasePrice ?? product.basePrice;
+    const priceFloor = requestedPriceFloor ?? product.priceFloor;
+    const priceCeiling = requestedPriceCeiling ?? product.priceCeiling;
+    const demandScore = requestedDemandScore ?? product.demandScore;
+    const stock = requestedStock ?? product.stock;
     if (
       ![basePrice, priceFloor, priceCeiling, demandScore, stock].every(
         Number.isFinite,
       ) ||
       basePrice <= 0 ||
       priceFloor <= 0 ||
+      priceCeiling <= 0 ||
       priceFloor > priceCeiling ||
-      stock < 0
+      demandScore < 0 ||
+      demandScore > 100 ||
+      stock < 0 ||
+      !Number.isInteger(stock)
     ) {
       return res.status(422).json({
         success: false,
@@ -98,9 +105,12 @@ router.post("/calculate", authenticateToken, async (req, res) => {
     const stockMultiplier =
       stock >= 1 && stock <= 5 ? 1.05 : stock >= 50 ? 0.95 : 1;
     const referencePrice =
-      competitorPrice === undefined
+      competitorPrice === undefined || competitorPrice === null
         ? basePrice
         : Math.min(basePrice, competitorPrice);
+    const demandAdjustmentPercent = (normalizedDemand - 50) / 5;
+    const stockAdjustmentPercent =
+      stock >= 1 && stock <= 5 ? 5 : stock >= 50 ? -5 : 0;
     const calculatedPrice = referencePrice * demandMultiplier * stockMultiplier;
     const roundedPrice = Math.round(calculatedPrice * 100) / 100;
     const currentPrice = Math.min(
@@ -108,6 +118,19 @@ router.post("/calculate", authenticateToken, async (req, res) => {
       Math.max(priceFloor, roundedPrice),
     );
 
+    const floorCeilingStatus =
+      roundedPrice <= priceFloor
+        ? "FLOOR"
+        : roundedPrice >= priceCeiling
+          ? "CEILING"
+          : "WITHIN_RANGE";
+
+    product.basePrice = basePrice;
+    product.demandScore = normalizedDemand;
+    product.stock = stock;
+    product.priceFloor = priceFloor;
+    product.priceCeiling = priceCeiling;
+    product.competitorPrice = competitorPrice ?? null;
     product.currentPrice = currentPrice;
     await product.save();
 
@@ -118,7 +141,20 @@ router.post("/calculate", authenticateToken, async (req, res) => {
       competitorPrice: competitorPrice ?? null,
       demandScore: normalizedDemand,
       stock,
+      priceFloor,
+      priceCeiling,
+      referencePrice,
+      calculatedPrice: roundedPrice,
       currentPrice,
+      adjustments: {
+        competitorPriceApplied:
+          competitorPrice !== undefined &&
+          competitorPrice !== null &&
+          competitorPrice < basePrice,
+        demandPercent: demandAdjustmentPercent,
+        stockPercent: stockAdjustmentPercent,
+      },
+      floorCeilingStatus,
     });
   } catch (error) {
     console.error("Dynamic pricing calculation failed:", error);
