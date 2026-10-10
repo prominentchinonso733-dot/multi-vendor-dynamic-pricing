@@ -14,3 +14,17 @@ A modern web application that enables multiple vendors to list and sell products
 - **Database:** MongoDB
 - **Payment & APIs:** Paystack API
 -
+
+## Dynamic Pricing API
+
+`POST /api/pricing/calculate` recalculates and saves a seller's product price.
+Send a bearer token for a seller account (or an admin account) and a JSON body
+containing `productId` and, optionally, a positive numeric `competitorPrice`.
+Sellers can only reprice their own products.
+
+The calculation starts from `basePrice` or the lower of `basePrice` and
+`competitorPrice`, applies a demand adjustment of up to 10% based on
+`demandScore` (0–100, with 50 neutral), adds 5% when stock is 1–5, and
+subtracts 5% when stock is at least 50. The result is rounded to two decimal
+places and clamped to the product's `priceFloor` and `priceCeiling`. The
+response includes the saved `currentPrice`.

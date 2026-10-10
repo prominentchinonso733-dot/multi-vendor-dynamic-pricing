@@ -24,10 +24,12 @@ app.use(
 const escrowRoutes = require("./routes/escrowRoutes");
 const authRoutes = require("./routes/auth");
 const productsRoutes = require("./routes/products");
+const pricingRoutes = require("./routes/pricingRoutes");
 const webhookRoutes = require("./routes/webhooks");
 app.use("/api/auth", authRoutes);
 app.use("/api/escrow", escrowRoutes);
 app.use("/api/products", productsRoutes);
+app.use("/api/pricing", pricingRoutes);
 app.use("/api/webhooks", webhookRoutes);
 
 const frontendDistPath = path.resolve(__dirname, "..", "frontend", "dist");

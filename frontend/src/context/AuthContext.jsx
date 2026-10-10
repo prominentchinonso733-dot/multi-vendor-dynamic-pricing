@@ -1,7 +1,6 @@
 import { createContext, useCallback, useContext, useState } from "react";
-import { API_BASE_URL } from "../api";
+import { authService } from "../services/authService";
 
-const AUTH_API = `${API_BASE_URL}/auth`;
 const AuthContext = createContext(null);
 
 const readStoredAuth = () => {
@@ -26,32 +25,10 @@ export function AuthProvider({ children }) {
     return data.user;
   };
 
-  const submitCredentials = async (path, credentials) => {
-    const response = await fetch(`${AUTH_API}/${path}`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(credentials),
-    });
-
-    const contentType = response.headers.get("content-type") || "";
-    if (!contentType.includes("application/json")) {
-      throw new Error(
-        response.status === 404
-          ? "Authentication API route not found. Restart the backend server and try again."
-          : `Authentication API returned a non-JSON response (HTTP ${response.status}).`,
-      );
-    }
-
-    const data = await response.json();
-
-    if (!response.ok) {
-      throw new Error(data.msg || data.error || "Authentication failed.");
-    }
-    return saveAuth(data);
-  };
-
-  const login = (credentials) => submitCredentials("login", credentials);
-  const register = (details) => submitCredentials("register", details);
+  const login = async (credentials) =>
+    saveAuth(await authService.login(credentials));
+  const register = async (details) =>
+    saveAuth(await authService.register(details));
   const logout = () => {
     localStorage.removeItem("authToken");
     localStorage.removeItem("authUser");

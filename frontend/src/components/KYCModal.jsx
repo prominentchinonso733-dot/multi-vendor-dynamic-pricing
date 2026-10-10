@@ -1,4 +1,4 @@
-import React, { useState } from "react";
+import { useState } from "react";
 
 const KYCModal = () => {
   const [formData, setFormData] = useState({
@@ -142,7 +142,7 @@ const KYCModal = () => {
             >
               <option value="NIN">National Identification Number (NIN)</option>
               <option value="BVN">Bank Verification Number (BVN)</option>
-              <option value="DriversLicense">Driver's License</option>
+              <option value="DriversLicense">Driver&apos;s License</option>
               <option value="Passport">International Passport</option>
             </select>
           </div>

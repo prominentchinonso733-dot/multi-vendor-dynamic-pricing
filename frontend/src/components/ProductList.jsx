@@ -1,27 +1,30 @@
-import React, { useState, useEffect } from "react";
-import { API_BASE_URL } from "../api";
+import { useState, useEffect } from "react";
+import { getApiErrorMessage } from "../api";
+import { productsService } from "../services/productsService";
 
+// eslint-disable-next-line react/prop-types
 const ProductList = ({ onAddToCart }) => {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
 
   useEffect(() => {
-    fetch(`${API_BASE_URL}/products`)
-      .then((res) => {
-        if (!res.ok) {
-          throw new Error("Failed to fetch products from backend");
-        }
-        return res.json();
-      })
+    const controller = new AbortController();
+
+    productsService
+      .list({ signal: controller.signal })
       .then((data) => {
         setProducts(data);
         setLoading(false);
       })
       .catch((err) => {
-        setError(err.message);
-        setLoading(false);
+        if (!controller.signal.aborted) {
+          setError(getApiErrorMessage(err, "Failed to fetch products."));
+          setLoading(false);
+        }
       });
+
+    return () => controller.abort();
   }, []);
 
   if (loading) {
