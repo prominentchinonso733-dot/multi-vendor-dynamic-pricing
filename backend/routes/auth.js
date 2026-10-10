@@ -3,6 +3,32 @@ const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const authenticateToken = require("../middleware/authenticateToken");
+
+const storeProfileFields = [
+  "storeName",
+  "storeLogo",
+  "storeBanner",
+  "storeDescription",
+];
+
+const toStoreProfile = (user) => ({
+  storeName:
+    user.storeName || user.vendorDetails?.businessName || user.name || "",
+  storeLogo: user.storeLogo || "",
+  storeBanner: user.storeBanner || "",
+  storeDescription: user.storeDescription || "",
+});
+
+const isValidImageUrl = (value) => {
+  if (!value) return true;
+  try {
+    const url = new URL(value);
+    return ["http:", "https:"].includes(url.protocol);
+  } catch {
+    return false;
+  }
+};
 
 const normalizeRole = (role) =>
   ({
@@ -99,6 +125,120 @@ router.post("/login", async (req, res) => {
     res.json({ token, user: toPublicUser(user) });
   } catch (err) {
     res.status(500).json({ error: err.message });
+  }
+});
+
+router.get("/profile", authenticateToken, async (req, res) => {
+  if (req.user.role !== "SELLER") {
+    return res
+      .status(403)
+      .json({ success: false, message: "Seller role required." });
+  }
+
+  try {
+    const user = await User.findById(req.user._id)
+      .select(
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName",
+      )
+      .lean();
+    if (!user || user.role !== "SELLER") {
+      return res
+        .status(404)
+        .json({ success: false, message: "Seller profile not found." });
+    }
+
+    return res.json({
+      success: true,
+      profile: {
+        name: user.name,
+        email: user.email,
+        ...toStoreProfile(user),
+      },
+    });
+  } catch (error) {
+    console.error("Seller store profile could not be loaded:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to load store profile.",
+    });
+  }
+});
+
+router.put("/profile", authenticateToken, async (req, res) => {
+  if (req.user.role !== "SELLER") {
+    return res
+      .status(403)
+      .json({ success: false, message: "Seller role required." });
+  }
+
+  const updates = {};
+  for (const field of storeProfileFields) {
+    const value = req.body?.[field];
+    if (typeof value !== "string") {
+      return res.status(400).json({
+        success: false,
+        message: `${field} must be a string.`,
+      });
+    }
+    updates[field] = value.trim();
+  }
+
+  if (!updates.storeName) {
+    return res.status(400).json({
+      success: false,
+      message: "Store name is required.",
+    });
+  }
+  if (updates.storeLogo.length > 2048 || !isValidImageUrl(updates.storeLogo)) {
+    return res.status(400).json({
+      success: false,
+      message: "Store logo must be a valid HTTP or HTTPS URL.",
+    });
+  }
+  if (
+    updates.storeBanner.length > 2048 ||
+    !isValidImageUrl(updates.storeBanner)
+  ) {
+    return res.status(400).json({
+      success: false,
+      message: "Store banner must be a valid HTTP or HTTPS URL.",
+    });
+  }
+  if (updates.storeName.length > 100) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Store name is too long." });
+  }
+  if (updates.storeDescription.length > 1000) {
+    return res
+      .status(400)
+      .json({ success: false, message: "Store description is too long." });
+  }
+
+  try {
+    const user = await User.findOneAndUpdate(
+      { _id: req.user._id, role: "SELLER" },
+      { $set: updates },
+      { new: true, runValidators: true },
+    )
+      .select("name email role storeName storeLogo storeBanner storeDescription")
+      .lean();
+    if (!user) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Seller profile not found." });
+    }
+
+    return res.json({
+      success: true,
+      profile: { name: user.name, email: user.email, ...toStoreProfile(user) },
+    });
+  } catch (error) {
+    console.error("Seller store profile could not be updated:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to save store settings.",
+    });
   }
 });
 

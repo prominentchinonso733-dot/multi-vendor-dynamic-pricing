@@ -151,7 +151,9 @@ router.get("/store/:vendorId", async (req, res) => {
 
   try {
     const vendor = await User.findById(vendorId)
-      .select("name email role vendorDetails.businessName vendorDetails.tier vendorDetails.isVerified createdAt")
+      .select(
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.tier vendorDetails.isVerified createdAt",
+      )
       .lean();
     if (!vendor || !["SELLER", "ADMIN"].includes(vendor.role)) {
       return res
@@ -169,7 +171,11 @@ router.get("/store/:vendorId", async (req, res) => {
         id: vendor._id.toString(),
         name: vendor.name,
         email: vendor.email,
-        storeName: vendor.vendorDetails?.businessName || vendor.name,
+        storeName:
+          vendor.storeName || vendor.vendorDetails?.businessName || vendor.name,
+        storeLogo: vendor.storeLogo || "",
+        storeBanner: vendor.storeBanner || "",
+        storeDescription: vendor.storeDescription || "",
         tier: vendor.vendorDetails?.tier || null,
         isVerified: Boolean(vendor.vendorDetails?.isVerified),
         memberSince: vendor.createdAt,
@@ -180,7 +186,10 @@ router.get("/store/:vendorId", async (req, res) => {
         name: product.title,
         price: product.currentPrice,
         vendorId: vendor._id.toString(),
-        vendor: vendor.vendorDetails?.businessName || vendor.name,
+        vendor:
+          vendor.storeName ||
+          vendor.vendorDetails?.businessName ||
+          vendor.name,
       })),
     });
   } catch (error) {
@@ -195,7 +204,10 @@ router.get("/store/:vendorId", async (req, res) => {
 router.get("/", async (_req, res) => {
   try {
     const products = await Product.find()
-      .populate("vendor", "name vendorDetails.businessName")
+      .populate(
+        "vendor",
+        "name storeName vendorDetails.businessName",
+      )
       .sort({ createdAt: -1 })
       .lean();
     return res.json(
@@ -206,6 +218,7 @@ router.get("/", async (_req, res) => {
         price: product.currentPrice,
         vendorId: product.vendor?._id?.toString(),
         vendor:
+          product.vendor?.storeName ||
           product.vendor?.vendorDetails?.businessName ||
           product.vendor?.name ||
           "Marketplace seller",

@@ -20,6 +20,35 @@
   border-bottom: 1px solid #dce5e5;
 }
 
+.vendor-pricing__tabs {
+  display: flex;
+  gap: 8px;
+  margin: 18px 0;
+  border-bottom: 1px solid #dce5e5;
+}
+
+.vendor-pricing__tab {
+  padding: 11px 14px;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  color: #5c6f76;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vendor-pricing__tab--active {
+  border-bottom-color: #14786f;
+  color: #14786f;
+}
+
+.vendor-pricing__tab:focus-visible {
+  outline: 2px solid #14786f;
+  outline-offset: -2px;
+}
+
 .vendor-pricing__eyebrow {
   margin: 0 0 8px;
   color: #14786f;
@@ -166,6 +195,85 @@
   color: #172b36;
   font: inherit;
   resize: vertical;
+}
+
+.vendor-pricing__settings {
+  padding: 22px;
+  border: 1px solid #dce5e5;
+  background: #fff;
+}
+
+.vendor-pricing__settings-heading {
+  padding-bottom: 16px;
+  border-bottom: 1px solid #e6eded;
+}
+
+.vendor-pricing__settings-heading h2 {
+  margin: 0;
+  color: #203943;
+  font-size: 1.15rem;
+}
+
+.vendor-pricing__settings-heading p:not(.vendor-pricing__eyebrow) {
+  margin: 7px 0 0;
+  color: #5c6f76;
+  font-size: 0.88rem;
+}
+
+.vendor-pricing__settings-form {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 16px;
+  padding-top: 18px;
+}
+
+.vendor-pricing__settings-form input,
+.vendor-pricing__settings-form textarea {
+  width: 100%;
+  min-height: 42px;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #b8c8c8;
+  border-radius: 3px;
+  color: #172b36;
+  font: inherit;
+}
+
+.vendor-pricing__settings-form textarea {
+  resize: vertical;
+}
+
+.vendor-pricing__settings-form input:focus-visible,
+.vendor-pricing__settings-form textarea:focus-visible {
+  outline: 2px solid #14786f;
+  outline-offset: 2px;
+}
+
+.vendor-pricing__image-preview {
+  position: relative;
+  display: grid;
+  min-height: 120px;
+  align-content: center;
+  justify-items: start;
+  gap: 12px;
+  overflow: hidden;
+  background: #edf3f2;
+}
+
+.vendor-pricing__banner-preview {
+  width: 100%;
+  max-height: 220px;
+  object-fit: cover;
+}
+
+.vendor-pricing__logo-preview {
+  width: 96px;
+  height: 96px;
+  margin: 0 0 0 14px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #fff;
+  object-fit: cover;
 }
 
 .vendor-pricing__field--wide {
@@ -372,6 +480,7 @@
 
   .vendor-pricing__form,
   .vendor-pricing__create-form,
+  .vendor-pricing__settings-form,
   .vendor-pricing__result dl {
     grid-template-columns: 1fr;
   }

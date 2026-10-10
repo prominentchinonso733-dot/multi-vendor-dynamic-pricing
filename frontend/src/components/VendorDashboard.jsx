@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { getApiErrorMessage } from "../api";
+import { authService } from "../services/authService";
 import { pricingService } from "../services/pricingService";
 import { productsService } from "../services/productsService";
 import "./VendorDashboard.css";
@@ -22,6 +23,13 @@ const initialProductDraft = {
   competitorPrice: "",
   priceFloor: "",
   priceCeiling: "",
+};
+
+const emptyStoreProfile = {
+  storeName: "",
+  storeLogo: "",
+  storeBanner: "",
+  storeDescription: "",
 };
 
 const toDraft = (product) => ({
@@ -91,6 +99,52 @@ export default function VendorDashboard({ onPriceUpdated }) {
   const [createError, setCreateError] = useState("");
   const [createNotice, setCreateNotice] = useState("");
   const [createPending, setCreatePending] = useState(false);
+  const [activeSection, setActiveSection] = useState("pricing");
+  const [storeProfile, setStoreProfile] = useState(emptyStoreProfile);
+  const [profileLoading, setProfileLoading] = useState(false);
+  const [profileSaving, setProfileSaving] = useState(false);
+  const [profileError, setProfileError] = useState("");
+  const [profileNotice, setProfileNotice] = useState("");
+
+  useEffect(() => {
+    if (activeSection !== "store-settings") return undefined;
+
+    const controller = new AbortController();
+    async function loadStoreProfile() {
+      setProfileLoading(true);
+      setProfileError("");
+      try {
+        const profile = await authService.getStoreProfile({
+          signal: controller.signal,
+        });
+        if (
+          !profile ||
+          ["storeName", "storeLogo", "storeBanner", "storeDescription"].some(
+            (field) => typeof profile[field] !== "string",
+          )
+        ) {
+          throw new Error("The profile API returned invalid store settings.");
+        }
+        setStoreProfile({
+          storeName: profile.storeName,
+          storeLogo: profile.storeLogo,
+          storeBanner: profile.storeBanner,
+          storeDescription: profile.storeDescription,
+        });
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setProfileError(
+            getApiErrorMessage(error, "Unable to load store settings."),
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setProfileLoading(false);
+      }
+    }
+
+    loadStoreProfile();
+    return () => controller.abort();
+  }, [activeSection]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -170,6 +224,67 @@ export default function VendorDashboard({ onPriceUpdated }) {
     setCreateDraft((currentDraft) => ({ ...currentDraft, [field]: value }));
     setCreateError("");
     setCreateNotice("");
+  };
+
+  const updateStoreProfileField = (field, value) => {
+    setStoreProfile((currentProfile) => ({
+      ...currentProfile,
+      [field]: value,
+    }));
+    setProfileError("");
+    setProfileNotice("");
+  };
+
+  const saveStoreProfile = async (event) => {
+    event.preventDefault();
+    setProfileError("");
+    setProfileNotice("");
+
+    const normalizedProfile = {
+      storeName: storeProfile.storeName.trim(),
+      storeLogo: storeProfile.storeLogo.trim(),
+      storeBanner: storeProfile.storeBanner.trim(),
+      storeDescription: storeProfile.storeDescription.trim(),
+    };
+    if (!normalizedProfile.storeName) {
+      setProfileError("Store name is required.");
+      return;
+    }
+    for (const [label, value] of [
+      ["Logo", normalizedProfile.storeLogo],
+      ["Banner", normalizedProfile.storeBanner],
+    ]) {
+      if (value) {
+        try {
+          const imageUrl = new URL(value);
+          if (!["https:", "http:"].includes(imageUrl.protocol)) {
+            throw new Error("unsupported protocol");
+          }
+        } catch {
+          setProfileError(`${label} image must be a valid HTTP or HTTPS URL.`);
+          return;
+        }
+      }
+    }
+
+    setProfileSaving(true);
+    try {
+      const savedProfile =
+        await authService.updateStoreProfile(normalizedProfile);
+      setStoreProfile({
+        storeName: savedProfile.storeName,
+        storeLogo: savedProfile.storeLogo,
+        storeBanner: savedProfile.storeBanner,
+        storeDescription: savedProfile.storeDescription,
+      });
+      setProfileNotice("Store settings saved successfully.");
+    } catch (error) {
+      setProfileError(
+        getApiErrorMessage(error, "Unable to save store settings."),
+      );
+    } finally {
+      setProfileSaving(false);
+    }
   };
 
   const createProduct = async (event) => {
@@ -359,6 +474,37 @@ export default function VendorDashboard({ onPriceUpdated }) {
         </button>
       </header>
 
+      <nav aria-label="Vendor dashboard sections" className="vendor-pricing__tabs">
+        <button
+          aria-current={activeSection === "pricing" ? "page" : undefined}
+          className={
+            activeSection === "pricing"
+              ? "vendor-pricing__tab vendor-pricing__tab--active"
+              : "vendor-pricing__tab"
+          }
+          onClick={() => setActiveSection("pricing")}
+          type="button"
+        >
+          Products & Pricing
+        </button>
+        <button
+          aria-current={
+            activeSection === "store-settings" ? "page" : undefined
+          }
+          className={
+            activeSection === "store-settings"
+              ? "vendor-pricing__tab vendor-pricing__tab--active"
+              : "vendor-pricing__tab"
+          }
+          onClick={() => setActiveSection("store-settings")}
+          type="button"
+        >
+          Store Settings
+        </button>
+      </nav>
+
+      {activeSection === "pricing" ? (
+        <>
       {createNotice && (
         <div
           className="vendor-pricing__message vendor-pricing__message--success"
@@ -782,6 +928,136 @@ export default function VendorDashboard({ onPriceUpdated }) {
             );
           })}
         </div>
+      )}
+        </>
+      ) : (
+        <section
+          aria-labelledby="vendor-store-settings-title"
+          className="vendor-pricing__settings"
+        >
+          <div className="vendor-pricing__settings-heading">
+            <div>
+              <p className="vendor-pricing__eyebrow">PUBLIC STORE PROFILE</p>
+              <h2 id="vendor-store-settings-title">Store Settings</h2>
+              <p>
+                Customize the identity and appearance buyers see on your public
+                storefront.
+              </p>
+            </div>
+          </div>
+
+          {profileError && (
+            <div
+              className="vendor-pricing__message vendor-pricing__message--error"
+              role="alert"
+            >
+              <AlertCircle aria-hidden="true" size={18} />
+              <span>{profileError}</span>
+            </div>
+          )}
+          {profileNotice && (
+            <div
+              className="vendor-pricing__message vendor-pricing__message--success"
+              role="status"
+            >
+              <CheckCircle2 aria-hidden="true" size={18} />
+              <span>{profileNotice}</span>
+            </div>
+          )}
+
+          {profileLoading ? (
+            <p className="vendor-pricing__empty" role="status">
+              Loading store settings...
+            </p>
+          ) : (
+            <form
+              className="vendor-pricing__settings-form"
+              onSubmit={saveStoreProfile}
+            >
+              <label className="vendor-pricing__field">
+                <span>Store name</span>
+                <input
+                  autoComplete="organization"
+                  maxLength="100"
+                  onChange={(event) =>
+                    updateStoreProfileField("storeName", event.target.value)
+                  }
+                  required
+                  value={storeProfile.storeName}
+                />
+              </label>
+              <label className="vendor-pricing__field">
+                <span>Store logo image URL</span>
+                <input
+                  maxLength="2048"
+                  onChange={(event) =>
+                    updateStoreProfileField("storeLogo", event.target.value)
+                  }
+                  placeholder="https://example.com/logo.png"
+                  type="url"
+                  value={storeProfile.storeLogo}
+                />
+              </label>
+              <label className="vendor-pricing__field vendor-pricing__field--wide">
+                <span>Store banner image URL</span>
+                <input
+                  maxLength="2048"
+                  onChange={(event) =>
+                    updateStoreProfileField("storeBanner", event.target.value)
+                  }
+                  placeholder="https://example.com/banner.jpg"
+                  type="url"
+                  value={storeProfile.storeBanner}
+                />
+              </label>
+              <label className="vendor-pricing__field vendor-pricing__field--wide">
+                <span>Store description</span>
+                <textarea
+                  maxLength="1000"
+                  onChange={(event) =>
+                    updateStoreProfileField(
+                      "storeDescription",
+                      event.target.value,
+                    )
+                  }
+                  placeholder="Tell buyers what your store specializes in."
+                  rows="5"
+                  value={storeProfile.storeDescription}
+                />
+              </label>
+
+              {(storeProfile.storeBanner || storeProfile.storeLogo) && (
+                <div
+                  aria-label="Store image preview"
+                  className="vendor-pricing__image-preview vendor-pricing__field--wide"
+                >
+                  {storeProfile.storeBanner && (
+                    <img
+                      alt="Store banner preview"
+                      className="vendor-pricing__banner-preview"
+                      src={storeProfile.storeBanner}
+                    />
+                  )}
+                  {storeProfile.storeLogo && (
+                    <img
+                      alt="Store logo preview"
+                      className="vendor-pricing__logo-preview"
+                      src={storeProfile.storeLogo}
+                    />
+                  )}
+                </div>
+              )}
+
+              <button
+                className="vendor-pricing__calculate vendor-pricing__create-submit"
+                disabled={profileSaving}
+                type="submit"
+              >
+                {profileSaving ? "Saving settings..." : "Save Store Settings"}
+              </button>
+            </form>
+          )}
+        </section>
       )}
     </section>
   );

@@ -100,10 +100,22 @@ export default function VendorStorefront({ onAddToCart }) {
         Back to marketplace
       </Link>
 
+      {store.storeBanner && (
+        <img
+          alt=""
+          className="vendor-store__banner"
+          src={store.storeBanner}
+        />
+      )}
+
       <header className="vendor-store__header">
         <div className="vendor-store__identity">
           <div className="vendor-store__icon" aria-hidden="true">
-            <Store size={28} />
+            {store.storeLogo ? (
+              <img src={store.storeLogo} alt="" />
+            ) : (
+              <Store size={28} />
+            )}
           </div>
           <div>
             <p className="vendor-store__eyebrow">VENDOR STORE</p>
@@ -119,6 +131,10 @@ export default function VendorStorefront({ onAddToCart }) {
             </p>
           </div>
         </div>
+
+        {store.storeDescription && (
+          <p className="vendor-store__description">{store.storeDescription}</p>
+        )}
 
         <dl className="vendor-store__details">
           <div>

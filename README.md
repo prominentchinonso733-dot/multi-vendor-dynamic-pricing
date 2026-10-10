@@ -39,6 +39,11 @@ products.
 products owned by that vendor. The frontend storefront is available at
 `/store/:vendorId`.
 
+Authenticated sellers can read `GET /api/auth/profile` and update their public
+store profile with `PUT /api/auth/profile`. The update accepts `storeName`,
+`storeLogo`, `storeBanner`, and `storeDescription`; image fields must be HTTP
+or HTTPS URLs.
+
 `POST /api/products` creates a product for the authenticated seller. Provide
 `title`, `basePrice`, `stock`, `priceFloor`, and `priceCeiling`; `description`,
 `category`, `demandScore`, and `competitorPrice` are optional. Product

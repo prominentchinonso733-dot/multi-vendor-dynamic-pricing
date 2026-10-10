@@ -10,6 +10,10 @@ const UserSchema = new mongoose.Schema(
       enum: ["BUYER", "SELLER", "ADMIN"],
       default: "BUYER",
     },
+    storeName: { type: String, trim: true, maxlength: 100 },
+    storeLogo: { type: String, trim: true, maxlength: 2048 },
+    storeBanner: { type: String, trim: true, maxlength: 2048 },
+    storeDescription: { type: String, trim: true, maxlength: 1000 },
 
     // Vendor-Specific Details
     vendorDetails: {
