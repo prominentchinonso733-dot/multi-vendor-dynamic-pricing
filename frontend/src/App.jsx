@@ -56,6 +56,7 @@ function App() {
   };
 
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
+  // Keep dashboard tab selection separate from the public storefront route.
   const tabContent =
     activeTab === "vendor" && isVendor ? (
       <VendorDashboard />
