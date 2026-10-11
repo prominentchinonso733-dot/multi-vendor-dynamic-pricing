@@ -474,6 +474,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
         </button>
       </header>
 
+      {/* Keep store profile settings alongside, but separate from, pricing tools. */}
       <nav aria-label="Vendor dashboard sections" className="vendor-pricing__tabs">
         <button
           aria-current={activeSection === "pricing" ? "page" : undefined}
