@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { Route, Routes } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import ProductList from "./components/ProductList";
@@ -12,13 +12,17 @@ import { useAuth } from "./context/AuthContext";
 const DEMO_BUYER_ID = "650000000000000000000000";
 
 function App() {
-  const { isAuthenticated, role } = useAuth();
-  const isVendor = isAuthenticated && role === "SELLER";
+  const { isAuthenticated, isVendor: hasVendorAccess } = useAuth();
+  const isVendor = isAuthenticated && hasVendorAccess;
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
   const [activeTab, setActiveTab] = useState("products");
   const [ordersRefreshVersion, setOrdersRefreshVersion] = useState(0);
+
+  useEffect(() => {
+    if (isVendor) setActiveTab("vendor");
+  }, [isVendor]);
 
   // Add product to cart or increment quantity if already present
   const addToCart = (product) => {

@@ -22,6 +22,7 @@
 
 .vendor-pricing__tabs {
   display: flex;
+  flex-wrap: wrap;
   gap: 8px;
   margin: 18px 0;
   border-bottom: 1px solid #dce5e5;
@@ -195,6 +196,15 @@
   color: #172b36;
   font: inherit;
   resize: vertical;
+}
+
+.vendor-pricing__product-image-preview {
+  display: block;
+  width: min(100%, 320px);
+  max-height: 220px;
+  margin-top: 8px;
+  border: 1px solid #dce5e5;
+  object-fit: contain;
 }
 
 .vendor-pricing__settings {

@@ -1,10 +1,11 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { getApiErrorMessage } from "../api";
 import { authService } from "../services/authService";
 import { pricingService } from "../services/pricingService";
 import { productsService } from "../services/productsService";
+import SellerDashboard from "./SellerDashboard";
 import "./VendorDashboard.css";
 
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
@@ -48,18 +49,12 @@ const validateDraft = (draft) => {
   const priceFloor = Number(draft.priceFloor);
   const priceCeiling = Number(draft.priceCeiling);
   const competitorPrice =
-    draft.competitorPrice.trim() === ""
-      ? null
-      : Number(draft.competitorPrice);
+    draft.competitorPrice.trim() === "" ? null : Number(draft.competitorPrice);
 
   if (!Number.isFinite(basePrice) || basePrice <= 0) {
     return "Base price must be a positive number.";
   }
-  if (
-    !Number.isFinite(demandScore) ||
-    demandScore < 0 ||
-    demandScore > 100
-  ) {
+  if (!Number.isFinite(demandScore) || demandScore < 0 || demandScore > 100) {
     return "Demand score must be between 0 and 100.";
   }
   if (!Number.isInteger(stock) || stock < 0) {
@@ -96,15 +91,29 @@ export default function VendorDashboard({ onPriceUpdated }) {
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createDraft, setCreateDraft] = useState(initialProductDraft);
+  const [selectedImage, setSelectedImage] = useState(null);
+  const [imagePreview, setImagePreview] = useState("");
+  const imageInputRef = useRef(null);
   const [createError, setCreateError] = useState("");
   const [createNotice, setCreateNotice] = useState("");
   const [createPending, setCreatePending] = useState(false);
-  const [activeSection, setActiveSection] = useState("pricing");
+  const [activeSection, setActiveSection] = useState("dynamic-pricing");
   const [storeProfile, setStoreProfile] = useState(emptyStoreProfile);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [profileNotice, setProfileNotice] = useState("");
+
+  useEffect(() => {
+    if (!selectedImage) {
+      setImagePreview("");
+      return undefined;
+    }
+
+    const previewUrl = URL.createObjectURL(selectedImage);
+    setImagePreview(previewUrl);
+    return () => URL.revokeObjectURL(previewUrl);
+  }, [selectedImage]);
 
   useEffect(() => {
     if (activeSection !== "store-settings") return undefined;
@@ -182,10 +191,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
         setProducts(vendorProducts);
         setDrafts(
           Object.fromEntries(
-            vendorProducts.map((product) => [
-              product._id,
-              toDraft(product),
-            ]),
+            vendorProducts.map((product) => [product._id, toDraft(product)]),
           ),
         );
         setResults({});
@@ -301,28 +307,24 @@ export default function VendorDashboard({ onPriceUpdated }) {
       createDraft.competitorPrice.trim() === ""
         ? null
         : Number(createDraft.competitorPrice);
-    const validationError =
-      !createDraft.title.trim()
-        ? "Product title is required."
-        : !Number.isFinite(basePrice) || basePrice <= 0
-          ? "Base price must be a positive number."
-          : !Number.isFinite(demandScore) ||
-              demandScore < 0 ||
-              demandScore > 100
-            ? "Demand score must be between 0 and 100."
-            : !Number.isInteger(stock) || stock < 0
-              ? "Stock must be a non-negative whole number."
-              : !Number.isFinite(priceFloor) || priceFloor <= 0
-                ? "Price floor must be a positive number."
-                : !Number.isFinite(priceCeiling) ||
-                    priceCeiling <= 0 ||
-                    priceCeiling < priceFloor
-                  ? "Price ceiling must be greater than or equal to the price floor."
-                  : competitorPrice !== null &&
-                      (!Number.isFinite(competitorPrice) ||
-                        competitorPrice <= 0)
-                    ? "Competitor price must be a positive number, or leave it blank."
-                    : null;
+    const validationError = !createDraft.title.trim()
+      ? "Product title is required."
+      : !Number.isFinite(basePrice) || basePrice <= 0
+        ? "Base price must be a positive number."
+        : !Number.isFinite(demandScore) || demandScore < 0 || demandScore > 100
+          ? "Demand score must be between 0 and 100."
+          : !Number.isInteger(stock) || stock < 0
+            ? "Stock must be a non-negative whole number."
+            : !Number.isFinite(priceFloor) || priceFloor <= 0
+              ? "Price floor must be a positive number."
+              : !Number.isFinite(priceCeiling) ||
+                  priceCeiling <= 0 ||
+                  priceCeiling < priceFloor
+                ? "Price ceiling must be greater than or equal to the price floor."
+                : competitorPrice !== null &&
+                    (!Number.isFinite(competitorPrice) || competitorPrice <= 0)
+                  ? "Competitor price must be a positive number, or leave it blank."
+                  : null;
 
     if (validationError) {
       setCreateError(validationError);
@@ -331,7 +333,8 @@ export default function VendorDashboard({ onPriceUpdated }) {
 
     setCreatePending(true);
     try {
-      await productsService.create({
+      const productData = new FormData();
+      Object.entries({
         title: createDraft.title.trim(),
         description: createDraft.description.trim(),
         category: createDraft.category.trim(),
@@ -341,10 +344,21 @@ export default function VendorDashboard({ onPriceUpdated }) {
         competitorPrice,
         priceFloor,
         priceCeiling,
+      }).forEach(([field, value]) => {
+        if (value !== null && value !== undefined) {
+          productData.append(field, String(value));
+        }
       });
+      if (selectedImage) productData.append("image", selectedImage);
+
+      await productsService.create(productData);
       setCreateDraft(initialProductDraft);
+      setSelectedImage(null);
+      if (imageInputRef.current) imageInputRef.current.value = "";
       setShowCreateForm(false);
-      setCreateNotice("Product created. It is now available in your pricing list.");
+      setCreateNotice(
+        "Product created. It is now available in your pricing list.",
+      );
       setRefreshVersion((version) => version + 1);
     } catch (error) {
       setCreateError(
@@ -369,7 +383,10 @@ export default function VendorDashboard({ onPriceUpdated }) {
     }
 
     setPendingProductId(productId);
-    setProductErrors((currentErrors) => ({ ...currentErrors, [productId]: "" }));
+    setProductErrors((currentErrors) => ({
+      ...currentErrors,
+      [productId]: "",
+    }));
     setResults((currentResults) => ({ ...currentResults, [productId]: null }));
 
     try {
@@ -433,10 +450,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
   };
 
   return (
-    <section
-      aria-labelledby="vendor-pricing-title"
-      className="vendor-pricing"
-    >
+    <section aria-labelledby="vendor-pricing-title" className="vendor-pricing">
       <header className="vendor-pricing__header">
         <div>
           <p className="vendor-pricing__eyebrow">VENDOR TOOLS</p>
@@ -475,23 +489,38 @@ export default function VendorDashboard({ onPriceUpdated }) {
       </header>
 
       {/* Keep store profile settings alongside, but separate from, pricing tools. */}
-      <nav aria-label="Vendor dashboard sections" className="vendor-pricing__tabs">
+      <nav
+        aria-label="Vendor dashboard sections"
+        className="vendor-pricing__tabs"
+      >
         <button
-          aria-current={activeSection === "pricing" ? "page" : undefined}
+          aria-current={
+            activeSection === "dynamic-pricing" ? "page" : undefined
+          }
           className={
-            activeSection === "pricing"
+            activeSection === "dynamic-pricing"
               ? "vendor-pricing__tab vendor-pricing__tab--active"
               : "vendor-pricing__tab"
           }
-          onClick={() => setActiveSection("pricing")}
+          onClick={() => setActiveSection("dynamic-pricing")}
           type="button"
         >
-          Products & Pricing
+          Dynamic Pricing
         </button>
         <button
-          aria-current={
-            activeSection === "store-settings" ? "page" : undefined
+          aria-current={activeSection === "inventory" ? "page" : undefined}
+          className={
+            activeSection === "inventory"
+              ? "vendor-pricing__tab vendor-pricing__tab--active"
+              : "vendor-pricing__tab"
           }
+          onClick={() => setActiveSection("inventory")}
+          type="button"
+        >
+          Inventory
+        </button>
+        <button
+          aria-current={activeSection === "store-settings" ? "page" : undefined}
           className={
             activeSection === "store-settings"
               ? "vendor-pricing__tab vendor-pricing__tab--active"
@@ -502,434 +531,545 @@ export default function VendorDashboard({ onPriceUpdated }) {
         >
           Store Settings
         </button>
+        <button
+          aria-current={activeSection === "escrow" ? "page" : undefined}
+          className={
+            activeSection === "escrow"
+              ? "vendor-pricing__tab vendor-pricing__tab--active"
+              : "vendor-pricing__tab"
+          }
+          onClick={() => setActiveSection("escrow")}
+          type="button"
+        >
+          Escrow Operations
+        </button>
       </nav>
 
-      {activeSection === "pricing" ? (
+      {activeSection === "dynamic-pricing" ? (
         <>
-      {createNotice && (
-        <div
-          className="vendor-pricing__message vendor-pricing__message--success"
-          role="status"
-        >
-          <CheckCircle2 aria-hidden="true" size={18} />
-          <span>{createNotice}</span>
-        </div>
-      )}
-
-      {showCreateForm && (
-        <form
-          className="vendor-pricing__create-form"
-          onSubmit={createProduct}
-        >
-          <div className="vendor-pricing__create-heading">
-            <div>
-              <h2>Create a product</h2>
-              <p>
-                Set the product details and initial pricing limits. You can
-                adjust them later.
-              </p>
-            </div>
-          </div>
-          <label className="vendor-pricing__field">
-            <span>Product name</span>
-            <input
-              autoComplete="off"
-              maxLength="160"
-              onChange={(event) =>
-                updateCreateDraft("title", event.target.value)
-              }
-              required
-              value={createDraft.title}
-            />
-          </label>
-          <label className="vendor-pricing__field">
-            <span>Category (optional)</span>
-            <input
-              maxLength="80"
-              onChange={(event) =>
-                updateCreateDraft("category", event.target.value)
-              }
-              value={createDraft.category}
-            />
-          </label>
-          <label className="vendor-pricing__field vendor-pricing__field--wide">
-            <span>Description (optional)</span>
-            <textarea
-              maxLength="2000"
-              onChange={(event) =>
-                updateCreateDraft("description", event.target.value)
-              }
-              rows="3"
-              value={createDraft.description}
-            />
-          </label>
-          <label className="vendor-pricing__field">
-            <span>Base price (₦)</span>
-            <input
-              min="0.01"
-              onChange={(event) =>
-                updateCreateDraft("basePrice", event.target.value)
-              }
-              required
-              step="0.01"
-              type="number"
-              value={createDraft.basePrice}
-            />
-          </label>
-          <label className="vendor-pricing__field vendor-pricing__field--demand">
-            <span>
-              Demand score <strong>{createDraft.demandScore}</strong>
-            </span>
-            <input
-              aria-label="New product demand score from 0 to 100"
-              max="100"
-              min="0"
-              onChange={(event) =>
-                updateCreateDraft("demandScore", event.target.value)
-              }
-              type="range"
-              value={createDraft.demandScore}
-            />
-            <input
-              aria-label="New product demand score number from 0 to 100"
-              max="100"
-              min="0"
-              onChange={(event) =>
-                updateCreateDraft("demandScore", event.target.value)
-              }
-              required
-              step="1"
-              type="number"
-              value={createDraft.demandScore}
-            />
-          </label>
-          <label className="vendor-pricing__field">
-            <span>Stock quantity</span>
-            <input
-              min="0"
-              onChange={(event) =>
-                updateCreateDraft("stock", event.target.value)
-              }
-              required
-              step="1"
-              type="number"
-              value={createDraft.stock}
-            />
-          </label>
-          <label className="vendor-pricing__field">
-            <span>Competitor price (₦, optional)</span>
-            <input
-              min="0.01"
-              onChange={(event) =>
-                updateCreateDraft("competitorPrice", event.target.value)
-              }
-              step="0.01"
-              type="number"
-              value={createDraft.competitorPrice}
-            />
-          </label>
-          <label className="vendor-pricing__field">
-            <span>Price floor (₦)</span>
-            <input
-              min="0.01"
-              onChange={(event) =>
-                updateCreateDraft("priceFloor", event.target.value)
-              }
-              required
-              step="0.01"
-              type="number"
-              value={createDraft.priceFloor}
-            />
-          </label>
-          <label className="vendor-pricing__field">
-            <span>Price ceiling (₦)</span>
-            <input
-              min="0.01"
-              onChange={(event) =>
-                updateCreateDraft("priceCeiling", event.target.value)
-              }
-              required
-              step="0.01"
-              type="number"
-              value={createDraft.priceCeiling}
-            />
-          </label>
-
-          {createError && (
+          {createNotice && (
             <div
-              className="vendor-pricing__message vendor-pricing__message--error vendor-pricing__form-message"
+              className="vendor-pricing__message vendor-pricing__message--success"
+              role="status"
+            >
+              <CheckCircle2 aria-hidden="true" size={18} />
+              <span>{createNotice}</span>
+            </div>
+          )}
+
+          {showCreateForm && (
+            <form
+              className="vendor-pricing__create-form"
+              onSubmit={createProduct}
+            >
+              <div className="vendor-pricing__create-heading">
+                <div>
+                  <h2>Create a product</h2>
+                  <p>
+                    Set the product details and initial pricing limits. You can
+                    adjust them later.
+                  </p>
+                </div>
+              </div>
+              <label className="vendor-pricing__field">
+                <span>Product name</span>
+                <input
+                  autoComplete="off"
+                  maxLength="160"
+                  onChange={(event) =>
+                    updateCreateDraft("title", event.target.value)
+                  }
+                  required
+                  value={createDraft.title}
+                />
+              </label>
+              <label className="vendor-pricing__field">
+                <span>Category (optional)</span>
+                <input
+                  maxLength="80"
+                  onChange={(event) =>
+                    updateCreateDraft("category", event.target.value)
+                  }
+                  value={createDraft.category}
+                />
+              </label>
+              <label className="vendor-pricing__field vendor-pricing__field--wide">
+                <span>Description (optional)</span>
+                <textarea
+                  maxLength="2000"
+                  onChange={(event) =>
+                    updateCreateDraft("description", event.target.value)
+                  }
+                  rows="3"
+                  value={createDraft.description}
+                />
+              </label>
+              <div className="vendor-pricing__field vendor-pricing__field--wide">
+                <label htmlFor="new-product-image">Product photo (optional)</label>
+                <input
+                  accept="image/jpeg,image/png,image/webp"
+                  id="new-product-image"
+                  onChange={(event) => {
+                    const file = event.target.files?.[0] || null;
+                    if (
+                      file &&
+                      !["image/jpeg", "image/png", "image/webp"].includes(
+                        file.type,
+                      )
+                    ) {
+                      setSelectedImage(null);
+                      event.target.value = "";
+                      setCreateError("Choose a JPEG, PNG, or WebP image.");
+                      return;
+                    }
+                    if (file && file.size > 5 * 1024 * 1024) {
+                      setSelectedImage(null);
+                      event.target.value = "";
+                      setCreateError("Product images must be 5 MB or smaller.");
+                      return;
+                    }
+                    setSelectedImage(file);
+                    setCreateError("");
+                    setCreateNotice("");
+                  }}
+                  ref={imageInputRef}
+                  type="file"
+                />
+                {imagePreview && selectedImage && (
+                  <img
+                    alt={`Preview of ${selectedImage.name}`}
+                    className="vendor-pricing__product-image-preview"
+                    src={imagePreview}
+                  />
+                )}
+              </div>
+              <label className="vendor-pricing__field">
+                <span>Base price (₦)</span>
+                <input
+                  min="0.01"
+                  onChange={(event) =>
+                    updateCreateDraft("basePrice", event.target.value)
+                  }
+                  required
+                  step="0.01"
+                  type="number"
+                  value={createDraft.basePrice}
+                />
+              </label>
+              <label className="vendor-pricing__field vendor-pricing__field--demand">
+                <span>
+                  Demand score <strong>{createDraft.demandScore}</strong>
+                </span>
+                <input
+                  aria-label="New product demand score from 0 to 100"
+                  max="100"
+                  min="0"
+                  onChange={(event) =>
+                    updateCreateDraft("demandScore", event.target.value)
+                  }
+                  type="range"
+                  value={createDraft.demandScore}
+                />
+                <input
+                  aria-label="New product demand score number from 0 to 100"
+                  max="100"
+                  min="0"
+                  onChange={(event) =>
+                    updateCreateDraft("demandScore", event.target.value)
+                  }
+                  required
+                  step="1"
+                  type="number"
+                  value={createDraft.demandScore}
+                />
+              </label>
+              <label className="vendor-pricing__field">
+                <span>Stock quantity</span>
+                <input
+                  min="0"
+                  onChange={(event) =>
+                    updateCreateDraft("stock", event.target.value)
+                  }
+                  required
+                  step="1"
+                  type="number"
+                  value={createDraft.stock}
+                />
+              </label>
+              <label className="vendor-pricing__field">
+                <span>Competitor price (₦, optional)</span>
+                <input
+                  min="0.01"
+                  onChange={(event) =>
+                    updateCreateDraft("competitorPrice", event.target.value)
+                  }
+                  step="0.01"
+                  type="number"
+                  value={createDraft.competitorPrice}
+                />
+              </label>
+              <label className="vendor-pricing__field">
+                <span>Price floor (₦)</span>
+                <input
+                  min="0.01"
+                  onChange={(event) =>
+                    updateCreateDraft("priceFloor", event.target.value)
+                  }
+                  required
+                  step="0.01"
+                  type="number"
+                  value={createDraft.priceFloor}
+                />
+              </label>
+              <label className="vendor-pricing__field">
+                <span>Price ceiling (₦)</span>
+                <input
+                  min="0.01"
+                  onChange={(event) =>
+                    updateCreateDraft("priceCeiling", event.target.value)
+                  }
+                  required
+                  step="0.01"
+                  type="number"
+                  value={createDraft.priceCeiling}
+                />
+              </label>
+
+              {createError && (
+                <div
+                  className="vendor-pricing__message vendor-pricing__message--error vendor-pricing__form-message"
+                  role="alert"
+                >
+                  <AlertCircle aria-hidden="true" size={18} />
+                  <span>{createError}</span>
+                </div>
+              )}
+              <button
+                className="vendor-pricing__calculate vendor-pricing__create-submit"
+                disabled={createPending}
+                type="submit"
+              >
+                {createPending ? "Creating product..." : "Create product"}
+              </button>
+            </form>
+          )}
+
+          {loadError && (
+            <div
+              className="vendor-pricing__message vendor-pricing__message--error"
               role="alert"
             >
               <AlertCircle aria-hidden="true" size={18} />
-              <span>{createError}</span>
+              <span>{loadError}</span>
             </div>
           )}
-          <button
-            className="vendor-pricing__calculate vendor-pricing__create-submit"
-            disabled={createPending}
-            type="submit"
-          >
-            {createPending ? "Creating product..." : "Create product"}
-          </button>
-        </form>
-      )}
 
-      {loadError && (
-        <div className="vendor-pricing__message vendor-pricing__message--error" role="alert">
-          <AlertCircle aria-hidden="true" size={18} />
-          <span>{loadError}</span>
-        </div>
-      )}
-
-      {loading ? (
-        <p className="vendor-pricing__empty" role="status">
-          Loading your products...
-        </p>
-      ) : loadError ? null : products.length === 0 ? (
-        <p className="vendor-pricing__empty">
-          No vendor products are available to price yet.
-        </p>
-      ) : (
-        <div className="vendor-pricing__products">
-          {products.map((product) => {
-            const productId = product._id;
-            const draft = drafts[productId];
-            const result = results[productId];
-            const error = productErrors[productId];
-            const isPending = pendingProductId === productId;
-
-            return (
-              <article
-                className="vendor-pricing__card"
-                key={productId}
-                aria-labelledby={`vendor-product-${productId}`}
-              >
-                <header className="vendor-pricing__product-header">
-                  <div>
-                    <h2 id={`vendor-product-${productId}`}>
-                      {product.title || product.name || "Untitled product"}
-                    </h2>
-                    <p>
-                      Current price:{" "}
-                      <strong>
-                        {Number.isFinite(product.currentPrice)
-                          ? currencyFormatter.format(product.currentPrice)
-                          : "Not set"}
-                      </strong>
-                    </p>
-                  </div>
-                  {result && (
-                    <span
-                      className={`vendor-pricing__status vendor-pricing__status--${result.floorCeilingStatus?.toLowerCase()}`}
-                    >
-                      {result.floorCeilingStatus === "WITHIN_RANGE"
-                        ? "Within range"
-                        : result.floorCeilingStatus === "FLOOR"
-                          ? "Floor applied"
-                          : "Ceiling applied"}
-                    </span>
-                  )}
-                </header>
-
-                <form
-                  className="vendor-pricing__form"
-                  onSubmit={(event) => recalculatePrice(event, product)}
+          {loading ? (
+            <p className="vendor-pricing__empty" role="status">
+              Loading your products...
+            </p>
+          ) : loadError ? null : activeSection === "inventory" ? (
+            <section
+              aria-labelledby="vendor-inventory-title"
+              className="vendor-pricing__settings"
+            >
+              <div className="vendor-pricing__settings-heading">
+                <div>
+                  <p className="vendor-pricing__eyebrow">PRODUCT STOCK</p>
+                  <h2 id="vendor-inventory-title">Inventory</h2>
+                </div>
+              </div>
+              {loadError ? (
+                <div
+                  className="vendor-pricing__message vendor-pricing__message--error"
+                  role="alert"
                 >
-                  <label className="vendor-pricing__field">
-                    <span>Base price (₦)</span>
-                    <input
-                      inputMode="decimal"
-                      min="0.01"
-                      onChange={(event) =>
-                        updateDraft(productId, "basePrice", event.target.value)
-                      }
-                      required
-                      step="0.01"
-                      type="number"
-                      value={draft.basePrice}
-                    />
-                  </label>
+                  <AlertCircle aria-hidden="true" size={18} />
+                  <span>{loadError}</span>
+                </div>
+              ) : loading ? (
+                <p className="vendor-pricing__empty" role="status">
+                  Loading your inventory...
+                </p>
+              ) : products.length === 0 ? (
+                <p className="vendor-pricing__empty">
+                  No inventory items are available yet.
+                </p>
+              ) : (
+                <div className="vendor-pricing__products">
+                  {products.map((product) => (
+                    <article className="vendor-pricing__card" key={product._id}>
+                      <header className="vendor-pricing__product-header">
+                        <div>
+                          <h2>{product.title || "Untitled product"}</h2>
+                          <p>{product.category || "Uncategorized"}</p>
+                        </div>
+                        <strong>{product.stock} in stock</strong>
+                      </header>
+                      <p>
+                        Current price:{" "}
+                        {currencyFormatter.format(product.currentPrice)}
+                      </p>
+                    </article>
+                  ))}
+                </div>
+              )}
+            </section>
+          ) : activeSection === "escrow" ? (
+            <SellerDashboard />
+          ) : products.length === 0 ? (
+            <p className="vendor-pricing__empty">
+              No vendor products are available to price yet.
+            </p>
+          ) : (
+            <div className="vendor-pricing__products">
+              {products.map((product) => {
+                const productId = product._id;
+                const draft = drafts[productId];
+                const result = results[productId];
+                const error = productErrors[productId];
+                const isPending = pendingProductId === productId;
 
-                  <label className="vendor-pricing__field vendor-pricing__field--demand">
-                    <span>
-                      Demand score <strong>{draft.demandScore}</strong>
-                    </span>
-                    <input
-                      max="100"
-                      min="0"
-                      onChange={(event) =>
-                        updateDraft(
-                          productId,
-                          "demandScore",
-                          event.target.value,
-                        )
-                      }
-                      type="range"
-                      value={draft.demandScore}
-                    />
-                    <input
-                      aria-label="Demand score from 0 to 100"
-                      max="100"
-                      min="0"
-                      onChange={(event) =>
-                        updateDraft(
-                          productId,
-                          "demandScore",
-                          event.target.value,
-                        )
-                      }
-                      required
-                      step="1"
-                      type="number"
-                      value={draft.demandScore}
-                    />
-                  </label>
+                return (
+                  <article
+                    className="vendor-pricing__card"
+                    key={productId}
+                    aria-labelledby={`vendor-product-${productId}`}
+                  >
+                    <header className="vendor-pricing__product-header">
+                      <div>
+                        <h2 id={`vendor-product-${productId}`}>
+                          {product.title || product.name || "Untitled product"}
+                        </h2>
+                        <p>
+                          Current price:{" "}
+                          <strong>
+                            {Number.isFinite(product.currentPrice)
+                              ? currencyFormatter.format(product.currentPrice)
+                              : "Not set"}
+                          </strong>
+                        </p>
+                      </div>
+                      {result && (
+                        <span
+                          className={`vendor-pricing__status vendor-pricing__status--${result.floorCeilingStatus?.toLowerCase()}`}
+                        >
+                          {result.floorCeilingStatus === "WITHIN_RANGE"
+                            ? "Within range"
+                            : result.floorCeilingStatus === "FLOOR"
+                              ? "Floor applied"
+                              : "Ceiling applied"}
+                        </span>
+                      )}
+                    </header>
 
-                  <label className="vendor-pricing__field">
-                    <span>Stock quantity</span>
-                    <input
-                      min="0"
-                      onChange={(event) =>
-                        updateDraft(productId, "stock", event.target.value)
-                      }
-                      required
-                      step="1"
-                      type="number"
-                      value={draft.stock}
-                    />
-                  </label>
-
-                  <label className="vendor-pricing__field">
-                    <span>Competitor price (₦, optional)</span>
-                    <input
-                      inputMode="decimal"
-                      min="0.01"
-                      onChange={(event) =>
-                        updateDraft(
-                          productId,
-                          "competitorPrice",
-                          event.target.value,
-                        )
-                      }
-                      placeholder="No competitor reference"
-                      step="0.01"
-                      type="number"
-                      value={draft.competitorPrice}
-                    />
-                  </label>
-
-                  <label className="vendor-pricing__field">
-                    <span>Price floor (₦)</span>
-                    <input
-                      inputMode="decimal"
-                      min="0.01"
-                      onChange={(event) =>
-                        updateDraft(productId, "priceFloor", event.target.value)
-                      }
-                      required
-                      step="0.01"
-                      type="number"
-                      value={draft.priceFloor}
-                    />
-                  </label>
-
-                  <label className="vendor-pricing__field">
-                    <span>Price ceiling (₦)</span>
-                    <input
-                      inputMode="decimal"
-                      min="0.01"
-                      onChange={(event) =>
-                        updateDraft(
-                          productId,
-                          "priceCeiling",
-                          event.target.value,
-                        )
-                      }
-                      required
-                      step="0.01"
-                      type="number"
-                      value={draft.priceCeiling}
-                    />
-                  </label>
-
-                  {error && (
-                    <div
-                      className="vendor-pricing__message vendor-pricing__message--error vendor-pricing__form-message"
-                      role="alert"
+                    <form
+                      className="vendor-pricing__form"
+                      onSubmit={(event) => recalculatePrice(event, product)}
                     >
-                      <AlertCircle aria-hidden="true" size={18} />
-                      <span>{error}</span>
-                    </div>
-                  )}
+                      <label className="vendor-pricing__field">
+                        <span>Base price (₦)</span>
+                        <input
+                          inputMode="decimal"
+                          min="0.01"
+                          onChange={(event) =>
+                            updateDraft(
+                              productId,
+                              "basePrice",
+                              event.target.value,
+                            )
+                          }
+                          required
+                          step="0.01"
+                          type="number"
+                          value={draft.basePrice}
+                        />
+                      </label>
 
-                  <button
-                    className="vendor-pricing__calculate"
-                    disabled={pendingProductId !== null}
-                    type="submit"
-                  >
-                    {isPending ? "Recalculating..." : "Recalculate price"}
-                  </button>
-                </form>
+                      <label className="vendor-pricing__field vendor-pricing__field--demand">
+                        <span>
+                          Demand score <strong>{draft.demandScore}</strong>
+                        </span>
+                        <input
+                          max="100"
+                          min="0"
+                          onChange={(event) =>
+                            updateDraft(
+                              productId,
+                              "demandScore",
+                              event.target.value,
+                            )
+                          }
+                          type="range"
+                          value={draft.demandScore}
+                        />
+                        <input
+                          aria-label="Demand score from 0 to 100"
+                          max="100"
+                          min="0"
+                          onChange={(event) =>
+                            updateDraft(
+                              productId,
+                              "demandScore",
+                              event.target.value,
+                            )
+                          }
+                          required
+                          step="1"
+                          type="number"
+                          value={draft.demandScore}
+                        />
+                      </label>
 
-                {result && (
-                  <section
-                    aria-label={`Calculation result for ${product.title || "product"}`}
-                    className="vendor-pricing__result"
-                    role="status"
-                  >
-                    <div className="vendor-pricing__result-price">
-                      <CheckCircle2 aria-hidden="true" size={20} />
-                      <span>Calculated price</span>
-                      <strong>
-                        {currencyFormatter.format(result.currentPrice)}
-                      </strong>
-                    </div>
-                    <dl>
-                      <div>
-                        <dt>Reference price</dt>
-                        <dd>
-                          {currencyFormatter.format(result.referencePrice)}
-                          {result.adjustments.competitorPriceApplied
-                            ? " (competitor price applied)"
-                            : " (base price)"}
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Demand adjustment</dt>
-                        <dd>
-                          {result.adjustments.demandPercent > 0 ? "+" : ""}
-                          {result.adjustments.demandPercent}%
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Stock adjustment</dt>
-                        <dd>
-                          {result.adjustments.stockPercent > 0 ? "+" : ""}
-                          {result.adjustments.stockPercent}%
-                        </dd>
-                      </div>
-                      <div>
-                        <dt>Price bounds</dt>
-                        <dd>
-                          {currencyFormatter.format(result.priceFloor)} –{" "}
-                          {currencyFormatter.format(result.priceCeiling)}
-                        </dd>
-                      </div>
-                    </dl>
-                    <p className="vendor-pricing__result-status">
-                      {result.floorCeilingStatus === "WITHIN_RANGE"
-                        ? "Calculated price is within the allowed range."
-                        : result.floorCeilingStatus === "FLOOR"
-                          ? "Calculated price was raised to the configured floor."
-                          : "Calculated price was lowered to the configured ceiling."}
-                    </p>
-                  </section>
-                )}
-              </article>
-            );
-          })}
-        </div>
-      )}
+                      <label className="vendor-pricing__field">
+                        <span>Stock quantity</span>
+                        <input
+                          min="0"
+                          onChange={(event) =>
+                            updateDraft(productId, "stock", event.target.value)
+                          }
+                          required
+                          step="1"
+                          type="number"
+                          value={draft.stock}
+                        />
+                      </label>
+
+                      <label className="vendor-pricing__field">
+                        <span>Competitor price (₦, optional)</span>
+                        <input
+                          inputMode="decimal"
+                          min="0.01"
+                          onChange={(event) =>
+                            updateDraft(
+                              productId,
+                              "competitorPrice",
+                              event.target.value,
+                            )
+                          }
+                          placeholder="No competitor reference"
+                          step="0.01"
+                          type="number"
+                          value={draft.competitorPrice}
+                        />
+                      </label>
+
+                      <label className="vendor-pricing__field">
+                        <span>Price floor (₦)</span>
+                        <input
+                          inputMode="decimal"
+                          min="0.01"
+                          onChange={(event) =>
+                            updateDraft(
+                              productId,
+                              "priceFloor",
+                              event.target.value,
+                            )
+                          }
+                          required
+                          step="0.01"
+                          type="number"
+                          value={draft.priceFloor}
+                        />
+                      </label>
+
+                      <label className="vendor-pricing__field">
+                        <span>Price ceiling (₦)</span>
+                        <input
+                          inputMode="decimal"
+                          min="0.01"
+                          onChange={(event) =>
+                            updateDraft(
+                              productId,
+                              "priceCeiling",
+                              event.target.value,
+                            )
+                          }
+                          required
+                          step="0.01"
+                          type="number"
+                          value={draft.priceCeiling}
+                        />
+                      </label>
+
+                      {error && (
+                        <div
+                          className="vendor-pricing__message vendor-pricing__message--error vendor-pricing__form-message"
+                          role="alert"
+                        >
+                          <AlertCircle aria-hidden="true" size={18} />
+                          <span>{error}</span>
+                        </div>
+                      )}
+
+                      <button
+                        className="vendor-pricing__calculate"
+                        disabled={pendingProductId !== null}
+                        type="submit"
+                      >
+                        {isPending ? "Recalculating..." : "Recalculate price"}
+                      </button>
+                    </form>
+
+                    {result && (
+                      <section
+                        aria-label={`Calculation result for ${product.title || "product"}`}
+                        className="vendor-pricing__result"
+                        role="status"
+                      >
+                        <div className="vendor-pricing__result-price">
+                          <CheckCircle2 aria-hidden="true" size={20} />
+                          <span>Calculated price</span>
+                          <strong>
+                            {currencyFormatter.format(result.currentPrice)}
+                          </strong>
+                        </div>
+                        <dl>
+                          <div>
+                            <dt>Reference price</dt>
+                            <dd>
+                              {currencyFormatter.format(result.referencePrice)}
+                              {result.adjustments.competitorPriceApplied
+                                ? " (competitor price applied)"
+                                : " (base price)"}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Demand adjustment</dt>
+                            <dd>
+                              {result.adjustments.demandPercent > 0 ? "+" : ""}
+                              {result.adjustments.demandPercent}%
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Stock adjustment</dt>
+                            <dd>
+                              {result.adjustments.stockPercent > 0 ? "+" : ""}
+                              {result.adjustments.stockPercent}%
+                            </dd>
+                          </div>
+                          <div>
+                            <dt>Price bounds</dt>
+                            <dd>
+                              {currencyFormatter.format(result.priceFloor)} –{" "}
+                              {currencyFormatter.format(result.priceCeiling)}
+                            </dd>
+                          </div>
+                        </dl>
+                        <p className="vendor-pricing__result-status">
+                          {result.floorCeilingStatus === "WITHIN_RANGE"
+                            ? "Calculated price is within the allowed range."
+                            : result.floorCeilingStatus === "FLOOR"
+                              ? "Calculated price was raised to the configured floor."
+                              : "Calculated price was lowered to the configured ceiling."}
+                        </p>
+                      </section>
+                    )}
+                  </article>
+                );
+              })}
+            </div>
+          )}
         </>
       ) : (
         <section

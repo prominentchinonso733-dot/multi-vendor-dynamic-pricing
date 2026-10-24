@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { Link, useParams } from "react-router-dom";
 import { AlertCircle, BadgeCheck, Store } from "lucide-react";
-import { getApiErrorMessage } from "../api";
+import { getApiErrorMessage, getAssetUrl } from "../api";
 import { productsService } from "../services/productsService";
 import "./VendorStorefront.css";
 
@@ -177,8 +177,12 @@ export default function VendorStorefront({ onAddToCart }) {
         <div className="vendor-store__products">
           {products.map((product) => (
             <article className="vendor-store__product" key={product.id}>
-              {product.image ? (
-                <img src={product.image} alt="" loading="lazy" />
+              {product.imageUrl || product.image ? (
+                <img
+                  src={getAssetUrl(product.imageUrl || product.image)}
+                  alt=""
+                  loading="lazy"
+                />
               ) : (
                 <div className="vendor-store__image-placeholder">
                   <Store aria-hidden="true" size={28} />

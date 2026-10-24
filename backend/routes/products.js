@@ -1,29 +1,82 @@
 const express = require("express");
+const fs = require("fs/promises");
+const path = require("path");
+const { randomUUID } = require("crypto");
+const multer = require("multer");
 const Product = require("../models/Product");
 const User = require("../models/User");
 const authenticateToken = require("../middleware/authenticateToken");
 const mongoose = require("mongoose");
 
 const router = express.Router();
+const imageExtensions = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+};
+const uploadProductImage = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (!imageExtensions[file.mimetype]) {
+      return callback(new Error("Upload a JPEG, PNG, or WebP image."));
+    }
+    return callback(null, true);
+  },
+}).single("image");
 
-router.post("/", authenticateToken, async (req, res) => {
-  if (req.user.role !== "SELLER") {
+const parseProductUpload = (req, res, next) => {
+  uploadProductImage(req, res, (error) => {
+    if (!error) return next();
+
+    const message =
+      error.code === "LIMIT_FILE_SIZE"
+        ? "Product images must be 5 MB or smaller."
+        : error.message;
+    return res.status(400).json({ success: false, message });
+  });
+};
+
+const hasValidImageSignature = (file) => {
+  const { buffer, mimetype } = file;
+  if (mimetype === "image/jpeg") {
+    return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
+  }
+  if (mimetype === "image/png") {
+    return buffer.subarray(0, 8).equals(
+      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
+    );
+  }
+  return (
+    mimetype === "image/webp" &&
+    buffer.toString("ascii", 0, 4) === "RIFF" &&
+    buffer.toString("ascii", 8, 12) === "WEBP"
+  );
+};
+
+router.post("/", authenticateToken, parseProductUpload, async (req, res) => {
+  if (req.user.role !== "SELLER" && req.user.isVendor !== true) {
     return res
       .status(403)
       .json({ success: false, message: "Seller role required." });
   }
 
-  const {
-    title,
-    description,
-    category,
-    basePrice,
-    stock,
-    demandScore = 0,
-    priceFloor,
-    priceCeiling,
-    competitorPrice,
-  } = req.body || {};
+  if (req.file && !hasValidImageSignature(req.file)) {
+    return res.status(400).json({
+      success: false,
+      message: "The uploaded file is not a valid JPEG, PNG, or WebP image.",
+    });
+  }
+
+  const toNumber = (value) =>
+    typeof value === "string" && value.trim() ? Number(value) : value;
+  const { title, description, category } = req.body || {};
+  const competitorPrice = toNumber(req.body?.competitorPrice);
+  const basePrice = toNumber(req.body?.basePrice);
+  const stock = toNumber(req.body?.stock);
+  const demandScore = toNumber(req.body?.demandScore ?? 0);
+  const priceFloor = toNumber(req.body?.priceFloor);
+  const priceCeiling = toNumber(req.body?.priceCeiling);
 
   if (typeof title !== "string" || !title.trim()) {
     return res
@@ -40,8 +93,7 @@ router.post("/", authenticateToken, async (req, res) => {
   };
   if (
     Object.entries(numericFields).some(
-      ([field, value]) =>
-        typeof value !== "number" || !Number.isFinite(value),
+      ([field, value]) => typeof value !== "number" || !Number.isFinite(value),
     )
   ) {
     return res.status(400).json({
@@ -91,16 +143,28 @@ router.post("/", authenticateToken, async (req, res) => {
     });
   }
 
+  let uploadedImagePath;
   try {
     const currentPrice = Math.min(
       priceCeiling,
       Math.max(priceFloor, basePrice),
     );
+    let imageUrl;
+    if (req.file) {
+      const filename = `${randomUUID()}.${imageExtensions[req.file.mimetype]}`;
+      const imageDirectory = path.resolve(__dirname, "../uploads/products");
+      uploadedImagePath = path.join(imageDirectory, filename);
+      await fs.mkdir(imageDirectory, { recursive: true });
+      await fs.writeFile(uploadedImagePath, req.file.buffer, { flag: "wx" });
+      imageUrl = `/uploads/products/${filename}`;
+    }
+
     const product = await Product.create({
       vendor: req.user._id,
       title: title.trim(),
       description: description?.trim() || "",
       category: category?.trim() || "",
+      imageUrl,
       basePrice,
       currentPrice,
       stock,
@@ -112,6 +176,13 @@ router.post("/", authenticateToken, async (req, res) => {
 
     return res.status(201).json({ success: true, product });
   } catch (error) {
+    if (uploadedImagePath) {
+      try {
+        await fs.rm(uploadedImagePath, { force: true });
+      } catch (cleanupError) {
+        console.error("Uploaded product image could not be removed:", cleanupError);
+      }
+    }
     console.error("Vendor product could not be created:", error);
     return res.status(500).json({
       success: false,
@@ -129,7 +200,9 @@ router.get("/mine", authenticateToken, async (req, res) => {
 
   try {
     const filter =
-      req.user.role === "ADMIN" ? {} : { vendor: req.user._id };
+      req.user.role === "ADMIN" && req.user.isVendor !== true
+        ? {}
+        : { vendor: req.user._id };
     const products = await Product.find(filter).sort({ updatedAt: -1 }).lean();
     return res.json({ success: true, products });
   } catch (error) {
@@ -187,9 +260,7 @@ router.get("/store/:vendorId", async (req, res) => {
         price: product.currentPrice,
         vendorId: vendor._id.toString(),
         vendor:
-          vendor.storeName ||
-          vendor.vendorDetails?.businessName ||
-          vendor.name,
+          vendor.storeName || vendor.vendorDetails?.businessName || vendor.name,
       })),
     });
   } catch (error) {
@@ -204,10 +275,7 @@ router.get("/store/:vendorId", async (req, res) => {
 router.get("/", async (_req, res) => {
   try {
     const products = await Product.find()
-      .populate(
-        "vendor",
-        "name storeName vendorDetails.businessName",
-      )
+      .populate("vendor", "name storeName vendorDetails.businessName")
       .sort({ createdAt: -1 })
       .lean();
     return res.json(

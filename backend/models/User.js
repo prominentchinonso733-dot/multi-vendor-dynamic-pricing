@@ -24,6 +24,7 @@ const UserSchema = new mongoose.Schema(
         enum: ["ACTIVE", "INACTIVE", "PENDING"],
         default: "INACTIVE",
       },
+      isVendor: { type: Boolean, default: false },
       paystackSubaccountCode: { type: String }, // For Paystack split payouts
       bankDetails: {
         accountNumber: { type: String },

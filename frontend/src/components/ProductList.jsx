@@ -1,6 +1,6 @@
 import { useState, useEffect } from "react";
 import { Link } from "react-router-dom";
-import { getApiErrorMessage } from "../api";
+import { getApiErrorMessage, getAssetUrl } from "../api";
 import { productsService } from "../services/productsService";
 
 // eslint-disable-next-line react/prop-types
@@ -85,7 +85,7 @@ const ProductList = ({ onAddToCart }) => {
           >
             <div>
               <img
-                src={product.image}
+                src={getAssetUrl(product.imageUrl || product.image)}
                 alt={product.name}
                 onError={(e) => {
                   e.target.src =

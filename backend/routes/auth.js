@@ -37,13 +37,21 @@ const normalizeRole = (role) =>
     ROLE_ADMIN: "ADMIN",
   })[role] || role;
 
+const hasVendorAccess = (user) =>
+  normalizeRole(user.role) === "SELLER" ||
+  user.vendorDetails?.isVendor === true;
+
 const issueToken = (user) => {
   if (!process.env.JWT_SECRET) {
     throw new Error("JWT_SECRET is not configured.");
   }
 
   return jwt.sign(
-    { id: user._id.toString(), role: normalizeRole(user.role) },
+    {
+      id: user._id.toString(),
+      role: normalizeRole(user.role),
+      isVendor: hasVendorAccess(user),
+    },
     process.env.JWT_SECRET,
     { expiresIn: "1h" },
   );
@@ -54,6 +62,7 @@ const toPublicUser = (user) => ({
   name: user.name,
   email: user.email,
   role: normalizeRole(user.role),
+  isVendor: hasVendorAccess(user),
 });
 
 router.post("/register", async (req, res) => {
@@ -129,7 +138,7 @@ router.post("/login", async (req, res) => {
 });
 
 router.get("/profile", authenticateToken, async (req, res) => {
-  if (req.user.role !== "SELLER") {
+  if (req.user.role !== "SELLER" && req.user.isVendor !== true) {
     return res
       .status(403)
       .json({ success: false, message: "Seller role required." });
@@ -138,10 +147,10 @@ router.get("/profile", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
       .select(
-        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName",
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.isVendor",
       )
       .lean();
-    if (!user || user.role !== "SELLER") {
+    if (!user || !hasVendorAccess(user)) {
       return res
         .status(404)
         .json({ success: false, message: "Seller profile not found." });
@@ -165,7 +174,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
 });
 
 router.put("/profile", authenticateToken, async (req, res) => {
-  if (req.user.role !== "SELLER") {
+  if (req.user.role !== "SELLER" && req.user.isVendor !== true) {
     return res
       .status(403)
       .json({ success: false, message: "Seller role required." });
@@ -217,11 +226,16 @@ router.put("/profile", authenticateToken, async (req, res) => {
 
   try {
     const user = await User.findOneAndUpdate(
-      { _id: req.user._id, role: "SELLER" },
+      {
+        _id: req.user._id,
+        $or: [{ role: "SELLER" }, { "vendorDetails.isVendor": true }],
+      },
       { $set: updates },
       { new: true, runValidators: true },
     )
-      .select("name email role storeName storeLogo storeBanner storeDescription")
+      .select(
+        "name email role storeName storeLogo storeBanner storeDescription",
+      )
       .lean();
     if (!user) {
       return res

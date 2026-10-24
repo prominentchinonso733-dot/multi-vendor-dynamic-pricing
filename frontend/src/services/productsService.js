@@ -2,7 +2,11 @@ import { api } from "../api";
 
 export const productsService = {
   async create(product) {
-    const { data } = await api.post("/products", product);
+    const config =
+      typeof FormData !== "undefined" && product instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : undefined;
+    const { data } = await api.post("/products", product, config);
     return data.product;
   },
 

@@ -3,6 +3,15 @@ import { authService } from "../services/authService";
 
 const AuthContext = createContext(null);
 
+const normalizeRole = (role) =>
+  ({
+    ROLE_CUSTOMER: "BUYER",
+    ROLE_VENDOR: "SELLER",
+    ROLE_ADMIN: "ADMIN",
+  })[role] ||
+  role ||
+  null;
+
 const readStoredAuth = () => {
   try {
     return {
@@ -49,8 +58,11 @@ export function AuthProvider({ children }) {
       value={{
         token: auth.token,
         user: auth.user,
-        role: auth.user?.role || null,
+        role: normalizeRole(auth.user?.role),
         isAuthenticated: Boolean(auth.token),
+        isVendor:
+          normalizeRole(auth.user?.role) === "SELLER" ||
+          auth.user?.isVendor === true,
         login,
         register,
         logout,
