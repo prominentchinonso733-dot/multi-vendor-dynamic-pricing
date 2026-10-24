@@ -48,12 +48,19 @@ async function startServer() {
     );
 
     if (process.env.ADMIN_BOOTSTRAP_PASSWORD) {
-      const result = await ensureAdmin();
-      console.log(
-        result.created
-          ? "Bootstrap admin account created."
-          : "Bootstrap admin account already exists.",
-      );
+      try {
+        const result = await ensureAdmin();
+        console.log(
+          result.created
+            ? "Bootstrap admin account created."
+            : "Bootstrap admin account already exists.",
+        );
+      } catch (error) {
+        console.warn(
+          "Admin bootstrap failed; continuing server startup:",
+          error.message,
+        );
+      }
     } else if (process.env.NODE_ENV === "production") {
       console.warn(
         "Admin bootstrap skipped: configure ADMIN_BOOTSTRAP_PASSWORD to enable it.",
