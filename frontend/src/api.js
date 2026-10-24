@@ -9,10 +9,15 @@ export const API_BASE_URL = /\/api$/i.test(normalizedBaseUrl)
   ? normalizedBaseUrl
   : `${normalizedBaseUrl}/api`;
 
-export const getAssetUrl = (url) =>
-  typeof url === "string" && url.startsWith("/uploads/")
-    ? `${API_BASE_URL.replace(/\/api$/i, "")}${url}`
-    : url;
+const BACKEND_BASE_URL = normalizedBaseUrl.replace(/\/api$/i, "");
+
+export const getAssetUrl = (url) => {
+  if (typeof url !== "string" || !/^\/?uploads\//i.test(url)) {
+    return url;
+  }
+
+  return `${BACKEND_BASE_URL}/${url.replace(/^\/+/, "")}`;
+};
 
 export const api = axios.create({
   baseURL: API_BASE_URL,

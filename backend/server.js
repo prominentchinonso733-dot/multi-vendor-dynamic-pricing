@@ -33,7 +33,7 @@ app.use("/api/pricing", pricingRoutes);
 app.use("/api/webhooks", webhookRoutes);
 
 const frontendDistPath = path.resolve(__dirname, "..", "frontend", "dist");
-app.use("/uploads", express.static(path.resolve(__dirname, "uploads")));
+app.use("/uploads", express.static(path.join(__dirname, "uploads")));
 app.use(express.static(frontendDistPath));
 app.get("/{*path}", (req, res, next) => {
   if (req.path === "/api" || req.path.startsWith("/api/")) {
