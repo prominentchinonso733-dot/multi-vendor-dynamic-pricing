@@ -14,7 +14,6 @@ const Navbar = ({
   activeTab,
   setActiveTab,
   onOpenCart,
-  isKycVerified,
   role,
   user,
   onLogout,
@@ -55,7 +54,8 @@ const Navbar = ({
           >
             Vendor Dashboard
           </button>
-        ) : (
+        ) : null}
+        {role !== "ADMIN" && role !== "SELLER" && (
           <>
             <button
               onClick={() => selectTab("products")}
@@ -72,30 +72,33 @@ const Navbar = ({
               My Orders
             </button>
             <button
-              onClick={() => selectTab("seller")}
-              style={buttonStyle(activeTab === "seller")}
-              type="button"
-            >
-              Admin Sign In
-            </button>
-            <button
               onClick={onOpenCart}
               style={buttonStyle(false)}
               type="button"
             >
               Cart ({cartCount})
             </button>
-            <button
-              aria-pressed={isKycVerified}
-              onClick={() => selectTab("kyc")}
-              style={buttonStyle(false)}
-              title={
-                isKycVerified ? "KYC verified" : "KYC verification required"
-              }
-              type="button"
-            >
-              {isKycVerified ? "KYC Verified" : "4-Way KYC"}
-            </button>
+            {role === "BUYER" ? (
+              <button
+                onClick={() => navigate("/account")}
+                style={buttonStyle(false)}
+                type="button"
+              >
+                Account
+              </button>
+            ) : (
+              <button
+                onClick={() => navigate("/account")}
+                style={{
+                  ...buttonStyle(false),
+                  border: "1px solid #94a3b8",
+                  padding: "0.5rem 1rem",
+                }}
+                type="button"
+              >
+                Sign In / Register
+              </button>
+            )}
           </>
         )}
         {role && (
@@ -128,7 +131,6 @@ Navbar.propTypes = {
   activeTab: PropTypes.string.isRequired,
   setActiveTab: PropTypes.func.isRequired,
   onOpenCart: PropTypes.func.isRequired,
-  isKycVerified: PropTypes.bool.isRequired,
   role: PropTypes.string,
   user: PropTypes.shape({
     name: PropTypes.string,

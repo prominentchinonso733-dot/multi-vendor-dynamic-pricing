@@ -7,6 +7,7 @@ import SellerDashboard from "./components/SellerDashboard";
 import VendorDashboard from "./components/VendorDashboard";
 import BuyerDashboard from "./components/BuyerDashboard";
 import VendorStorefront from "./components/VendorStorefront";
+import AccountAuth from "./components/AccountAuth";
 import { useAuth } from "./context/AuthContext";
 
 const DEMO_BUYER_ID = "650000000000000000000000";
@@ -89,7 +90,6 @@ function App() {
         onOpenCart={() => setIsCartOpen(true)}
         activeTab={activeTab}
         setActiveTab={setActiveTab}
-        isKycVerified={isKycVerified}
         role={role}
         user={user}
         onLogout={logout}
@@ -97,6 +97,9 @@ function App() {
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <Routes>
+          <Route path="/account" element={<AccountAuth role="BUYER" />} />
+          <Route path="/admin/login" element={<SellerDashboard />} />
+          <Route path="/vendor/login" element={<AccountAuth role="SELLER" />} />
           <Route
             path="/store/:vendorId"
             element={
