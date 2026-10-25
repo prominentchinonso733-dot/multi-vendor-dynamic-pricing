@@ -64,13 +64,15 @@ const Navbar = ({
             >
               Products
             </button>
-            <button
-              onClick={() => selectTab("buyer")}
-              style={buttonStyle(activeTab === "buyer")}
-              type="button"
-            >
-              My Orders
-            </button>
+            {role === "BUYER" && (
+              <button
+                onClick={() => selectTab("buyer")}
+                style={buttonStyle(activeTab === "buyer")}
+                type="button"
+              >
+                My Orders
+              </button>
+            )}
             <button
               onClick={onOpenCart}
               style={buttonStyle(false)}
@@ -78,15 +80,7 @@ const Navbar = ({
             >
               Cart ({cartCount})
             </button>
-            {role === "BUYER" ? (
-              <button
-                onClick={() => navigate("/account")}
-                style={buttonStyle(false)}
-                type="button"
-              >
-                Account
-              </button>
-            ) : (
+            {!role && (
               <button
                 onClick={() => navigate("/account")}
                 style={{
@@ -101,7 +95,7 @@ const Navbar = ({
             )}
           </>
         )}
-        {role && (
+        {role && role !== "BUYER" && (
           <span aria-label="Signed in account">
             {user?.name || user?.email} ({role})
           </span>
@@ -118,7 +112,7 @@ const Navbar = ({
             }}
             type="button"
           >
-            Sign out
+            Sign Out
           </button>
         )}
       </div>
