@@ -14,6 +14,7 @@ const escrowContractSchema = new mongoose.Schema(
         price: Number,
         quantity: Number,
         vendor: String,
+        vendorId: String,
       },
     ],
     subtotal: {
@@ -38,6 +39,24 @@ const escrowContractSchema = new mongoose.Schema(
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "User",
+      },
+    ],
+    fulfillmentStatuses: [
+      {
+        sellerId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        status: {
+          type: String,
+          enum: ["PENDING", "PROCESSING", "SHIPPED", "DELIVERED"],
+          default: "PENDING",
+        },
+        updatedAt: {
+          type: Date,
+          default: Date.now,
+        },
       },
     ],
     status: {

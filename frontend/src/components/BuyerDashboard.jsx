@@ -8,6 +8,7 @@ import {
 import DisputeReasonDialog, { DisputeReasonNote } from "./DisputeReasonDialog";
 import "./BuyerDashboard.css";
 import { API_BASE_URL } from "../api";
+import { useAuth } from "../context/AuthContext";
 
 const ESCROW_API = `${API_BASE_URL}/escrow`;
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
@@ -33,6 +34,10 @@ const statusClassNames = {
   COMPLETED: "buyer-dashboard__status--released",
   CLOSED: "buyer-dashboard__status--released",
   REFUNDED: "buyer-dashboard__status--refunded",
+  PENDING: "buyer-dashboard__status--pending",
+  PROCESSING: "buyer-dashboard__status--processing",
+  SHIPPED: "buyer-dashboard__status--shipped",
+  DELIVERED: "buyer-dashboard__status--delivered",
 };
 
 const getStatusLabel = (status) => {
@@ -48,6 +53,29 @@ const getOrderItems = (items = []) =>
   items.map((item) => `${item.name} x${item.quantity}`).join(", ") ||
   "Order items";
 
+const getFulfillmentStatuses = (order) => {
+  const statuses = Array.isArray(order.fulfillmentStatuses)
+    ? order.fulfillmentStatuses
+    : [];
+  const sellerIds = Array.isArray(order.sellerIds) ? order.sellerIds : [];
+  const entries =
+    statuses.length > 0
+      ? statuses
+      : sellerIds.map((sellerId) => ({ sellerId, status: "PENDING" }));
+
+  return entries.map((entry) => {
+    const sellerId = String(entry.sellerId || "");
+    const vendorName = order.items?.find(
+      (item) => String(item.vendorId || "") === sellerId,
+    )?.vendor;
+    return {
+      sellerId,
+      label: vendorName || `Vendor ${sellerId.slice(-6)}`,
+      status: entry.status || "PENDING",
+    };
+  });
+};
+
 export default function BuyerDashboard({
   // eslint-disable-next-line react/prop-types
   buyerId,
@@ -56,6 +84,7 @@ export default function BuyerDashboard({
   // eslint-disable-next-line react/prop-types
   setRefreshVersion,
 }) {
+  const { authFetch } = useAuth();
   const [activeOrders, setActiveOrders] = useState([]);
   const [completedOrders, setCompletedOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -67,15 +96,22 @@ export default function BuyerDashboard({
   useEffect(() => {
     const controller = new AbortController();
     const query = `?buyerId=${encodeURIComponent(buyerId)}`;
+    let isRefreshing = false;
 
-    async function loadOrders() {
-      setLoading(true);
-      setError("");
+    async function loadOrders(showLoading = false) {
+      if (isRefreshing) return;
+      isRefreshing = true;
+      if (showLoading) {
+        setLoading(true);
+        setError("");
+      }
 
       try {
         const [activeResponse, completedResponse] = await Promise.all([
-          fetch(`${ESCROW_API}/active${query}`, { signal: controller.signal }),
-          fetch(`${ESCROW_API}/completed${query}`, {
+          authFetch(`${ESCROW_API}/active${query}`, {
+            signal: controller.signal,
+          }),
+          authFetch(`${ESCROW_API}/completed${query}`, {
             signal: controller.signal,
           }),
         ]);
@@ -105,18 +141,24 @@ export default function BuyerDashboard({
             ? completedData.contracts.filter(isCompletedOrder)
             : [],
         );
+        setError("");
       } catch (loadError) {
         if (loadError.name !== "AbortError") {
           setError(loadError.message || "Unable to load orders.");
         }
       } finally {
-        if (!controller.signal.aborted) setLoading(false);
+        isRefreshing = false;
+        if (!controller.signal.aborted && showLoading) setLoading(false);
       }
     }
 
-    loadOrders();
-    return () => controller.abort();
-  }, [buyerId, refreshVersion]);
+    loadOrders(true);
+    const refreshInterval = window.setInterval(() => loadOrders(), 5000);
+    return () => {
+      window.clearInterval(refreshInterval);
+      controller.abort();
+    };
+  }, [authFetch, buyerId, refreshVersion]);
 
   const updateOrder = async (contractId, action, disputeReason) => {
     setPendingOrderId(contractId);
@@ -257,13 +299,33 @@ export default function BuyerDashboard({
                     )}
                   </td>
                   <td>
-                    <span
-                      className={`buyer-dashboard__status ${
-                        statusClassNames[order.status] || ""
-                      }`}
-                    >
-                      {getStatusLabel(order.status)}
-                    </span>
+                    {getFulfillmentStatuses(order).length > 0 ? (
+                      <div className="buyer-dashboard__fulfillments">
+                        {getFulfillmentStatuses(order).map((fulfillment) => (
+                          <div
+                            className="buyer-dashboard__fulfillment"
+                            key={fulfillment.sellerId}
+                          >
+                            <span>{fulfillment.label}</span>
+                            <span
+                              className={`buyer-dashboard__status ${
+                                statusClassNames[fulfillment.status] || ""
+                              }`}
+                            >
+                              {getStatusLabel(fulfillment.status)}
+                            </span>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <span
+                        className={`buyer-dashboard__status ${
+                          statusClassNames[order.status] || ""
+                        }`}
+                      >
+                        {getStatusLabel(order.status)}
+                      </span>
+                    )}
                     {order.status === "IN_DISPUTE" && (
                       <DisputeReasonNote reason={order.disputeReason} />
                     )}
@@ -271,17 +333,28 @@ export default function BuyerDashboard({
                   <td className="buyer-dashboard__actions">
                     {["LOCKED", "FUNDS_LOCKED"].includes(order.status) && (
                       <>
-                        <button
-                          className="buyer-dashboard__confirm"
-                          type="button"
-                          onClick={() => updateOrder(order._id, "release")}
-                          disabled={pendingOrderId !== null}
-                        >
-                          <CheckCircle2 size={16} aria-hidden="true" />
-                          {pendingOrderId === order._id
-                            ? "Confirming..."
-                            : "Confirm Receipt & Release"}
-                        </button>
+                        {getFulfillmentStatuses(order).every(
+                          (fulfillment) => fulfillment.status === "DELIVERED",
+                        ) && (
+                          <button
+                            className="buyer-dashboard__confirm"
+                            type="button"
+                            onClick={() => updateOrder(order._id, "release")}
+                            disabled={pendingOrderId !== null}
+                          >
+                            <CheckCircle2 size={16} aria-hidden="true" />
+                            {pendingOrderId === order._id
+                              ? "Confirming..."
+                              : "Confirm Receipt & Release"}
+                          </button>
+                        )}
+                        {getFulfillmentStatuses(order).some(
+                          (fulfillment) => fulfillment.status !== "DELIVERED",
+                        ) && (
+                          <span className="buyer-dashboard__review-note">
+                            Waiting for all vendors to mark delivery
+                          </span>
+                        )}
                         <button
                           className="buyer-dashboard__dispute"
                           type="button"
@@ -354,15 +427,35 @@ export default function BuyerDashboard({
                       )}
                     </td>
                     <td>
-                      <span
-                        className={`buyer-dashboard__status ${
-                          statusClassNames[
-                            String(order.status || "").toUpperCase()
-                          ] || ""
-                        }`}
-                      >
-                        {getStatusLabel(order.status)}
-                      </span>
+                      {getFulfillmentStatuses(order).length > 0 ? (
+                        <div className="buyer-dashboard__fulfillments">
+                          {getFulfillmentStatuses(order).map((fulfillment) => (
+                            <div
+                              className="buyer-dashboard__fulfillment"
+                              key={fulfillment.sellerId}
+                            >
+                              <span>{fulfillment.label}</span>
+                              <span
+                                className={`buyer-dashboard__status ${
+                                  statusClassNames[fulfillment.status] || ""
+                                }`}
+                              >
+                                {getStatusLabel(fulfillment.status)}
+                              </span>
+                            </div>
+                          ))}
+                        </div>
+                      ) : (
+                        <span
+                          className={`buyer-dashboard__status ${
+                            statusClassNames[
+                              String(order.status || "").toUpperCase()
+                            ] || ""
+                          }`}
+                        >
+                          {getStatusLabel(order.status)}
+                        </span>
+                      )}
                     </td>
                     <td>
                       {completedAt ? (

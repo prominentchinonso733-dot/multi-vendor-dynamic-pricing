@@ -79,10 +79,53 @@ const requireAdmin = (req, res, next) => {
   return next();
 };
 
+const toVendorOrder = (contract, sellerId) => {
+  const order = contract.toObject();
+  return {
+    _id: order._id,
+    paymentReference: order.paymentReference,
+    status: order.status,
+    createdAt: order.createdAt,
+    items: (order.items || [])
+      .filter(
+        (item) =>
+          String(item.vendorId || item.sellerId || "") === sellerId.toString(),
+      )
+      .map(({ name, quantity, vendor, vendorId }) => ({
+        name,
+        quantity,
+        vendor,
+        vendorId,
+      })),
+    fulfillmentStatuses: (order.fulfillmentStatuses || [])
+      .filter((entry) => entry.sellerId.toString() === sellerId.toString())
+      .map(({ sellerId: fulfillmentSellerId, status, updatedAt }) => ({
+        sellerId: fulfillmentSellerId,
+        status,
+        updatedAt,
+      })),
+  };
+};
+
 // POST /api/escrow/lock-funds
-router.post("/lock-funds", async (req, res) => {
+router.post("/lock-funds", authenticateOptionalToken, async (req, res) => {
   try {
     const { buyerId, items, subtotal, isKycVerified } = req.body;
+    if (
+      req.user?.role === "BUYER" &&
+      buyerId !== (req.user._id || req.user.id)
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only create an order for your own account.",
+      });
+    }
+    if (req.user && !["BUYER", "ADMIN"].includes(req.user.role)) {
+      return res.status(403).json({
+        success: false,
+        message: "Buyer role required to create an order.",
+      });
+    }
     const buyerEmail =
       typeof req.body.buyerEmail === "string"
         ? req.body.buyerEmail.trim().toLowerCase()
@@ -132,6 +175,10 @@ router.post("/lock-funds", async (req, res) => {
       totalHoldAmount,
       buyerEmail,
       sellerIds,
+      fulfillmentStatuses: sellerIds.map((sellerId) => ({
+        sellerId,
+        status: "PENDING",
+      })),
       status: "PAYMENT_PENDING",
       paymentReference: `ESCROW_${crypto.randomUUID()}`,
     });
@@ -235,6 +282,106 @@ router.post("/verify", async (req, res) => {
   }
 });
 
+// GET /api/escrow/vendor/orders
+router.get("/vendor/orders", authenticateToken, async (req, res) => {
+  try {
+    if (req.user.role !== "SELLER") {
+      return res
+        .status(403)
+        .json({ success: false, message: "Vendor role required." });
+    }
+
+    const sellerId = req.user._id || req.user.id;
+    if (!mongoose.isValidObjectId(sellerId)) {
+      return res
+        .status(401)
+        .json({ success: false, message: "Invalid vendor account." });
+    }
+
+    const contracts = await EscrowContract.find({
+      sellerIds: sellerId,
+      status: { $in: ["LOCKED", "FUNDS_LOCKED"] },
+    }).sort({ createdAt: -1 });
+
+    return res.json({
+      success: true,
+      contracts: contracts.map((contract) => toVendorOrder(contract, sellerId)),
+    });
+  } catch (error) {
+    return res.status(500).json({ success: false, error: error.message });
+  }
+});
+
+// PATCH /api/escrow/:contractId/vendor-status
+router.patch(
+  "/:contractId/vendor-status",
+  authenticateToken,
+  async (req, res) => {
+    try {
+      if (req.user.role !== "SELLER") {
+        return res
+          .status(403)
+          .json({ success: false, message: "Vendor role required." });
+      }
+
+      const { contractId } = req.params;
+      const { status } = req.body;
+      const sellerId = req.user._id || req.user.id;
+
+      if (!mongoose.isValidObjectId(contractId)) {
+        return res.status(400).json({
+          success: false,
+          message: "A valid contractId is required.",
+        });
+      }
+      if (!mongoose.isValidObjectId(sellerId)) {
+        return res
+          .status(401)
+          .json({ success: false, message: "Invalid vendor account." });
+      }
+      if (!["PENDING", "PROCESSING", "SHIPPED", "DELIVERED"].includes(status)) {
+        return res.status(400).json({
+          success: false,
+          message:
+            "Status must be PENDING, PROCESSING, SHIPPED, or DELIVERED.",
+        });
+      }
+
+      const contract = await EscrowContract.findOne({
+        _id: contractId,
+        sellerIds: sellerId,
+        status: { $in: ["LOCKED", "FUNDS_LOCKED"] },
+      });
+      if (!contract) {
+        return res.status(404).json({
+          success: false,
+          message: "Active order not found for this vendor.",
+        });
+      }
+
+      let fulfillment = contract.fulfillmentStatuses.find(
+        (entry) => entry.sellerId.toString() === sellerId.toString(),
+      );
+      if (!fulfillment) {
+        contract.fulfillmentStatuses.push({ sellerId, status });
+        fulfillment = contract.fulfillmentStatuses.at(-1);
+      } else {
+        fulfillment.status = status;
+        fulfillment.updatedAt = new Date();
+      }
+
+      await contract.save();
+      return res.json({
+        success: true,
+        message: "Order fulfillment status updated.",
+        contract: toVendorOrder(contract, sellerId),
+      });
+    } catch (error) {
+      return res.status(500).json({ success: false, error: error.message });
+    }
+  },
+);
+
 // POST /api/escrow/release-funds
 router.post("/release-funds", async (req, res) => {
   try {
@@ -244,6 +391,31 @@ router.post("/release-funds", async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "A valid contractId is required.",
+      });
+    }
+
+    const currentContract = await EscrowContract.findById(contractId);
+    if (
+      !currentContract ||
+      !["LOCKED", "FUNDS_LOCKED"].includes(currentContract.status)
+    ) {
+      return res.status(404).json({
+        success: false,
+        message: "Locked escrow contract not found.",
+      });
+    }
+    if (
+      currentContract.fulfillmentStatuses.length > 0 &&
+      currentContract.sellerIds.some((sellerId) => {
+        const fulfillment = currentContract.fulfillmentStatuses.find(
+          (entry) => entry.sellerId.toString() === sellerId.toString(),
+        );
+        return fulfillment?.status !== "DELIVERED";
+      })
+    ) {
+      return res.status(409).json({
+        success: false,
+        message: "All vendors must mark their items delivered before release.",
       });
     }
 
@@ -365,7 +537,7 @@ router.post(
 );
 
 // GET /api/escrow/active
-router.get("/active", async (req, res) => {
+router.get("/active", authenticateOptionalToken, async (req, res) => {
   try {
     const { buyerId } = req.query;
 
@@ -379,7 +551,23 @@ router.get("/active", async (req, res) => {
     const filter = {
       status: { $in: ["LOCKED", "FUNDS_LOCKED", "IN_DISPUTE"] },
     };
-    if (buyerId) filter.buyerId = buyerId;
+    if (req.user?.role === "BUYER") {
+      const authenticatedBuyerId = req.user._id || req.user.id;
+      if (buyerId && buyerId !== authenticatedBuyerId) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only view your own orders.",
+        });
+      }
+      filter.buyerId = authenticatedBuyerId;
+    } else if (req.user && req.user.role !== "ADMIN") {
+      return res.status(403).json({
+        success: false,
+        message: "Buyer role required.",
+      });
+    } else if (buyerId) {
+      filter.buyerId = buyerId;
+    }
 
     const contracts = await EscrowContract.find(filter).sort({ createdAt: -1 });
 
@@ -402,12 +590,31 @@ router.get("/completed", authenticateOptionalToken, async (req, res) => {
       });
     }
 
+    if (req.user?.role === "BUYER") {
+      const authenticatedBuyerId = req.user._id || req.user.id;
+      if (buyerId && buyerId !== authenticatedBuyerId) {
+        return res.status(403).json({
+          success: false,
+          message: "You can only view your own orders.",
+        });
+      }
+    } else if (req.user && !isAdmin) {
+      return res.status(403).json({
+        success: false,
+        message: "Buyer role required.",
+      });
+    }
+
     const filter = {
       status: {
         $in: [/^RELEASED$/i, /^COMPLETED$/i, /^REFUNDED$/i, /^CLOSED$/i],
       },
     };
-    if (buyerId && !isAdmin) filter.buyerId = buyerId;
+    if (req.user?.role === "BUYER") {
+      filter.buyerId = req.user._id || req.user.id;
+    } else if (buyerId && !isAdmin) {
+      filter.buyerId = buyerId;
+    }
 
     const contracts = await EscrowContract.find(filter).sort({
       completedAt: -1,

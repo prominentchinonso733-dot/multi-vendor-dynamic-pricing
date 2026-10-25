@@ -16,6 +16,7 @@ function App() {
   const { isAuthenticated, isVendor, role, user, logout } = useAuth();
   const isAdmin = isAuthenticated && role === "ADMIN";
   const isActiveVendor = isAuthenticated && isVendor && role === "SELLER";
+  const buyerId = role === "BUYER" && user?.id ? user.id : DEMO_BUYER_ID;
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
@@ -75,7 +76,7 @@ function App() {
     <VendorDashboard />
   ) : activeTab === "buyer" ? (
     <BuyerDashboard
-      buyerId={DEMO_BUYER_ID}
+      buyerId={buyerId}
       refreshVersion={ordersRefreshVersion}
       setRefreshVersion={setOrdersRefreshVersion}
     />
@@ -122,7 +123,7 @@ function App() {
         cart={cart}
         onUpdateQuantity={updateQuantity}
         onRemoveItem={removeFromCart}
-        buyerId={DEMO_BUYER_ID}
+        buyerId={buyerId}
         isKycVerified={isKycVerified}
         setIsKycVerified={setIsKycVerified}
         onPaymentVerified={() =>

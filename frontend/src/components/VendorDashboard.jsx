@@ -5,6 +5,8 @@ import { getApiErrorMessage, getAssetUrl } from "../api";
 import { authService } from "../services/authService";
 import { pricingService } from "../services/pricingService";
 import { productsService } from "../services/productsService";
+import { escrowService } from "../services/escrowService";
+import { useAuth } from "../context/AuthContext";
 import "./VendorDashboard.css";
 
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
@@ -80,6 +82,7 @@ const validateDraft = (draft) => {
 };
 
 export default function VendorDashboard({ onPriceUpdated }) {
+  const { user } = useAuth();
   const [products, setProducts] = useState([]);
   const [drafts, setDrafts] = useState({});
   const [results, setResults] = useState({});
@@ -113,6 +116,12 @@ export default function VendorDashboard({ onPriceUpdated }) {
   const [profileSaving, setProfileSaving] = useState(false);
   const [profileError, setProfileError] = useState("");
   const [profileNotice, setProfileNotice] = useState("");
+  const [vendorOrders, setVendorOrders] = useState([]);
+  const [ordersLoading, setOrdersLoading] = useState(false);
+  const [ordersError, setOrdersError] = useState("");
+  const [ordersNotice, setOrdersNotice] = useState("");
+  const [pendingOrderStatusId, setPendingOrderStatusId] = useState(null);
+  const [ordersRefreshVersion, setOrdersRefreshVersion] = useState(0);
 
   useEffect(() => {
     if (!selectedImage) {
@@ -164,6 +173,36 @@ export default function VendorDashboard({ onPriceUpdated }) {
     loadStoreProfile();
     return () => controller.abort();
   }, [activeSection]);
+
+  useEffect(() => {
+    if (activeSection !== "orders") return undefined;
+
+    const controller = new AbortController();
+    async function loadVendorOrders() {
+      setOrdersLoading(true);
+      setOrdersError("");
+      try {
+        const contracts = await escrowService.listVendorOrders({
+          signal: controller.signal,
+        });
+        if (!Array.isArray(contracts)) {
+          throw new Error("The orders API returned an invalid order list.");
+        }
+        setVendorOrders(contracts);
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          setOrdersError(
+            getApiErrorMessage(error, "Unable to load your orders."),
+          );
+        }
+      } finally {
+        if (!controller.signal.aborted) setOrdersLoading(false);
+      }
+    }
+
+    loadVendorOrders();
+    return () => controller.abort();
+  }, [activeSection, ordersRefreshVersion]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -234,6 +273,28 @@ export default function VendorDashboard({ onPriceUpdated }) {
       ...currentResults,
       [productId]: null,
     }));
+  };
+
+  const updateVendorOrderStatus = async (contractId, status) => {
+    setPendingOrderStatusId(contractId);
+    setOrdersError("");
+    setOrdersNotice("");
+    try {
+      const updatedContract = await escrowService.updateVendorStatus(
+        contractId,
+        status,
+      );
+      setVendorOrders((orders) =>
+        orders.map((order) =>
+          order._id === updatedContract._id ? updatedContract : order,
+        ),
+      );
+      setOrdersNotice("Order status updated.");
+    } catch (error) {
+      setOrdersError(getApiErrorMessage(error, "Unable to update order status."));
+    } finally {
+      setPendingOrderStatusId(null);
+    }
   };
 
   const updateCreateDraft = (field, value) => {
@@ -624,6 +685,18 @@ export default function VendorDashboard({ onPriceUpdated }) {
           Inventory
         </button>
         <button
+          aria-current={activeSection === "orders" ? "page" : undefined}
+          className={
+            activeSection === "orders"
+              ? "vendor-pricing__tab vendor-pricing__tab--active"
+              : "vendor-pricing__tab"
+          }
+          onClick={() => setActiveSection("orders")}
+          type="button"
+        >
+          Orders
+        </button>
+        <button
           aria-current={activeSection === "store-settings" ? "page" : undefined}
           className={
             activeSection === "store-settings"
@@ -637,7 +710,113 @@ export default function VendorDashboard({ onPriceUpdated }) {
         </button>
       </nav>
 
-      {activeSection === "dynamic-pricing" ? (
+      {activeSection === "orders" ? (
+        <section
+          aria-labelledby="vendor-orders-title"
+          className="vendor-pricing__settings"
+        >
+          <div className="vendor-pricing__settings-heading">
+            <div>
+              <p className="vendor-pricing__eyebrow">ORDER MANAGEMENT</p>
+              <h2 id="vendor-orders-title">Orders</h2>
+              <p>Update fulfillment progress for your items in each order.</p>
+            </div>
+            <button
+              className="vendor-pricing__refresh"
+              disabled={ordersLoading}
+              onClick={() =>
+                setOrdersRefreshVersion((version) => version + 1)
+              }
+              type="button"
+            >
+              <RefreshCw
+                aria-hidden="true"
+                className={ordersLoading ? "vendor-pricing__spinning" : ""}
+                size={16}
+              />
+              Refresh orders
+            </button>
+          </div>
+          {ordersError && (
+            <div
+              className="vendor-pricing__message vendor-pricing__message--error"
+              role="alert"
+            >
+              <AlertCircle aria-hidden="true" size={18} />
+              <span>{ordersError}</span>
+            </div>
+          )}
+          {ordersNotice && (
+            <div
+              className="vendor-pricing__message vendor-pricing__message--success"
+              role="status"
+            >
+              {ordersNotice}
+            </div>
+          )}
+          {ordersLoading ? (
+            <p className="vendor-pricing__empty" role="status">
+              Loading your orders...
+            </p>
+          ) : ordersError ? null : vendorOrders.length === 0 ? (
+            <p className="vendor-pricing__empty">
+              No paid orders are ready for fulfillment.
+            </p>
+          ) : (
+            <div className="vendor-pricing__products">
+              {vendorOrders.map((order) => {
+                const sellerId = String(user?.id || "");
+                const fulfillment = order.fulfillmentStatuses?.find(
+                  (entry) => String(entry.sellerId) === sellerId,
+                );
+                const status = fulfillment?.status || "PENDING";
+                const vendorItems = order.items?.filter((item) => {
+                  const itemSellerId = item.vendorId || item.sellerId;
+                  return !itemSellerId || String(itemSellerId) === sellerId;
+                });
+                const itemSummary =
+                  vendorItems
+                    ?.map((item) => `${item.name} x${item.quantity}`)
+                    .join(", ") || "Order items";
+
+                return (
+                  <article
+                    className="vendor-pricing__card vendor-pricing__order-card"
+                    key={order._id}
+                  >
+                    <header className="vendor-pricing__product-header">
+                      <div>
+                        <h3>{order.paymentReference}</h3>
+                        <p>{itemSummary}</p>
+                      </div>
+                      <span
+                        className={`vendor-pricing__order-status vendor-pricing__order-status--${status.toLowerCase()}`}
+                      >
+                        {status.replaceAll("_", " ")}
+                      </span>
+                    </header>
+                    <label className="vendor-pricing__order-control">
+                      <span>Fulfillment status</span>
+                      <select
+                        disabled={pendingOrderStatusId === order._id}
+                        onChange={(event) =>
+                          updateVendorOrderStatus(order._id, event.target.value)
+                        }
+                        value={status}
+                      >
+                        <option value="PENDING">Pending</option>
+                        <option value="PROCESSING">Processing</option>
+                        <option value="SHIPPED">Shipped</option>
+                        <option value="DELIVERED">Delivered</option>
+                      </select>
+                    </label>
+                  </article>
+                );
+              })}
+            </div>
+          )}
+        </section>
+      ) : activeSection === "dynamic-pricing" ? (
         <>
           {createNotice && (
             <div

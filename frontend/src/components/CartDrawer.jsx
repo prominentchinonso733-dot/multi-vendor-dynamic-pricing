@@ -36,7 +36,7 @@ export default function CartDrawer({
   setIsKycVerified,
   onPaymentVerified,
 }) {
-  const { user } = useAuth();
+  const { authFetch, user } = useAuth();
   const [buyerEmail, setBuyerEmail] = useState(user?.email || "");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [checkoutPending, setCheckoutPending] = useState(false);
@@ -88,7 +88,7 @@ export default function CartDrawer({
         ),
       ];
 
-      const response = await fetch(`${API_BASE_URL}/escrow/lock-funds`, {
+      const response = await authFetch(`${API_BASE_URL}/escrow/lock-funds`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
@@ -122,7 +122,7 @@ export default function CartDrawer({
 
         void (async () => {
           try {
-            const verifyResponse = await fetch(
+            const verifyResponse = await authFetch(
               `${API_BASE_URL}/escrow/verify`,
               {
                 method: "POST",
