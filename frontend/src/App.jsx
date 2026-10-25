@@ -12,8 +12,9 @@ import { useAuth } from "./context/AuthContext";
 const DEMO_BUYER_ID = "650000000000000000000000";
 
 function App() {
-  const { isAuthenticated, isVendor: hasVendorAccess } = useAuth();
-  const isVendor = isAuthenticated && hasVendorAccess;
+  const { isAuthenticated, isVendor, role, user, logout } = useAuth();
+  const isAdmin = isAuthenticated && role === "ADMIN";
+  const isActiveVendor = isAuthenticated && isVendor && role === "SELLER";
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [isKycVerified, setIsKycVerified] = useState(false);
@@ -21,8 +22,14 @@ function App() {
   const [ordersRefreshVersion, setOrdersRefreshVersion] = useState(0);
 
   useEffect(() => {
-    if (isVendor) setActiveTab("vendor");
-  }, [isVendor]);
+    if (isAdmin) {
+      setActiveTab("seller");
+    } else if (isActiveVendor) {
+      setActiveTab("vendor");
+    } else if (activeTab === "seller" || activeTab === "vendor") {
+      setActiveTab("products");
+    }
+  }, [activeTab, isActiveVendor, isAdmin]);
 
   // Add product to cart or increment quantity if already present
   const addToCart = (product) => {
@@ -61,20 +68,19 @@ function App() {
 
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
   // Keep dashboard tab selection separate from the public storefront route.
-  const tabContent =
-    activeTab === "vendor" && isVendor ? (
-      <VendorDashboard />
-    ) : activeTab === "seller" ? (
-      <SellerDashboard />
-    ) : activeTab === "buyer" ? (
-      <BuyerDashboard
-        buyerId={DEMO_BUYER_ID}
-        refreshVersion={ordersRefreshVersion}
-        setRefreshVersion={setOrdersRefreshVersion}
-      />
-    ) : (
-      <ProductList onAddToCart={addToCart} />
-    );
+  const tabContent = isAdmin ? (
+    <SellerDashboard />
+  ) : isActiveVendor ? (
+    <VendorDashboard />
+  ) : activeTab === "buyer" ? (
+    <BuyerDashboard
+      buyerId={DEMO_BUYER_ID}
+      refreshVersion={ordersRefreshVersion}
+      setRefreshVersion={setOrdersRefreshVersion}
+    />
+  ) : (
+    <ProductList onAddToCart={addToCart} />
+  );
 
   return (
     <div className="min-h-screen bg-gray-50 text-gray-900">
@@ -84,15 +90,24 @@ function App() {
         activeTab={activeTab}
         setActiveTab={setActiveTab}
         isKycVerified={isKycVerified}
-        setIsKycVerified={setIsKycVerified}
-        isVendor={isVendor}
+        role={role}
+        user={user}
+        onLogout={logout}
       />
 
       <main className="max-w-7xl mx-auto px-4 py-8">
         <Routes>
           <Route
             path="/store/:vendorId"
-            element={<VendorStorefront onAddToCart={addToCart} />}
+            element={
+              isAdmin ? (
+                <SellerDashboard />
+              ) : isActiveVendor ? (
+                <VendorDashboard />
+              ) : (
+                <VendorStorefront onAddToCart={addToCart} />
+              )
+            }
           />
           <Route path="*" element={tabContent} />
         </Routes>

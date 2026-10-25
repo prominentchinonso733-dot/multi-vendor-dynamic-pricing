@@ -46,7 +46,7 @@ const isCompletedContract = (contract) =>
   completedStatuses.has(String(contract?.status || "").toUpperCase());
 
 export default function SellerDashboard() {
-  const { authFetch, login, logout, role, user } = useAuth();
+  const { authFetch, login, role, user } = useAuth();
   const isAdmin = role === "ADMIN";
   const [contracts, setContracts] = useState([]);
   const [completedContracts, setCompletedContracts] = useState([]);
@@ -64,6 +64,13 @@ export default function SellerDashboard() {
     const controller = new AbortController();
 
     async function loadContracts() {
+      if (!isAdmin) {
+        setContracts([]);
+        setCompletedContracts([]);
+        setLoading(false);
+        return;
+      }
+
       setLoading(true);
       setError("");
 
@@ -113,7 +120,7 @@ export default function SellerDashboard() {
 
     loadContracts();
     return () => controller.abort();
-  }, [authFetch, refreshVersion]);
+  }, [authFetch, isAdmin, refreshVersion]);
 
   const releaseFunds = async (contractId) => {
     setPendingContractId(contractId);
@@ -231,17 +238,11 @@ export default function SellerDashboard() {
     setNotice("");
 
     try {
-      const signedInUser = await login({
-        email: adminEmail,
-        password: adminPassword,
-      });
+      await login(
+        { email: adminEmail, password: adminPassword },
+        { expectedRole: "ADMIN" },
+      );
       setAdminPassword("");
-
-      if (signedInUser.role !== "ADMIN") {
-        setError("This account does not have ADMIN access.");
-        return;
-      }
-
       setNotice("Admin access granted. Disputes can now be resolved.");
     } catch (authError) {
       setError(authError.message || "Unable to sign in.");
@@ -258,33 +259,41 @@ export default function SellerDashboard() {
       <header className="seller-dashboard__header">
         <div>
           <p className="seller-dashboard__eyebrow">ESCROW OPERATIONS</p>
-          <h1 id="seller-dashboard-title">Seller dashboard</h1>
+          <h1 id="seller-dashboard-title">
+            {isAdmin ? "Admin dashboard" : "Admin sign in"}
+          </h1>
           <p className="seller-dashboard__description">
-            Review active contracts and release funds when an order is complete.
+            {isAdmin
+              ? "Review active contracts and resolve escrow disputes."
+              : "Sign in with an administrator account to manage escrow disputes."}
           </p>
         </div>
-        <div className="seller-dashboard__count" aria-live="polite">
-          <span>Active contracts</span>
-          <strong>{contracts.length}</strong>
-        </div>
+        {isAdmin && (
+          <div className="seller-dashboard__count" aria-live="polite">
+            <span>Active contracts</span>
+            <strong>{contracts.length}</strong>
+          </div>
+        )}
       </header>
 
-      <div className="seller-dashboard__toolbar">
-        <h2>Active escrow contracts</h2>
-        <button
-          className="seller-dashboard__refresh"
-          type="button"
-          onClick={() => setRefreshVersion((version) => version + 1)}
-          disabled={loading}
-        >
-          <RefreshCw
-            size={16}
-            aria-hidden="true"
-            className={loading ? "seller-dashboard__spinning" : ""}
-          />
-          Refresh
-        </button>
-      </div>
+      {isAdmin && (
+        <div className="seller-dashboard__toolbar">
+          <h2>Active escrow contracts</h2>
+          <button
+            className="seller-dashboard__refresh"
+            type="button"
+            onClick={() => setRefreshVersion((version) => version + 1)}
+            disabled={loading}
+          >
+            <RefreshCw
+              size={16}
+              aria-hidden="true"
+              className={loading ? "seller-dashboard__spinning" : ""}
+            />
+            Refresh
+          </button>
+        </div>
+      )}
 
       {error && (
         <div
@@ -313,13 +322,6 @@ export default function SellerDashboard() {
             <p>
               Signed in as <strong>{user?.email || "ADMIN"}</strong>
             </p>
-            <button
-              className="seller-dashboard__refresh"
-              type="button"
-              onClick={logout}
-            >
-              Sign out
-            </button>
           </div>
         ) : (
           <form
@@ -365,8 +367,9 @@ export default function SellerDashboard() {
         )}
       </section>
 
-      <div className="seller-dashboard__table-wrap">
-        <table className="seller-dashboard__table">
+      {isAdmin && (
+        <div className="seller-dashboard__table-wrap">
+          <table className="seller-dashboard__table">
           <thead>
             <tr>
               <th scope="col">Payment reference</th>
@@ -471,17 +474,20 @@ export default function SellerDashboard() {
               ))
             )}
           </tbody>
-        </table>
-      </div>
+          </table>
+        </div>
+      )}
 
-      <div className="seller-dashboard__toolbar">
-        <h2 id="completed-transactions-title">Completed Transactions</h2>
-      </div>
-      <div className="seller-dashboard__table-wrap">
-        <table
-          className="seller-dashboard__table"
-          aria-labelledby="completed-transactions-title"
-        >
+      {isAdmin && (
+        <>
+          <div className="seller-dashboard__toolbar">
+            <h2 id="completed-transactions-title">Completed Transactions</h2>
+          </div>
+          <div className="seller-dashboard__table-wrap">
+            <table
+              className="seller-dashboard__table"
+              aria-labelledby="completed-transactions-title"
+            >
           <thead>
             <tr>
               <th scope="col">Payment reference</th>
@@ -543,8 +549,10 @@ export default function SellerDashboard() {
               })
             )}
           </tbody>
-        </table>
-      </div>
+            </table>
+          </div>
+        </>
+      )}
       {disputeContractId && (
         <DisputeReasonDialog
           isPending={pendingContractId === disputeContractId}

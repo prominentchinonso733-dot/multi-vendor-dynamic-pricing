@@ -1,13 +1,23 @@
 import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
 
+const buttonStyle = (active) => ({
+  background: "none",
+  border: "none",
+  color: active ? "#60a5fa" : "#fff",
+  cursor: "pointer",
+  fontWeight: active ? "bold" : "normal",
+});
+
 const Navbar = ({
   cartCount,
   activeTab,
   setActiveTab,
   onOpenCart,
   isKycVerified,
-  isVendor,
+  role,
+  user,
+  onLogout,
 }) => {
   const navigate = useNavigate();
   const selectTab = (tab) => {
@@ -27,83 +37,87 @@ const Navbar = ({
     >
       <h2>Escrow Marketplace MVP</h2>
       <div style={{ display: "flex", gap: "1.5rem", alignItems: "center" }}>
-        <button
-          aria-pressed={isKycVerified}
-          title={isKycVerified ? "KYC verified" : "KYC verification required"}
-          style={{
-            background: "none",
-            border: "none",
-            color: activeTab === "products" ? "#60a5fa" : "#fff",
-            cursor: "pointer",
-            fontWeight: "bold",
-          }}
-          onClick={() => selectTab("products")}
-        >
-          Products
-        </button>
-        <button
-          style={{
-            background: "none",
-            border: "none",
-            color: activeTab === "buyer" ? "#60a5fa" : "#fff",
-            cursor: "pointer",
-            fontWeight: activeTab === "buyer" ? "bold" : "normal",
-          }}
-          onClick={() => selectTab("buyer")}
-        >
-          My Orders
-        </button>
-        <button
-          style={{
-            background: "none",
-            border: "none",
-            color: activeTab === "seller" ? "#60a5fa" : "#fff",
-            cursor: "pointer",
-            fontWeight: activeTab === "seller" ? "bold" : "normal",
-          }}
-          onClick={() => selectTab("seller")}
-        >
-          Seller Dashboard
-        </button>
-        {isVendor && (
+        {role === "ADMIN" ? (
           <button
-            aria-current={activeTab === "vendor" ? "page" : undefined}
-            style={{
-              background: "none",
-              border: "none",
-              color: activeTab === "vendor" ? "#60a5fa" : "#fff",
-              cursor: "pointer",
-              fontWeight: activeTab === "vendor" ? "bold" : "normal",
-            }}
+            aria-current="page"
+            onClick={() => selectTab("seller")}
+            style={buttonStyle(activeTab === "seller")}
+            type="button"
+          >
+            Admin Dashboard
+          </button>
+        ) : role === "SELLER" ? (
+          <button
+            aria-current="page"
             onClick={() => selectTab("vendor")}
+            style={buttonStyle(activeTab === "vendor")}
+            type="button"
           >
             Vendor Dashboard
           </button>
+        ) : (
+          <>
+            <button
+              onClick={() => selectTab("products")}
+              style={buttonStyle(activeTab === "products")}
+              type="button"
+            >
+              Products
+            </button>
+            <button
+              onClick={() => selectTab("buyer")}
+              style={buttonStyle(activeTab === "buyer")}
+              type="button"
+            >
+              My Orders
+            </button>
+            <button
+              onClick={() => selectTab("seller")}
+              style={buttonStyle(activeTab === "seller")}
+              type="button"
+            >
+              Admin Sign In
+            </button>
+            <button
+              onClick={onOpenCart}
+              style={buttonStyle(false)}
+              type="button"
+            >
+              Cart ({cartCount})
+            </button>
+            <button
+              aria-pressed={isKycVerified}
+              onClick={() => selectTab("kyc")}
+              style={buttonStyle(false)}
+              title={
+                isKycVerified ? "KYC verified" : "KYC verification required"
+              }
+              type="button"
+            >
+              {isKycVerified ? "KYC Verified" : "4-Way KYC"}
+            </button>
+          </>
         )}
-        <button
-          style={{
-            background: "none",
-            border: "none",
-            color: "#fff",
-            cursor: "pointer",
-          }}
-          onClick={onOpenCart}
-        >
-          Cart ({cartCount})
-        </button>
-        <button
-          style={{
-            padding: "0.5rem 1rem",
-            backgroundColor: "#2563eb",
-            color: "#fff",
-            border: "none",
-            borderRadius: "4px",
-            cursor: "pointer",
-          }}
-          onClick={() => selectTab("kyc")}
-        >
-          {isKycVerified ? "KYC Verified" : "4-Way KYC"}
-        </button>
+        {role && (
+          <span aria-label="Signed in account">
+            {user?.name || user?.email} ({role})
+          </span>
+        )}
+        {role && (
+          <button
+            onClick={onLogout}
+            style={{
+              background: "none",
+              border: "1px solid #94a3b8",
+              color: "#fff",
+              padding: "0.5rem 1rem",
+              cursor: "pointer",
+            }}
+            type="button"
+          >
+            Sign out
+          </button>
+        )}
       </div>
     </nav>
   );
@@ -115,7 +129,12 @@ Navbar.propTypes = {
   setActiveTab: PropTypes.func.isRequired,
   onOpenCart: PropTypes.func.isRequired,
   isKycVerified: PropTypes.bool.isRequired,
-  isVendor: PropTypes.bool,
+  role: PropTypes.string,
+  user: PropTypes.shape({
+    name: PropTypes.string,
+    email: PropTypes.string,
+  }),
+  onLogout: PropTypes.func.isRequired,
 };
 
 export default Navbar;

@@ -104,7 +104,7 @@ const parseProductUpload = (req, res, next) => {
 };
 
 const canManageProducts = (user) =>
-  ["SELLER", "ADMIN"].includes(user.role) || user.isVendor === true;
+  ["SELLER", "ADMIN"].includes(user.role);
 
 const requireProductManager = (req, res, next) => {
   if (!canManageProducts(req.user)) {
@@ -116,7 +116,8 @@ const requireProductManager = (req, res, next) => {
 };
 
 const canManageProduct = (user, product) =>
-  user.role === "ADMIN" || product.vendor.toString() === user.id;
+  user.role === "ADMIN" ||
+  (user.role === "SELLER" && product.vendor.toString() === user.id);
 
 const loadManagedProduct = async (req, res, next) => {
   const { productId } = req.params;
@@ -354,10 +355,7 @@ router.get("/mine", authenticateToken, async (req, res) => {
   }
 
   try {
-    const filter =
-      req.user.role === "ADMIN" && req.user.isVendor !== true
-        ? {}
-        : { vendor: req.user._id };
+    const filter = req.user.role === "ADMIN" ? {} : { vendor: req.user._id };
     const products = await Product.find(filter).sort({ updatedAt: -1 }).lean();
     return res.json({ success: true, products });
   } catch (error) {

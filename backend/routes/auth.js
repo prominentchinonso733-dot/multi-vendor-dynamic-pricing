@@ -37,9 +37,7 @@ const normalizeRole = (role) =>
     ROLE_ADMIN: "ADMIN",
   })[role] || role;
 
-const hasVendorAccess = (user) =>
-  normalizeRole(user.role) === "SELLER" ||
-  user.vendorDetails?.isVendor === true;
+const hasVendorAccess = (user) => normalizeRole(user.role) === "SELLER";
 
 const issueToken = (user) => {
   if (!process.env.JWT_SECRET) {
@@ -138,7 +136,7 @@ router.post("/login", async (req, res) => {
 });
 
 router.get("/profile", authenticateToken, async (req, res) => {
-  if (req.user.role !== "SELLER" && req.user.isVendor !== true) {
+  if (req.user.role !== "SELLER") {
     return res
       .status(403)
       .json({ success: false, message: "Seller role required." });
@@ -174,7 +172,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
 });
 
 router.put("/profile", authenticateToken, async (req, res) => {
-  if (req.user.role !== "SELLER" && req.user.isVendor !== true) {
+  if (req.user.role !== "SELLER") {
     return res
       .status(403)
       .json({ success: false, message: "Seller role required." });

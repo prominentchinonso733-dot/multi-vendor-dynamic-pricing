@@ -5,7 +5,6 @@ import { getApiErrorMessage, getAssetUrl } from "../api";
 import { authService } from "../services/authService";
 import { pricingService } from "../services/pricingService";
 import { productsService } from "../services/productsService";
-import SellerDashboard from "./SellerDashboard";
 import "./VendorDashboard.css";
 
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
@@ -636,18 +635,6 @@ export default function VendorDashboard({ onPriceUpdated }) {
         >
           Store Settings
         </button>
-        <button
-          aria-current={activeSection === "escrow" ? "page" : undefined}
-          className={
-            activeSection === "escrow"
-              ? "vendor-pricing__tab vendor-pricing__tab--active"
-              : "vendor-pricing__tab"
-          }
-          onClick={() => setActiveSection("escrow")}
-          type="button"
-        >
-          Escrow Operations
-        </button>
       </nav>
 
       {activeSection === "dynamic-pricing" ? (
@@ -1045,8 +1032,6 @@ export default function VendorDashboard({ onPriceUpdated }) {
                 </div>
               )}
             </section>
-          ) : activeSection === "escrow" ? (
-            <SellerDashboard />
           ) : products.length === 0 ? (
             <p className="vendor-pricing__empty">
               No vendor products are available to price yet.

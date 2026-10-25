@@ -66,7 +66,8 @@ router.post("/calculate", authenticateToken, async (req, res) => {
     }
     if (
       req.user.role !== "ADMIN" &&
-      product.vendor.toString() !== req.user.id
+      (req.user.role !== "SELLER" ||
+        product.vendor.toString() !== req.user.id)
     ) {
       return res
         .status(403)

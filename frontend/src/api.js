@@ -27,9 +27,19 @@ export const api = axios.create({
 });
 
 api.interceptors.request.use((config) => {
-  const token =
+  const roleToTokenKey = {
+    ADMIN: "adminToken",
+    SELLER: "vendorToken",
+    BUYER: "buyerToken",
+  };
+  const activeRole =
     typeof localStorage !== "undefined"
-      ? localStorage.getItem("authToken")
+      ? localStorage.getItem("activeAuthRole")
+      : null;
+  const tokenKey = roleToTokenKey[activeRole];
+  const token =
+    tokenKey && typeof localStorage !== "undefined"
+      ? localStorage.getItem(tokenKey)
       : null;
 
   if (token) {
