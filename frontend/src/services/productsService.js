@@ -10,6 +10,26 @@ export const productsService = {
     return data.product;
   },
 
+  async update(productId, product) {
+    const config =
+      typeof FormData !== "undefined" && product instanceof FormData
+        ? { headers: { "Content-Type": "multipart/form-data" } }
+        : undefined;
+    const { data } = await api.patch(
+      `/products/${encodeURIComponent(productId)}`,
+      product,
+      config,
+    );
+    return data.product;
+  },
+
+  async remove(productId) {
+    const { data } = await api.delete(
+      `/products/${encodeURIComponent(productId)}`,
+    );
+    return data;
+  },
+
   async listMine(config = {}) {
     const { data } = await api.get("/products/mine", config);
     return data.products;

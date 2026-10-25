@@ -1,73 +1,162 @@
 const express = require("express");
-const fs = require("fs/promises");
-const path = require("path");
 const { randomUUID } = require("crypto");
 const multer = require("multer");
+const cloudinary = require("cloudinary").v2;
+const { CloudinaryStorage } = require("multer-storage-cloudinary");
 const Product = require("../models/Product");
 const User = require("../models/User");
 const authenticateToken = require("../middleware/authenticateToken");
 const mongoose = require("mongoose");
 
 const router = express.Router();
-const imageExtensions = {
-  "image/jpeg": "jpg",
-  "image/png": "png",
-  "image/webp": "webp",
-};
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+});
+const cloudinaryStorage = new CloudinaryStorage({
+  cloudinary,
+  params: async () => {
+    if (
+      !process.env.CLOUDINARY_CLOUD_NAME ||
+      !process.env.CLOUDINARY_API_KEY ||
+      !process.env.CLOUDINARY_API_SECRET
+    ) {
+      const error = new Error("Cloudinary is not configured.");
+      error.code = "CLOUDINARY_CONFIG_MISSING";
+      throw error;
+    }
+
+    return {
+      folder: "products",
+      resource_type: "image",
+      allowed_formats: ["jpg", "jpeg", "png", "webp"],
+      public_id: randomUUID(),
+    };
+  },
+});
 const uploadProductImage = multer({
-  storage: multer.memoryStorage(),
+  storage: cloudinaryStorage,
   limits: { fileSize: 5 * 1024 * 1024, files: 1 },
   fileFilter: (_req, file, callback) => {
-    if (!imageExtensions[file.mimetype]) {
-      return callback(new Error("Upload a JPEG, PNG, or WebP image."));
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) {
+      const error = new Error("Upload a JPEG, PNG, or WebP image.");
+      error.code = "INVALID_IMAGE_TYPE";
+      return callback(error);
     }
     return callback(null, true);
   },
 }).single("image");
 
+const removeCloudinaryImage = async (publicId) => {
+  if (!publicId) return;
+
+  try {
+    const result = await cloudinary.uploader.destroy(publicId, {
+      resource_type: "image",
+    });
+    if (!["ok", "not found"].includes(result.result)) {
+      console.error("Uploaded product image could not be removed:", result);
+    }
+  } catch (error) {
+    console.error("Uploaded product image could not be removed:", error);
+  }
+};
+
 const parseProductUpload = (req, res, next) => {
   uploadProductImage(req, res, (error) => {
-    if (!error) return next();
+    if (!error) {
+      if (req.file) {
+        res.once("finish", () => {
+          if (![200, 201].includes(res.statusCode)) {
+            void removeCloudinaryImage(req.file.filename);
+          }
+        });
+      }
+      return next();
+    }
 
-    const message =
-      error.code === "LIMIT_FILE_SIZE"
-        ? "Product images must be 5 MB or smaller."
-        : error.message;
-    return res.status(400).json({ success: false, message });
+    if (error.code === "CLOUDINARY_CONFIG_MISSING") {
+      return res.status(503).json({
+        success: false,
+        message: "Product image uploads are not configured.",
+      });
+    }
+    if (error.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        success: false,
+        message: "Product images must be 5 MB or smaller.",
+      });
+    }
+    if (
+      error.code === "INVALID_IMAGE_TYPE" ||
+      error instanceof multer.MulterError
+    ) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+
+    console.error("Product image could not be uploaded to Cloudinary:", error);
+    return res.status(502).json({
+      success: false,
+      message: "Product image could not be uploaded.",
+    });
   });
 };
 
-const hasValidImageSignature = (file) => {
-  const { buffer, mimetype } = file;
-  if (mimetype === "image/jpeg") {
-    return buffer[0] === 0xff && buffer[1] === 0xd8 && buffer[2] === 0xff;
-  }
-  if (mimetype === "image/png") {
-    return buffer.subarray(0, 8).equals(
-      Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    );
-  }
-  return (
-    mimetype === "image/webp" &&
-    buffer.toString("ascii", 0, 4) === "RIFF" &&
-    buffer.toString("ascii", 8, 12) === "WEBP"
-  );
-};
+const canManageProducts = (user) =>
+  ["SELLER", "ADMIN"].includes(user.role) || user.isVendor === true;
 
-router.post("/", authenticateToken, parseProductUpload, async (req, res) => {
-  if (req.user.role !== "SELLER" && req.user.isVendor !== true) {
+const requireProductManager = (req, res, next) => {
+  if (!canManageProducts(req.user)) {
     return res
       .status(403)
       .json({ success: false, message: "Seller role required." });
   }
+  return next();
+};
 
-  if (req.file && !hasValidImageSignature(req.file)) {
-    return res.status(400).json({
-      success: false,
-      message: "The uploaded file is not a valid JPEG, PNG, or WebP image.",
-    });
+const canManageProduct = (user, product) =>
+  user.role === "ADMIN" || product.vendor.toString() === user.id;
+
+const loadManagedProduct = async (req, res, next) => {
+  const { productId } = req.params;
+  if (!mongoose.isValidObjectId(productId)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "A valid productId is required." });
   }
 
+  try {
+    const product = await Product.findById(productId);
+    if (!product) {
+      return res
+        .status(404)
+        .json({ success: false, message: "Product not found." });
+    }
+    if (!canManageProduct(req.user, product)) {
+      return res.status(403).json({
+        success: false,
+        message: "You can only manage your own products.",
+      });
+    }
+
+    req.product = product;
+    return next();
+  } catch (error) {
+    console.error("Vendor product could not be loaded for management:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to load product.",
+    });
+  }
+};
+
+router.post(
+  "/",
+  authenticateToken,
+  requireProductManager,
+  parseProductUpload,
+  async (req, res) => {
   const toNumber = (value) =>
     typeof value === "string" && value.trim() ? Number(value) : value;
   const { title, description, category } = req.body || {};
@@ -143,28 +232,19 @@ router.post("/", authenticateToken, parseProductUpload, async (req, res) => {
     });
   }
 
-  let uploadedImagePath;
   try {
     const currentPrice = Math.min(
       priceCeiling,
       Math.max(priceFloor, basePrice),
     );
-    let imageUrl;
-    if (req.file) {
-      const filename = `${randomUUID()}.${imageExtensions[req.file.mimetype]}`;
-      const imageDirectory = path.resolve(__dirname, "../uploads/products");
-      uploadedImagePath = path.join(imageDirectory, filename);
-      await fs.mkdir(imageDirectory, { recursive: true });
-      await fs.writeFile(uploadedImagePath, req.file.buffer, { flag: "wx" });
-      imageUrl = `/uploads/products/${filename}`;
-    }
 
     const product = await Product.create({
       vendor: req.user._id,
       title: title.trim(),
       description: description?.trim() || "",
       category: category?.trim() || "",
-      imageUrl,
+      imageUrl: req.file?.path,
+      imagePublicId: req.file?.filename,
       basePrice,
       currentPrice,
       stock,
@@ -176,23 +256,98 @@ router.post("/", authenticateToken, parseProductUpload, async (req, res) => {
 
     return res.status(201).json({ success: true, product });
   } catch (error) {
-    if (uploadedImagePath) {
-      try {
-        await fs.rm(uploadedImagePath, { force: true });
-      } catch (cleanupError) {
-        console.error("Uploaded product image could not be removed:", cleanupError);
-      }
-    }
     console.error("Vendor product could not be created:", error);
     return res.status(500).json({
       success: false,
       message: "Unable to create product.",
     });
   }
-});
+  },
+);
+
+router.patch(
+  "/:productId",
+  authenticateToken,
+  requireProductManager,
+  loadManagedProduct,
+  parseProductUpload,
+  async (req, res) => {
+    const { title, description, category } = req.body || {};
+    if (
+      (title !== undefined &&
+        (typeof title !== "string" || !title.trim() || title.length > 160)) ||
+      (description !== undefined &&
+        (typeof description !== "string" || description.length > 2000)) ||
+      (category !== undefined &&
+        (typeof category !== "string" || category.length > 80))
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Product title, description, or category is invalid.",
+      });
+    }
+    if (
+      title === undefined &&
+      description === undefined &&
+      category === undefined &&
+      !req.file
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide product details or a replacement image.",
+      });
+    }
+
+    try {
+      const product = req.product;
+      const oldImagePublicId = product.imagePublicId;
+      if (title !== undefined) product.title = title.trim();
+      if (description !== undefined) product.description = description.trim();
+      if (category !== undefined) product.category = category.trim();
+      if (req.file) {
+        product.imageUrl = req.file.path;
+        product.imagePublicId = req.file.filename;
+        product.image = undefined;
+      }
+      await product.save();
+
+      if (req.file && oldImagePublicId) {
+        await removeCloudinaryImage(oldImagePublicId);
+      }
+      return res.json({ success: true, product });
+    } catch (error) {
+      console.error("Vendor product could not be updated:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Unable to update product.",
+      });
+    }
+  },
+);
+
+router.delete(
+  "/:productId",
+  authenticateToken,
+  requireProductManager,
+  loadManagedProduct,
+  async (req, res) => {
+    try {
+      const product = req.product;
+      await product.deleteOne();
+      await removeCloudinaryImage(product.imagePublicId);
+      return res.json({ success: true, productId: product.id });
+    } catch (error) {
+      console.error("Vendor product could not be deleted:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Unable to delete product.",
+      });
+    }
+  },
+);
 
 router.get("/mine", authenticateToken, async (req, res) => {
-  if (!["SELLER", "ADMIN"].includes(req.user.role)) {
+  if (!canManageProducts(req.user)) {
     return res
       .status(403)
       .json({ success: false, message: "Seller or admin role required." });

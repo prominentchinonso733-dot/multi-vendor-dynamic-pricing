@@ -48,6 +48,13 @@ or HTTPS URLs.
 `title`, `basePrice`, `stock`, `priceFloor`, and `priceCeiling`; `description`,
 `category`, `demandScore`, and `competitorPrice` are optional. Product
 ownership is assigned from the authenticated token, not from request data.
+Optional product images are uploaded directly to Cloudinary and stored as
+secure URLs. Configure `CLOUDINARY_CLOUD_NAME`, `CLOUDINARY_API_KEY`, and
+`CLOUDINARY_API_SECRET` in the backend environment (for example, in Render's
+environment settings) to enable image uploads. Images must be JPEG, PNG, or
+WebP and no larger than 5 MB. Use `PATCH /api/products/:productId` to update
+product details or replace an image, and `DELETE /api/products/:productId` to
+remove a product. Sellers can only update or remove their own listings.
 
 To reassign all existing products to an account, configure `MONGO_URI`
 and run `npm --prefix backend run reassign:products -- <USER_ID>
@@ -56,6 +63,5 @@ existing account with the `SELLER` or `ADMIN` role. This operation transfers
 ownership of every existing product document, including products currently
 assigned to other sellers.
 
-Run `npm --prefix backend run seed:sample-products` to idempotently insert the
-four example marketplace products for `prominentchinonso733@gmail.com`. The
-public `GET /api/products` endpoint reads product documents from MongoDB.
+The public `GET /api/products` endpoint reads product documents from MongoDB.
+Demo product seed data is not run on server startup.

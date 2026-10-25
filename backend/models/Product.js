@@ -11,6 +11,7 @@ const ProductSchema = new mongoose.Schema(
     description: { type: String },
     category: { type: String },
     imageUrl: { type: String },
+    imagePublicId: { type: String },
     image: { type: String },
     stock: { type: Number, required: true, default: 0 },
 

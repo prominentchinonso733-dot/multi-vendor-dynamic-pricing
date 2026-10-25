@@ -111,6 +111,61 @@
   box-shadow: 0 5px 18px rgb(19 43 53 / 5%);
 }
 
+.vendor-pricing__inventory-image {
+  display: block;
+  width: min(100%, 320px);
+  max-height: 220px;
+  margin-bottom: 16px;
+  object-fit: contain;
+}
+
+.vendor-pricing__inventory-edit {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  align-items: end;
+  gap: 14px;
+}
+
+.vendor-pricing__inventory-edit textarea {
+  width: 100%;
+  box-sizing: border-box;
+  padding: 10px;
+  border: 1px solid #b8c8c8;
+  border-radius: 3px;
+  color: #172b36;
+  font: inherit;
+  resize: vertical;
+}
+
+.vendor-pricing__inventory-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding-top: 12px;
+}
+
+.vendor-pricing__inventory-delete {
+  min-height: 40px;
+  padding: 0 14px;
+  border: 1px solid #d9a39b;
+  border-radius: 4px;
+  background: #fff;
+  color: #9b392b;
+  font: inherit;
+  font-size: 0.84rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vendor-pricing__inventory-delete:hover:not(:disabled) {
+  background: #fff4f1;
+}
+
+.vendor-pricing__inventory-delete:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
 .vendor-pricing__product-header {
   align-items: center;
   padding-bottom: 16px;
@@ -490,6 +545,7 @@
 
   .vendor-pricing__form,
   .vendor-pricing__create-form,
+  .vendor-pricing__inventory-edit,
   .vendor-pricing__settings-form,
   .vendor-pricing__result dl {
     grid-template-columns: 1fr;

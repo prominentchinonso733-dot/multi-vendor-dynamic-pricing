@@ -7,7 +7,6 @@
     "test": "echo \"Error: no test specified\" && exit 1",
     "seed:admin": "node scripts/seedAdmin.js",
     "promote:vendor": "node scripts/promoteVendor.js",
-    "seed:sample-products": "node scripts/seedSampleProducts.js",
     "reassign:products": "node scripts/reassignProductsToSeller.js"
   },
   "keywords": [],
@@ -17,12 +16,14 @@
     "@google/genai": "^2.23.0",
     "axios": "^1.20.0",
     "bcryptjs": "^3.0.3",
+    "cloudinary": "^1.41.3",
     "cors": "^2.8.6",
     "dotenv": "^17.4.2",
     "express": "^5.2.1",
     "jsonwebtoken": "^9.0.3",
     "mongoose": "^9.10.1",
     "multer": "^2.5.0",
+    "multer-storage-cloudinary": "^4.0.0",
     "paystack": "^2.0.1",
     "paystack-node": "^0.3.0",
     "socket.io": "^4.8.3"

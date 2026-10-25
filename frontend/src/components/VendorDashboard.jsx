@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
-import { getApiErrorMessage } from "../api";
+import { getApiErrorMessage, getAssetUrl } from "../api";
 import { authService } from "../services/authService";
 import { pricingService } from "../services/pricingService";
 import { productsService } from "../services/productsService";
@@ -88,6 +88,17 @@ export default function VendorDashboard({ onPriceUpdated }) {
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState("");
   const [pendingProductId, setPendingProductId] = useState(null);
+  const [pendingInventoryProductId, setPendingInventoryProductId] =
+    useState(null);
+  const [editingProductId, setEditingProductId] = useState(null);
+  const [editDraft, setEditDraft] = useState({
+    title: "",
+    description: "",
+    category: "",
+    image: null,
+  });
+  const [inventoryError, setInventoryError] = useState("");
+  const [inventoryNotice, setInventoryNotice] = useState("");
   const [refreshVersion, setRefreshVersion] = useState(0);
   const [showCreateForm, setShowCreateForm] = useState(false);
   const [createDraft, setCreateDraft] = useState(initialProductDraft);
@@ -366,6 +377,100 @@ export default function VendorDashboard({ onPriceUpdated }) {
       );
     } finally {
       setCreatePending(false);
+    }
+  };
+
+  const startEditingProduct = (product) => {
+    setEditingProductId(product._id);
+    setEditDraft({
+      title: product.title || "",
+      description: product.description || "",
+      category: product.category || "",
+      image: null,
+    });
+    setInventoryError("");
+    setInventoryNotice("");
+  };
+
+  const saveProductDetails = async (event, product) => {
+    event.preventDefault();
+    setInventoryError("");
+    setInventoryNotice("");
+    if (!editDraft.title.trim()) {
+      setInventoryError("Product name is required.");
+      return;
+    }
+    if (
+      editDraft.image &&
+      (!["image/jpeg", "image/png", "image/webp"].includes(
+        editDraft.image.type,
+      ) ||
+        editDraft.image.size > 5 * 1024 * 1024)
+    ) {
+      setInventoryError(
+        "Choose a JPEG, PNG, or WebP image no larger than 5 MB.",
+      );
+      return;
+    }
+
+    const productData = new FormData();
+    productData.append("title", editDraft.title.trim());
+    productData.append("description", editDraft.description.trim());
+    productData.append("category", editDraft.category.trim());
+    if (editDraft.image) productData.append("image", editDraft.image);
+
+    setPendingInventoryProductId(product._id);
+    try {
+      const updatedProduct = await productsService.update(
+        product._id,
+        productData,
+      );
+      setProducts((currentProducts) =>
+        currentProducts.map((currentProduct) =>
+          currentProduct._id === product._id
+            ? updatedProduct
+            : currentProduct,
+        ),
+      );
+      setEditingProductId(null);
+      setInventoryNotice("Product details saved.");
+    } catch (error) {
+      setInventoryError(
+        getApiErrorMessage(error, "Unable to update this product."),
+      );
+    } finally {
+      setPendingInventoryProductId(null);
+    }
+  };
+
+  const deleteProduct = async (product) => {
+    if (!window.confirm(`Delete "${product.title}"? This cannot be undone.`)) {
+      return;
+    }
+
+    setInventoryError("");
+    setInventoryNotice("");
+    setPendingInventoryProductId(product._id);
+    try {
+      await productsService.remove(product._id);
+      setProducts((currentProducts) =>
+        currentProducts.filter(
+          (currentProduct) => currentProduct._id !== product._id,
+        ),
+      );
+      setDrafts((currentDrafts) => {
+        const nextDrafts = { ...currentDrafts };
+        delete nextDrafts[product._id];
+        return nextDrafts;
+      });
+      setEditingProductId(null);
+      setInventoryNotice("Product deleted.");
+    } catch (error) {
+      setInventoryError(
+        getApiErrorMessage(error, "Unable to delete this product."),
+      );
+    } finally {
+      setPendingInventoryProductId(null);
     }
   };
 
@@ -779,6 +884,22 @@ export default function VendorDashboard({ onPriceUpdated }) {
                   <h2 id="vendor-inventory-title">Inventory</h2>
                 </div>
               </div>
+              {inventoryNotice && (
+                <div
+                  className="vendor-pricing__message vendor-pricing__message--success"
+                  role="status"
+                >
+                  {inventoryNotice}
+                </div>
+              )}
+              {inventoryError && (
+                <div
+                  className="vendor-pricing__message vendor-pricing__message--error"
+                  role="alert"
+                >
+                  {inventoryError}
+                </div>
+              )}
               {loadError ? (
                 <div
                   className="vendor-pricing__message vendor-pricing__message--error"
@@ -799,17 +920,126 @@ export default function VendorDashboard({ onPriceUpdated }) {
                 <div className="vendor-pricing__products">
                   {products.map((product) => (
                     <article className="vendor-pricing__card" key={product._id}>
-                      <header className="vendor-pricing__product-header">
-                        <div>
-                          <h2>{product.title || "Untitled product"}</h2>
-                          <p>{product.category || "Uncategorized"}</p>
-                        </div>
-                        <strong>{product.stock} in stock</strong>
-                      </header>
-                      <p>
-                        Current price:{" "}
-                        {currencyFormatter.format(product.currentPrice)}
-                      </p>
+                      {product.imageUrl || product.image ? (
+                        <img
+                          alt={product.title || "Product"}
+                          className="vendor-pricing__inventory-image"
+                          src={getAssetUrl(product.imageUrl || product.image)}
+                        />
+                      ) : null}
+                      {editingProductId === product._id ? (
+                        <form
+                          className="vendor-pricing__inventory-edit"
+                          onSubmit={(event) =>
+                            saveProductDetails(event, product)
+                          }
+                        >
+                          <label className="vendor-pricing__field">
+                            <span>Product name</span>
+                            <input
+                              maxLength="160"
+                              onChange={(event) =>
+                                setEditDraft((draft) => ({
+                                  ...draft,
+                                  title: event.target.value,
+                                }))
+                              }
+                              required
+                              value={editDraft.title}
+                            />
+                          </label>
+                          <label className="vendor-pricing__field">
+                            <span>Category</span>
+                            <input
+                              maxLength="80"
+                              onChange={(event) =>
+                                setEditDraft((draft) => ({
+                                  ...draft,
+                                  category: event.target.value,
+                                }))
+                              }
+                              value={editDraft.category}
+                            />
+                          </label>
+                          <label className="vendor-pricing__field vendor-pricing__field--wide">
+                            <span>Description</span>
+                            <textarea
+                              maxLength="2000"
+                              onChange={(event) =>
+                                setEditDraft((draft) => ({
+                                  ...draft,
+                                  description: event.target.value,
+                                }))
+                              }
+                              rows="3"
+                              value={editDraft.description}
+                            />
+                          </label>
+                          <label className="vendor-pricing__field vendor-pricing__field--wide">
+                            <span>Replace product image (optional)</span>
+                            <input
+                              accept="image/jpeg,image/png,image/webp"
+                              onChange={(event) =>
+                                setEditDraft((draft) => ({
+                                  ...draft,
+                                  image: event.target.files?.[0] || null,
+                                }))
+                              }
+                              type="file"
+                            />
+                          </label>
+                          <div className="vendor-pricing__inventory-actions">
+                            <button
+                              className="vendor-pricing__calculate"
+                              disabled={
+                                pendingInventoryProductId === product._id
+                              }
+                              type="submit"
+                            >
+                              Save changes
+                            </button>
+                            <button
+                              className="vendor-pricing__refresh"
+                              onClick={() => setEditingProductId(null)}
+                              type="button"
+                            >
+                              Cancel
+                            </button>
+                          </div>
+                        </form>
+                      ) : (
+                        <>
+                          <header className="vendor-pricing__product-header">
+                            <div>
+                              <h2>{product.title || "Untitled product"}</h2>
+                              <p>{product.category || "Uncategorized"}</p>
+                            </div>
+                            <strong>{product.stock} in stock</strong>
+                          </header>
+                          <p>
+                            Current price:{" "}
+                            {currencyFormatter.format(product.currentPrice)}
+                          </p>
+                          <div className="vendor-pricing__inventory-actions">
+                            <button
+                              className="vendor-pricing__refresh"
+                              disabled={pendingInventoryProductId !== null}
+                              onClick={() => startEditingProduct(product)}
+                              type="button"
+                            >
+                              Edit product
+                            </button>
+                            <button
+                              className="vendor-pricing__inventory-delete"
+                              disabled={pendingInventoryProductId !== null}
+                              onClick={() => deleteProduct(product)}
+                              type="button"
+                            >
+                              Delete product
+                            </button>
+                          </div>
+                        </>
+                      )}
                     </article>
                   ))}
                 </div>
