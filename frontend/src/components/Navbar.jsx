@@ -1,129 +1,118 @@
 import PropTypes from "prop-types";
-import { useNavigate } from "react-router-dom";
+import { Link, useLocation, useNavigate } from "react-router-dom";
+import "./Navbar.css";
 
-const buttonStyle = (active) => ({
-  background: "none",
-  border: "none",
-  color: active ? "#60a5fa" : "#fff",
-  cursor: "pointer",
-  fontWeight: active ? "bold" : "normal",
-});
-
-const Navbar = ({
-  cartCount,
-  activeTab,
-  setActiveTab,
-  onOpenCart,
-  role,
-  user,
-  onLogout,
-}) => {
+export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) {
+  const location = useLocation();
   const navigate = useNavigate();
-  const selectTab = (tab) => {
-    setActiveTab(tab);
-    navigate("/");
+  const isVendor = role === "SELLER";
+  const isAdmin = role === "ADMIN";
+  const isCustomer = !role || role === "BUYER";
+
+  const linkClassName = (path) =>
+    `site-nav__link${location.pathname === path ? " site-nav__link--active" : ""}`;
+  const handleLogout = () => {
+    onLogout();
+    navigate("/", { replace: true });
   };
 
   return (
-    <nav
-      style={{
-        display: "flex",
-        justifyContent: "space-between",
-        padding: "1rem 2rem",
-        backgroundColor: "#1e293b",
-        color: "#fff",
-      }}
-    >
-      <h2>Escrow Marketplace MVP</h2>
-      <div style={{ display: "flex", gap: "1.5rem", alignItems: "center" }}>
-        {role === "ADMIN" ? (
-          <button
-            aria-current="page"
-            onClick={() => selectTab("seller")}
-            style={buttonStyle(activeTab === "seller")}
-            type="button"
-          >
-            Admin Dashboard
-          </button>
-        ) : role === "SELLER" ? (
-          <button
-            aria-current="page"
-            onClick={() => selectTab("vendor")}
-            style={buttonStyle(activeTab === "vendor")}
-            type="button"
-          >
-            Vendor Dashboard
-          </button>
-        ) : null}
-        {role !== "ADMIN" && role !== "SELLER" && (
+    <header className="site-header">
+      <Link aria-label="Marketplace home" className="site-brand" to="/">
+        <span className="site-brand__mark" aria-hidden="true">
+          M
+        </span>
+        <span>Market<span className="site-brand__accent">place</span></span>
+      </Link>
+      <nav aria-label="Main navigation" className="site-nav">
+        {isCustomer && (
           <>
-            <button
-              onClick={() => selectTab("products")}
-              style={buttonStyle(activeTab === "products")}
-              type="button"
-            >
-              Products
-            </button>
+            <Link className={linkClassName("/")} to="/">
+              Explore products
+            </Link>
             {role === "BUYER" && (
-              <button
-                onClick={() => selectTab("buyer")}
-                style={buttonStyle(activeTab === "buyer")}
-                type="button"
-              >
-                My Orders
-              </button>
+              <Link className={linkClassName("/orders")} to="/orders">
+                My orders
+              </Link>
             )}
             <button
+              aria-label={`Open cart with ${cartCount} items`}
+              className="site-nav__cart"
               onClick={onOpenCart}
-              style={buttonStyle(false)}
               type="button"
             >
-              Cart ({cartCount})
+              Cart <span>{cartCount}</span>
             </button>
-            {!role && (
-              <button
-                onClick={() => navigate("/account")}
-                style={{
-                  ...buttonStyle(false),
-                  border: "1px solid #94a3b8",
-                  padding: "0.5rem 1rem",
-                }}
-                type="button"
-              >
-                Sign In / Register
-              </button>
+            {!role ? (
+              <Link className="site-nav__primary" to="/account">
+                Sign in / Register
+              </Link>
+            ) : (
+              <>
+                <span className="site-nav__identity">
+                  {user?.name || user?.email}
+                </span>
+                <button
+                  className="site-nav__link site-nav__button"
+                  onClick={handleLogout}
+                  type="button"
+                >
+                  Sign out
+                </button>
+              </>
             )}
           </>
         )}
-        {role && role !== "BUYER" && (
-          <span aria-label="Signed in account">
-            {user?.name || user?.email} ({role})
-          </span>
+        {isVendor && (
+          <>
+            <Link className={linkClassName("/")} to="/">
+              View marketplace
+            </Link>
+            <Link
+              className="site-nav__primary"
+              to="/vendor/dashboard"
+            >
+              Store management
+            </Link>
+            <span className="site-nav__identity">
+              {user?.name || user?.email}
+            </span>
+            <button
+              className="site-nav__link site-nav__button"
+              onClick={handleLogout}
+              type="button"
+            >
+              Sign out
+            </button>
+          </>
         )}
-        {role && (
-          <button
-            onClick={onLogout}
-            style={{
-              background: "none",
-              border: "1px solid #94a3b8",
-              color: "#fff",
-              padding: "0.5rem 1rem",
-              cursor: "pointer",
-            }}
-            type="button"
-          >
-            Sign Out
-          </button>
+        {isAdmin && (
+          <>
+            <Link className={linkClassName("/")} to="/">
+              View marketplace
+            </Link>
+            <Link className="site-nav__primary" to="/admin">
+              Admin panel
+            </Link>
+            <span className="site-nav__identity">
+              {user?.name || user?.email}
+            </span>
+            <button
+              className="site-nav__link site-nav__button"
+              onClick={handleLogout}
+              type="button"
+            >
+              Sign out
+            </button>
+          </>
         )}
-      </div>
-    </nav>
+      </nav>
+    </header>
   );
-};
+}
 
 Navbar.propTypes = {
   cartCount: PropTypes.number.isRequired,
-  activeTab: PropTypes.string.isRequired,
-  setActiveTab: PropTypes.func.isRequired,
   onOpenCart: PropTypes.func.isRequired,
   role: PropTypes.string,
   user: PropTypes.shape({
@@ -132,5 +121,3 @@ Navbar.propTypes = {
   }),
   onLogout: PropTypes.func.isRequired,
 };
-
-export default Navbar;

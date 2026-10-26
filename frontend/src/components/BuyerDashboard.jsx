@@ -169,7 +169,7 @@ export default function BuyerDashboard({
     const endpoint = isRelease ? "release-funds" : "dispute";
 
     try {
-      const response = await fetch(`${ESCROW_API}/${endpoint}`, {
+      const response = await authFetch(`${ESCROW_API}/${endpoint}`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ contractId, disputeReason }),

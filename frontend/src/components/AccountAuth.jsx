@@ -26,7 +26,9 @@ const AccountAuth = ({ role }) => {
       } else {
         await login({ email, password }, { expectedRole: role });
       }
-      navigate("/");
+      navigate(role === "SELLER" ? "/vendor/dashboard" : "/", {
+        replace: true,
+      });
     } catch (authError) {
       setError(authError.message || "Unable to sign in.");
     } finally {

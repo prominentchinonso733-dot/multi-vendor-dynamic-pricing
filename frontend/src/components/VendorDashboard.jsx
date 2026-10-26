@@ -297,6 +297,23 @@ export default function VendorDashboard({ onPriceUpdated }) {
     }
   };
 
+  const vendorSalesValue = vendorOrders.reduce(
+    (total, order) =>
+      order.status === "REFUNDED"
+        ? total
+        : total +
+          (order.items || []).reduce(
+            (orderTotal, item) =>
+              orderTotal +
+              (Number(item.price) || 0) * (Number(item.quantity) || 0),
+            0,
+          ),
+    0,
+  );
+  const vendorSalesOrderCount = vendorOrders.filter(
+    (order) => order.status !== "REFUNDED",
+  ).length;
+
   const updateCreateDraft = (field, value) => {
     setCreateDraft((currentDraft) => ({ ...currentDraft, [field]: value }));
     setCreateError("");
@@ -619,38 +636,55 @@ export default function VendorDashboard({ onPriceUpdated }) {
       <header className="vendor-pricing__header">
         <div>
           <p className="vendor-pricing__eyebrow">VENDOR TOOLS</p>
-          <h1 id="vendor-pricing-title">Dynamic pricing</h1>
+          <h1 id="vendor-pricing-title">
+            {activeSection === "orders"
+              ? "Order management"
+              : activeSection === "inventory"
+                ? "Inventory"
+                : activeSection === "store-settings"
+                  ? "Store settings"
+                  : "Store management"}
+          </h1>
           <p className="vendor-pricing__description">
-            Adjust product pricing inputs, then recalculate within your price
-            floor and ceiling. Recalculation saves all edited values.
+            {activeSection === "orders"
+              ? "Track paid orders and update delivery progress for your products."
+              : activeSection === "inventory"
+                ? "Manage your product details and available stock."
+                : activeSection === "store-settings"
+                  ? "Customize your public storefront."
+                  : "Manage your products, inventory, and dynamic pricing."}
           </p>
         </div>
-        <button
-          aria-label="Refresh vendor products"
-          className="vendor-pricing__refresh"
-          disabled={loading || pendingProductId !== null}
-          onClick={() => setRefreshVersion((version) => version + 1)}
-          type="button"
-        >
-          <RefreshCw
-            aria-hidden="true"
-            className={loading ? "vendor-pricing__spinning" : ""}
-            size={16}
-          />
-          Refresh products
-        </button>
-        <button
-          className="vendor-pricing__calculate"
-          disabled={createPending || loading}
-          onClick={() => {
-            setShowCreateForm((visible) => !visible);
-            setCreateError("");
-            setCreateNotice("");
-          }}
-          type="button"
-        >
-          {showCreateForm ? "Cancel" : "Add product"}
-        </button>
+        {["dynamic-pricing", "inventory"].includes(activeSection) && (
+          <button
+            aria-label="Refresh vendor products"
+            className="vendor-pricing__refresh"
+            disabled={loading || pendingProductId !== null}
+            onClick={() => setRefreshVersion((version) => version + 1)}
+            type="button"
+          >
+            <RefreshCw
+              aria-hidden="true"
+              className={loading ? "vendor-pricing__spinning" : ""}
+              size={16}
+            />
+            Refresh products
+          </button>
+        )}
+        {activeSection === "dynamic-pricing" && (
+          <button
+            className="vendor-pricing__calculate"
+            disabled={createPending || loading}
+            onClick={() => {
+              setShowCreateForm((visible) => !visible);
+              setCreateError("");
+              setCreateNotice("");
+            }}
+            type="button"
+          >
+            {showCreateForm ? "Cancel" : "Add product"}
+          </button>
+        )}
       </header>
 
       {/* Keep store profile settings alongside, but separate from, pricing tools. */}
@@ -737,6 +771,16 @@ export default function VendorDashboard({ onPriceUpdated }) {
               Refresh orders
             </button>
           </div>
+          <div className="vendor-pricing__sales-summary">
+            <article>
+              <span>Paid orders</span>
+              <strong>{vendorSalesOrderCount}</strong>
+            </article>
+            <article>
+              <span>Gross paid sales</span>
+              <strong>{currencyFormatter.format(vendorSalesValue)}</strong>
+            </article>
+          </div>
           {ordersError && (
             <div
               className="vendor-pricing__message vendor-pricing__message--error"
@@ -798,7 +842,10 @@ export default function VendorDashboard({ onPriceUpdated }) {
                     <label className="vendor-pricing__order-control">
                       <span>Fulfillment status</span>
                       <select
-                        disabled={pendingOrderStatusId === order._id}
+                        disabled={
+                          pendingOrderStatusId === order._id ||
+                          !["LOCKED", "FUNDS_LOCKED"].includes(order.status)
+                        }
                         onChange={(event) =>
                           updateVendorOrderStatus(order._id, event.target.value)
                         }
@@ -816,7 +863,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
             </div>
           )}
         </section>
-      ) : activeSection === "dynamic-pricing" ? (
+      ) : activeSection !== "store-settings" ? (
         <>
           {createNotice && (
             <div

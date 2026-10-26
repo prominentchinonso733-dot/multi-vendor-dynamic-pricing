@@ -55,6 +55,10 @@ export default function CartDrawer({
   const grandTotal = subtotal + escrowFee;
 
   const handleInitiateEscrow = async () => {
+    if (user?.role !== "BUYER" || !buyerId) {
+      setCheckoutMessage("Sign in to a customer account before checking out.");
+      return;
+    }
     if (!isKycVerified) {
       alert(
         "KYC Verification Required: Please complete 4-Way KYC verification before initiating an escrow contract.",

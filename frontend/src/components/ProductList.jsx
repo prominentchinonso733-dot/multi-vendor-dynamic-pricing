@@ -1,13 +1,17 @@
-import { useState, useEffect } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
+import { Search } from "lucide-react";
 import { getApiErrorMessage, getAssetUrl } from "../api";
 import { productsService } from "../services/productsService";
+import "./ProductList.css";
 
 // eslint-disable-next-line react/prop-types
-const ProductList = ({ onAddToCart }) => {
+export default function ProductList({ onAddToCart }) {
   const [products, setProducts] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(null);
+  const [error, setError] = useState("");
+  const [search, setSearch] = useState("");
+  const [selectedCategory, setSelectedCategory] = useState("All");
 
   useEffect(() => {
     const controller = new AbortController();
@@ -15,171 +19,210 @@ const ProductList = ({ onAddToCart }) => {
     productsService
       .list({ signal: controller.signal })
       .then((data) => {
-        setProducts(data);
-        setLoading(false);
-      })
-      .catch((err) => {
-        if (!controller.signal.aborted) {
-          setError(getApiErrorMessage(err, "Failed to fetch products."));
-          setLoading(false);
+        if (!Array.isArray(data)) {
+          throw new Error("The marketplace API returned an invalid product list.");
         }
+        setProducts(data);
+      })
+      .catch((loadError) => {
+        if (!controller.signal.aborted) {
+          setError(getApiErrorMessage(loadError, "Failed to fetch products."));
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setLoading(false);
       });
 
     return () => controller.abort();
   }, []);
 
+  const categories = useMemo(
+    () => [
+      "All",
+      ...new Set(
+        products
+          .map((product) => product.category?.trim())
+          .filter(Boolean)
+          .sort((left, right) => left.localeCompare(right)),
+      ),
+    ],
+    [products],
+  );
+
+  const filteredProducts = useMemo(() => {
+    const normalizedSearch = search.trim().toLowerCase();
+    return products.filter((product) => {
+      const matchesCategory =
+        selectedCategory === "All" ||
+        product.category?.trim() === selectedCategory;
+      const searchableText = [
+        product.name,
+        product.title,
+        product.description,
+        product.category,
+        product.vendor,
+      ]
+        .filter(Boolean)
+        .join(" ")
+        .toLowerCase();
+      return matchesCategory && searchableText.includes(normalizedSearch);
+    });
+  }, [products, search, selectedCategory]);
+
   if (loading) {
     return (
-      <div
-        style={{
-          textAlign: "center",
-          padding: "3rem",
-          fontSize: "1.2rem",
-          color: "#64748b",
-        }}
-      >
-        Loading marketplace products from server...
+      <div className="marketplace-state" role="status">
+        Loading marketplace products...
       </div>
     );
   }
 
   if (error) {
     return (
-      <div style={{ textAlign: "center", padding: "3rem", color: "#ef4444" }}>
-        <p>
-          <strong>Error:</strong> {error}
-        </p>
-        <p style={{ fontSize: "0.9rem", color: "#64748b" }}>
-          Check that the configured backend API is available.
-        </p>
-      </div>
+      <section className="marketplace-state marketplace-state--error" role="alert">
+        <h1>Marketplace unavailable</h1>
+        <p>{error}</p>
+        <p>Check that the configured marketplace API is available.</p>
+      </section>
     );
   }
 
   return (
-    <div style={{ maxWidth: "1200px", margin: "0 auto", padding: "1rem" }}>
-      <h2 style={{ marginBottom: "1.5rem", color: "#1e293b" }}>
-        Featured Marketplace Products
-      </h2>
+    <section aria-labelledby="marketplace-title" className="marketplace">
+      <header className="marketplace__hero">
+        <p className="marketplace__eyebrow">DISCOVER INDEPENDENT STORES</p>
+        <h1 id="marketplace-title">Good finds, from sellers worth knowing.</h1>
+        <p>
+          Explore products from independent vendors, find your next favorite,
+          and shop directly from their stores.
+        </p>
+        <label className="marketplace__search">
+          <Search aria-hidden="true" size={19} />
+          <span className="marketplace__sr-only">Search products and stores</span>
+          <input
+            onChange={(event) => setSearch(event.target.value)}
+            placeholder="Search products, categories, or stores"
+            type="search"
+            value={search}
+          />
+        </label>
+      </header>
 
-      <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(250px, 1fr))",
-          gap: "2rem",
-        }}
-      >
-        {products.map((product) => (
-          <div
-            key={product.id}
-            style={{
-              border: "1px solid #e2e8f0",
-              borderRadius: "10px",
-              overflow: "hidden",
-              boxShadow: "0 4px 6px -1px rgba(0, 0, 0, 0.1)",
-              backgroundColor: "#fff",
-              display: "flex",
-              flexDirection: "column",
-              justify: "space-between",
-            }}
+      <div className="marketplace__section-heading">
+        <div>
+          <p className="marketplace__eyebrow">THE MARKETPLACE</p>
+          <h2>Explore products</h2>
+        </div>
+        <span>{filteredProducts.length} products</span>
+      </div>
+
+      <nav aria-label="Filter products by category" className="marketplace__categories">
+        {categories.map((category) => (
+          <button
+            aria-pressed={selectedCategory === category}
+            className={
+              selectedCategory === category
+                ? "marketplace__category marketplace__category--active"
+                : "marketplace__category"
+            }
+            key={category}
+            onClick={() => setSelectedCategory(category)}
+            type="button"
           >
-            <div>
-              <img
-                src={getAssetUrl(product.imageUrl || product.image)}
-                alt={product.name}
-                onError={(e) => {
-                  e.target.src =
-                    "https://via.placeholder.com/300x180?text=Product+Image";
-                }}
-                style={{ width: "100%", height: "180px", objectFit: "cover" }}
-              />
-              <div style={{ padding: "1rem" }}>
-                <span
-                  style={{
-                    fontSize: "0.75rem",
-                    color: "#2563eb",
-                    fontWeight: "bold",
-                    textTransform: "uppercase",
-                  }}
-                >
-                  {product.category}
-                </span>
-                <h3
-                  style={{
-                    fontSize: "1.1rem",
-                    margin: "0.5rem 0",
-                    color: "#0f172a",
-                  }}
-                >
-                  {product.name}
-                </h3>
-                <p
-                  style={{
-                    fontSize: "0.85rem",
-                    color: "#64748b",
-                    margin: "0 0 1rem 0",
-                  }}
-                >
-                  Vendor: <strong>{product.vendor}</strong>
+            {category}
+          </button>
+        ))}
+      </nav>
+
+      {filteredProducts.length === 0 ? (
+        <div className="marketplace__empty">
+          <h3>{products.length ? "No matching products" : "The shelves are being stocked"}</h3>
+          <p>
+            {products.length
+              ? "Try another search or category."
+              : "Check back soon to discover products from our vendors."}
+          </p>
+          {(search || selectedCategory !== "All") && (
+            <button
+              className="marketplace__reset"
+              onClick={() => {
+                setSearch("");
+                setSelectedCategory("All");
+              }}
+              type="button"
+            >
+              Clear filters
+            </button>
+          )}
+        </div>
+      ) : (
+        <div className="marketplace__grid">
+          {filteredProducts.map((product) => (
+            <article className="marketplace-card" key={product.id || product._id}>
+              <div className="marketplace-card__image">
+                {product.imageUrl || product.image ? (
+                  <img
+                    alt={product.name || product.title || "Marketplace product"}
+                    loading="lazy"
+                    onError={(event) => {
+                      event.currentTarget.hidden = true;
+                    }}
+                    src={getAssetUrl(product.imageUrl || product.image)}
+                  />
+                ) : (
+                  <div
+                    aria-label={`${product.name || product.title || "Product"} image`}
+                    className="marketplace-card__image-placeholder"
+                    role="img"
+                  >
+                    {product.category || "Marketplace"}
+                  </div>
+                )}
+                <span>{product.category || "Featured"}</span>
+              </div>
+              <div className="marketplace-card__body">
+                <h3>{product.name || product.title}</h3>
+                {product.vendorId ? (
+                  <Link
+                    className="marketplace-card__vendor"
+                    to={`/store/${encodeURIComponent(product.vendorId)}`}
+                  >
+                    {product.vendor || "Visit vendor store"}
+                  </Link>
+                ) : (
+                  <span className="marketplace-card__vendor">
+                    {product.vendor || "Marketplace seller"}
+                  </span>
+                )}
+                <p className="marketplace-card__price">
+                  ₦{(Number(product.price ?? product.currentPrice) || 0).toLocaleString()}
                 </p>
-                <div
-                  style={{
-                    fontSize: "1.25rem",
-                    fontWeight: "bold",
-                    color: "#16a34a",
-                  }}
-                >
-                  ₦{product.price.toLocaleString()}
+                <div className="marketplace-card__actions">
+                  {product.vendorId ? (
+                    <Link
+                      className="marketplace-card__store"
+                      to={`/store/${encodeURIComponent(product.vendorId)}`}
+                    >
+                      Visit store
+                    </Link>
+                  ) : (
+                    <span className="marketplace-card__store marketplace-card__store--disabled">
+                      Store details unavailable
+                    </span>
+                  )}
+                  <button
+                    className="marketplace-card__add"
+                    onClick={() => onAddToCart(product)}
+                    type="button"
+                  >
+                    Add to cart
+                  </button>
                 </div>
               </div>
-            </div>
-
-            <div
-              style={{
-                display: "grid",
-                gap: "0.6rem",
-                padding: "1rem",
-                paddingTop: "0",
-              }}
-            >
-              {product.vendorId && (
-                <Link
-                  to={`/store/${encodeURIComponent(product.vendorId)}`}
-                  style={{
-                    display: "block",
-                    padding: "0.65rem",
-                    border: "1px solid #2563eb",
-                    borderRadius: "6px",
-                    color: "#2563eb",
-                    fontWeight: "bold",
-                    textAlign: "center",
-                    textDecoration: "none",
-                  }}
-                >
-                  Visit Store
-                </Link>
-              )}
-              <button
-                onClick={() => onAddToCart(product)}
-                style={{
-                  width: "100%",
-                  padding: "0.75rem",
-                  backgroundColor: "#2563eb",
-                  color: "#fff",
-                  border: "none",
-                  borderRadius: "6px",
-                  fontWeight: "bold",
-                  cursor: "pointer",
-                }}
-              >
-                Add to Cart
-              </button>
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
+            </article>
+          ))}
+        </div>
+      )}
+    </section>
   );
-};
-
-export default ProductList;
+}

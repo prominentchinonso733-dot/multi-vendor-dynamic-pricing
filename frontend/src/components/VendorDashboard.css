@@ -194,6 +194,31 @@
   overflow-wrap: anywhere;
 }
 
+.vendor-pricing__sales-summary {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(210px, 1fr));
+  gap: 14px;
+  margin: 18px 0;
+}
+
+.vendor-pricing__sales-summary article {
+  display: grid;
+  gap: 7px;
+  padding: 16px;
+  border: 1px solid #dce5e5;
+  background: #f8fbfa;
+}
+
+.vendor-pricing__sales-summary span {
+  color: #5c6f76;
+  font-size: 0.8rem;
+}
+
+.vendor-pricing__sales-summary strong {
+  color: #176f5d;
+  font-size: 1.3rem;
+}
+
 .vendor-pricing__order-status {
   padding: 6px 9px;
   border: 1px solid #efd28a;

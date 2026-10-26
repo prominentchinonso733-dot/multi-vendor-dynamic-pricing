@@ -1,0 +1,136 @@
+.site-header {
+  position: relative;
+  z-index: 10;
+  display: flex;
+  min-height: 76px;
+  align-items: center;
+  justify-content: space-between;
+  gap: 24px;
+  padding: 12px clamp(18px, 5vw, 72px);
+  border-bottom: 1px solid #e4e8e6;
+  background: #fff;
+}
+
+.site-brand {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 10px;
+  color: #18342e;
+  font-size: 1.15rem;
+  font-weight: 800;
+  letter-spacing: -0.04em;
+}
+
+.site-brand:hover {
+  color: #18342e;
+}
+
+.site-brand__mark {
+  display: grid;
+  width: 34px;
+  height: 34px;
+  place-items: center;
+  border-radius: 10px;
+  background: #176f5d;
+  color: #fff;
+  font-size: 1rem;
+  letter-spacing: 0;
+}
+
+.site-brand__accent {
+  color: #176f5d;
+}
+
+.site-nav {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 8px clamp(10px, 1.8vw, 24px);
+}
+
+.site-nav__link,
+.site-nav__cart,
+.site-nav__primary {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 8px;
+  border: 0;
+  background: transparent;
+  color: #53645f;
+  font: inherit;
+  font-size: 0.88rem;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
+.site-nav__link:hover,
+.site-nav__link--active {
+  color: #176f5d;
+}
+
+.site-nav__button {
+  cursor: pointer;
+}
+
+.site-nav__cart {
+  cursor: pointer;
+}
+
+.site-nav__cart span {
+  display: grid;
+  min-width: 22px;
+  height: 22px;
+  place-items: center;
+  padding: 0 5px;
+  border-radius: 99px;
+  background: #edf5f1;
+  color: #176f5d;
+  font-size: 0.73rem;
+}
+
+.site-nav__primary {
+  padding: 0 16px;
+  border-radius: 6px;
+  background: #176f5d;
+  color: #fff;
+}
+
+.site-nav__primary:hover {
+  background: #125b4c;
+  color: #fff;
+}
+
+.site-nav__identity {
+  max-width: 190px;
+  overflow: hidden;
+  color: #71807b;
+  font-size: 0.8rem;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+@media (max-width: 760px) {
+  .site-header {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .site-nav {
+    width: 100%;
+    justify-content: flex-start;
+    gap: 6px 12px;
+  }
+
+  .site-nav__link,
+  .site-nav__cart,
+  .site-nav__primary {
+    min-height: 36px;
+    font-size: 0.82rem;
+  }
+}

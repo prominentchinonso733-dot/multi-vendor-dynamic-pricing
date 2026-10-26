@@ -1,12 +1,11 @@
 import { useEffect, useState } from "react";
 import {
   AlertCircle,
-  CircleDollarSign,
   RefreshCw,
-  ShieldAlert,
 } from "lucide-react";
+import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
-import DisputeReasonDialog, { DisputeReasonNote } from "./DisputeReasonDialog";
+import { DisputeReasonNote } from "./DisputeReasonDialog";
 import "./SellerDashboard.css";
 import { API_BASE_URL } from "../api";
 
@@ -47,6 +46,7 @@ const isCompletedContract = (contract) =>
 
 export default function SellerDashboard() {
   const { authFetch, login, role, user } = useAuth();
+  const navigate = useNavigate();
   const isAdmin = role === "ADMIN";
   const [contracts, setContracts] = useState([]);
   const [completedContracts, setCompletedContracts] = useState([]);
@@ -54,7 +54,6 @@ export default function SellerDashboard() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [pendingContractId, setPendingContractId] = useState(null);
-  const [disputeContractId, setDisputeContractId] = useState(null);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
   const [authPending, setAuthPending] = useState(false);
@@ -76,7 +75,7 @@ export default function SellerDashboard() {
 
       try {
         const [activeResponse, completedResponse] = await Promise.all([
-          fetch(`${ESCROW_API}/active`, { signal: controller.signal }),
+          authFetch(`${ESCROW_API}/active`, { signal: controller.signal }),
           authFetch(`${ESCROW_API}/completed`, { signal: controller.signal }),
         ]);
         const [activeData, completedData] = await Promise.all([
@@ -121,75 +120,6 @@ export default function SellerDashboard() {
     loadContracts();
     return () => controller.abort();
   }, [authFetch, isAdmin, refreshVersion]);
-
-  const releaseFunds = async (contractId) => {
-    setPendingContractId(contractId);
-    setError("");
-    setNotice("");
-
-    try {
-      const response = await fetch(`${ESCROW_API}/release-funds`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contractId }),
-      });
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message || data.error || "Unable to release escrow funds.",
-        );
-      }
-
-      setContracts((currentContracts) =>
-        currentContracts.filter((contract) => contract._id !== contractId),
-      );
-      setCompletedContracts((currentContracts) => [
-        data.contract,
-        ...currentContracts.filter(
-          (contract) => contract._id !== data.contract._id,
-        ),
-      ]);
-      setNotice(`Funds released for ${data.contract.paymentReference}.`);
-    } catch (releaseError) {
-      setError(releaseError.message || "Unable to release escrow funds.");
-    } finally {
-      setPendingContractId(null);
-    }
-  };
-
-  const raiseDispute = async (contractId, disputeReason) => {
-    setPendingContractId(contractId);
-    setError("");
-    setNotice("");
-
-    try {
-      const response = await fetch(`${ESCROW_API}/dispute`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ contractId, disputeReason }),
-      });
-      const data = await response.json();
-
-      if (!response.ok || !data.success) {
-        throw new Error(
-          data.message || data.error || "Unable to raise a dispute.",
-        );
-      }
-
-      setDisputeContractId(null);
-      setContracts((currentContracts) =>
-        currentContracts.map((contract) =>
-          contract._id === contractId ? data.contract : contract,
-        ),
-      );
-      setNotice(`Dispute raised for ${data.contract.paymentReference}.`);
-    } catch (disputeError) {
-      setError(disputeError.message || "Unable to raise a dispute.");
-    } finally {
-      setPendingContractId(null);
-    }
-  };
 
   const resolveDispute = async (contractId, decision) => {
     setPendingContractId(contractId);
@@ -243,7 +173,7 @@ export default function SellerDashboard() {
         { expectedRole: "ADMIN" },
       );
       setAdminPassword("");
-      setNotice("Admin access granted. Disputes can now be resolved.");
+      navigate("/admin", { replace: true });
     } catch (authError) {
       setError(authError.message || "Unable to sign in.");
     } finally {
@@ -444,30 +374,7 @@ export default function SellerDashboard() {
                         <span>Awaiting admin resolution</span>
                       )
                     ) : (
-                      <>
-                        <button
-                          className="seller-dashboard__release"
-                          type="button"
-                          onClick={() => releaseFunds(contract._id)}
-                          disabled={pendingContractId !== null}
-                        >
-                          <CircleDollarSign size={16} aria-hidden="true" />
-                          {pendingContractId === contract._id
-                            ? "Releasing..."
-                            : "Release Funds"}
-                        </button>
-                        <button
-                          className="seller-dashboard__dispute"
-                          type="button"
-                          onClick={() => setDisputeContractId(contract._id)}
-                          disabled={pendingContractId !== null}
-                        >
-                          <ShieldAlert size={16} aria-hidden="true" />
-                          {pendingContractId === contract._id
-                            ? "Processing..."
-                            : "Raise Dispute"}
-                        </button>
-                      </>
+                      <span>Awaiting buyer delivery confirmation</span>
                     )}
                   </td>
                 </tr>
@@ -552,13 +459,6 @@ export default function SellerDashboard() {
             </table>
           </div>
         </>
-      )}
-      {disputeContractId && (
-        <DisputeReasonDialog
-          isPending={pendingContractId === disputeContractId}
-          onClose={() => setDisputeContractId(null)}
-          onSubmit={(reason) => raiseDispute(disputeContractId, reason)}
-        />
       )}
     </section>
   );

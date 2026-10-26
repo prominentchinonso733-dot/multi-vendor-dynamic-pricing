@@ -91,8 +91,9 @@ const toVendorOrder = (contract, sellerId) => {
         (item) =>
           String(item.vendorId || item.sellerId || "") === sellerId.toString(),
       )
-      .map(({ name, quantity, vendor, vendorId }) => ({
+      .map(({ name, price, quantity, vendor, vendorId }) => ({
         name,
+        price,
         quantity,
         vendor,
         vendorId,
@@ -108,22 +109,23 @@ const toVendorOrder = (contract, sellerId) => {
 };
 
 // POST /api/escrow/lock-funds
-router.post("/lock-funds", authenticateOptionalToken, async (req, res) => {
+router.post("/lock-funds", authenticateToken, async (req, res) => {
   try {
     const { buyerId, items, subtotal, isKycVerified } = req.body;
+    if (req.user.role !== "BUYER") {
+      return res.status(403).json({
+        success: false,
+        message: "Buyer role required to create an order.",
+      });
+    }
+    const authenticatedBuyerId = req.user._id || req.user.id;
     if (
-      req.user?.role === "BUYER" &&
-      buyerId !== (req.user._id || req.user.id)
+      !mongoose.isValidObjectId(authenticatedBuyerId) ||
+      buyerId !== authenticatedBuyerId
     ) {
       return res.status(403).json({
         success: false,
         message: "You can only create an order for your own account.",
-      });
-    }
-    if (req.user && !["BUYER", "ADMIN"].includes(req.user.role)) {
-      return res.status(403).json({
-        success: false,
-        message: "Buyer role required to create an order.",
       });
     }
     const buyerEmail =
@@ -300,7 +302,17 @@ router.get("/vendor/orders", authenticateToken, async (req, res) => {
 
     const contracts = await EscrowContract.find({
       sellerIds: sellerId,
-      status: { $in: ["LOCKED", "FUNDS_LOCKED"] },
+      status: {
+        $in: [
+          "LOCKED",
+          "FUNDS_LOCKED",
+          "IN_DISPUTE",
+          "RELEASED",
+          "COMPLETED",
+          "CLOSED",
+          "REFUNDED",
+        ],
+      },
     }).sort({ createdAt: -1 });
 
     return res.json({
@@ -383,8 +395,14 @@ router.patch(
 );
 
 // POST /api/escrow/release-funds
-router.post("/release-funds", async (req, res) => {
+router.post("/release-funds", authenticateToken, async (req, res) => {
   try {
+    if (req.user.role !== "BUYER") {
+      return res.status(403).json({
+        success: false,
+        message: "Buyer role required to confirm delivery.",
+      });
+    }
     const { contractId } = req.body;
 
     if (!mongoose.isValidObjectId(contractId)) {
@@ -397,15 +415,16 @@ router.post("/release-funds", async (req, res) => {
     const currentContract = await EscrowContract.findById(contractId);
     if (
       !currentContract ||
+      currentContract.buyerId.toString() !==
+        (req.user._id || req.user.id).toString() ||
       !["LOCKED", "FUNDS_LOCKED"].includes(currentContract.status)
     ) {
       return res.status(404).json({
         success: false,
-        message: "Locked escrow contract not found.",
+        message: "Active order not found for this buyer.",
       });
     }
     if (
-      currentContract.fulfillmentStatuses.length > 0 &&
       currentContract.sellerIds.some((sellerId) => {
         const fulfillment = currentContract.fulfillmentStatuses.find(
           (entry) => entry.sellerId.toString() === sellerId.toString(),
@@ -443,8 +462,14 @@ router.post("/release-funds", async (req, res) => {
 });
 
 // POST /api/escrow/dispute
-router.post("/dispute", async (req, res) => {
+router.post("/dispute", authenticateToken, async (req, res) => {
   try {
+    if (req.user.role !== "BUYER") {
+      return res.status(403).json({
+        success: false,
+        message: "Buyer role required to raise a dispute.",
+      });
+    }
     const { contractId } = req.body;
     const disputeReason =
       typeof req.body.disputeReason === "string"
@@ -466,7 +491,11 @@ router.post("/dispute", async (req, res) => {
     }
 
     const contract = await EscrowContract.findOneAndUpdate(
-      { _id: contractId, status: { $in: ["LOCKED", "FUNDS_LOCKED"] } },
+      {
+        _id: contractId,
+        buyerId: req.user._id || req.user.id,
+        status: { $in: ["LOCKED", "FUNDS_LOCKED"] },
+      },
       { $set: { status: "IN_DISPUTE", disputeReason } },
       { new: true, runValidators: true },
     );
@@ -537,7 +566,7 @@ router.post(
 );
 
 // GET /api/escrow/active
-router.get("/active", authenticateOptionalToken, async (req, res) => {
+router.get("/active", authenticateToken, async (req, res) => {
   try {
     const { buyerId } = req.query;
 
@@ -551,7 +580,7 @@ router.get("/active", authenticateOptionalToken, async (req, res) => {
     const filter = {
       status: { $in: ["LOCKED", "FUNDS_LOCKED", "IN_DISPUTE"] },
     };
-    if (req.user?.role === "BUYER") {
+    if (req.user.role === "BUYER") {
       const authenticatedBuyerId = req.user._id || req.user.id;
       if (buyerId && buyerId !== authenticatedBuyerId) {
         return res.status(403).json({
@@ -560,7 +589,7 @@ router.get("/active", authenticateOptionalToken, async (req, res) => {
         });
       }
       filter.buyerId = authenticatedBuyerId;
-    } else if (req.user && req.user.role !== "ADMIN") {
+    } else if (req.user.role !== "ADMIN") {
       return res.status(403).json({
         success: false,
         message: "Buyer role required.",
@@ -578,10 +607,10 @@ router.get("/active", authenticateOptionalToken, async (req, res) => {
 });
 
 // GET /api/escrow/completed
-router.get("/completed", authenticateOptionalToken, async (req, res) => {
+router.get("/completed", authenticateToken, async (req, res) => {
   try {
     const { buyerId } = req.query;
-    const isAdmin = req.user?.role === "ADMIN";
+    const isAdmin = req.user.role === "ADMIN";
 
     if (buyerId && !isAdmin && !mongoose.isValidObjectId(buyerId)) {
       return res.status(400).json({
@@ -590,7 +619,7 @@ router.get("/completed", authenticateOptionalToken, async (req, res) => {
       });
     }
 
-    if (req.user?.role === "BUYER") {
+    if (req.user.role === "BUYER") {
       const authenticatedBuyerId = req.user._id || req.user.id;
       if (buyerId && buyerId !== authenticatedBuyerId) {
         return res.status(403).json({
@@ -598,7 +627,7 @@ router.get("/completed", authenticateOptionalToken, async (req, res) => {
           message: "You can only view your own orders.",
         });
       }
-    } else if (req.user && !isAdmin) {
+    } else if (!isAdmin) {
       return res.status(403).json({
         success: false,
         message: "Buyer role required.",
@@ -610,7 +639,7 @@ router.get("/completed", authenticateOptionalToken, async (req, res) => {
         $in: [/^RELEASED$/i, /^COMPLETED$/i, /^REFUNDED$/i, /^CLOSED$/i],
       },
     };
-    if (req.user?.role === "BUYER") {
+    if (req.user.role === "BUYER") {
       filter.buyerId = req.user._id || req.user.id;
     } else if (buyerId && !isAdmin) {
       filter.buyerId = buyerId;
