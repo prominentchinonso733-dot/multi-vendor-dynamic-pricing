@@ -1,16 +1,21 @@
 const bcrypt = require("bcryptjs");
 const User = require("./models/User");
 
-const DEFAULT_ADMIN_EMAIL = "prominentchinonso733@gmail.com";
-const MIN_PASSWORD_LENGTH = 16;
+const DEFAULT_ADMIN_EMAIL = "prominentchinonso27@gmail.com";
+const MIN_PASSWORD_LENGTH = 20;
 
 async function ensureAdmin() {
-  const email = (process.env.ADMIN_BOOTSTRAP_EMAIL || DEFAULT_ADMIN_EMAIL)
+  const email = String(
+    process.env.ADMIN_BOOTSTRAP_EMAIL || DEFAULT_ADMIN_EMAIL,
+  )
     .trim()
     .toLowerCase();
   const password = process.env.ADMIN_BOOTSTRAP_PASSWORD;
 
   if (!password) return { created: false, skipped: true };
+  if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) {
+    throw new Error("ADMIN_BOOTSTRAP_EMAIL must be a valid email address.");
+  }
   if (password.length < MIN_PASSWORD_LENGTH) {
     throw new Error(
       `ADMIN_BOOTSTRAP_PASSWORD must be at least ${MIN_PASSWORD_LENGTH} characters.`,

@@ -26,6 +26,22 @@ This repository does not include an identity-verification provider integration o
 
 The admin overview is available at `GET /api/admin/overview` and accepts `usersPage`, `ordersPage`, and `usersRole` (`accounts`, `vendors`, or `riders`) query parameters. Admin-only endpoints also support account suspension, identity review, delivery-partner creation, and order-to-rider assignment.
 
+### Provisioning the platform administrator
+
+The production-safe provisioning command targets `prominentchinonso27@gmail.com` by default, requires `MONGO_URI` (or `MONGODB_URI`), and never uses a default password or changes an existing password. It reads secrets from the ignored root `.env` file or the process environment; set:
+
+```dotenv
+MONGO_URI=<your MongoDB connection string>
+ADMIN_BOOTSTRAP_EMAIL=prominentchinonso27@gmail.com
+ADMIN_BOOTSTRAP_PASSWORD=<unique random password with at least 20 characters>
+```
+
+Run `npm --prefix backend run seed:admin` from the repository root. If this email already belongs to a customer/vendor account, explicitly confirm promotion with `npm --prefix backend run seed:admin -- --promote-existing`. Promotion preserves the existing password; the account owner can then sign in at `/admin/login` with their existing password. If no account exists, the command creates one with the supplied password hash. Re-running is safe and does not reset credentials.
+
+For Kubernetes, copy `k8s/secrets.env.example` to the ignored `k8s/secrets.env`, fill it with deployment secrets, then apply it using `kubectl create secret generic app-secrets --from-env-file=k8s/secrets.env --dry-run=client -o yaml | kubectl apply -f -`. Never commit the filled secrets file.
+
+**Credential rotation required:** credentials were previously stored in a committed Kubernetes secret manifest. Removing that file does not erase it from Git history. Rotate the MongoDB credential, JWT signing secret, and admin bootstrap password in the deployment secret store; invalidate previously issued JWTs by changing `JWT_SECRET`.
+
 ## Tech Stack
 - **Frontend:** React.js, Tailwind CSS
 - **Backend:** Node.js, Express.js
