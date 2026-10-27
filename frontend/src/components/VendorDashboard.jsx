@@ -7,6 +7,7 @@ import { pricingService } from "../services/pricingService";
 import { productsService } from "../services/productsService";
 import { escrowService } from "../services/escrowService";
 import { useAuth } from "../context/AuthContext";
+import VerificationPanel from "./VerificationPanel";
 import "./VendorDashboard.css";
 
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
@@ -79,6 +80,40 @@ const validateDraft = (draft) => {
   }
 
   return null;
+};
+
+const getPricePreview = (draft, currentPrice) => {
+  if (!draft || validateDraft(draft)) return null;
+  const basePrice = Number(draft.basePrice);
+  const competitorPrice =
+    draft.competitorPrice.trim() === ""
+      ? null
+      : Number(draft.competitorPrice);
+  const demandScore = Number(draft.demandScore);
+  const stock = Number(draft.stock);
+  const referencePrice =
+    competitorPrice === null ? basePrice : Math.min(basePrice, competitorPrice);
+  const demandMultiplier = 1 + (demandScore - 50) / 500;
+  const stockMultiplier =
+    stock >= 1 && stock <= 5 ? 1.05 : stock >= 50 ? 0.95 : 1;
+  const calculatedPrice =
+    Math.round(referencePrice * demandMultiplier * stockMultiplier * 100) /
+    100;
+  const price = Math.min(
+    Number(draft.priceCeiling),
+    Math.max(Number(draft.priceFloor), calculatedPrice),
+  );
+  const delta = Number.isFinite(currentPrice) ? price - currentPrice : 0;
+  return {
+    price,
+    direction: delta > 0.009 ? "up" : delta < -0.009 ? "down" : "steady",
+    status:
+      calculatedPrice <= Number(draft.priceFloor)
+        ? "floor"
+        : calculatedPrice >= Number(draft.priceCeiling)
+          ? "ceiling"
+          : "within range",
+  };
 };
 
 export default function VendorDashboard({ onPriceUpdated }) {
@@ -1270,6 +1305,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
                 const result = results[productId];
                 const error = productErrors[productId];
                 const isPending = pendingProductId === productId;
+                const preview = getPricePreview(draft, product.currentPrice);
 
                 return (
                   <article
@@ -1452,6 +1488,24 @@ export default function VendorDashboard({ onPriceUpdated }) {
                       </button>
                     </form>
 
+                    {preview && (
+                      <p
+                        aria-live="polite"
+                        className={`vendor-pricing__live-preview vendor-pricing__live-preview--${preview.direction}`}
+                      >
+                        Live preview:{" "}
+                        <strong>{currencyFormatter.format(preview.price)}</strong>
+                        {" · "}
+                        {preview.direction === "up"
+                          ? "price increasing"
+                          : preview.direction === "down"
+                            ? "price decreasing"
+                            : "no price change"}
+                        {" · "}
+                        {preview.status}. Save with Recalculate price.
+                      </p>
+                    )}
+
                     {result && (
                       <section
                         aria-label={`Calculation result for ${product.title || "product"}`}
@@ -1527,6 +1581,8 @@ export default function VendorDashboard({ onPriceUpdated }) {
               </p>
             </div>
           </div>
+
+          <VerificationPanel compact />
 
           {profileError && (
             <div

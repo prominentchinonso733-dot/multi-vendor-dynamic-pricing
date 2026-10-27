@@ -1,5 +1,6 @@
 /* eslint-disable react/prop-types */
 import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL } from "../api";
 
@@ -32,8 +33,6 @@ export default function CartDrawer({
   onUpdateQuantity,
   onRemoveItem,
   buyerId,
-  isKycVerified,
-  setIsKycVerified,
   onPaymentVerified,
 }) {
   const { authFetch, user } = useAuth();
@@ -57,12 +56,6 @@ export default function CartDrawer({
   const handleInitiateEscrow = async () => {
     if (user?.role !== "BUYER" || !buyerId) {
       setCheckoutMessage("Sign in to a customer account before checking out.");
-      return;
-    }
-    if (!isKycVerified) {
-      alert(
-        "KYC Verification Required: Please complete 4-Way KYC verification before initiating an escrow contract.",
-      );
       return;
     }
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(buyerEmail.trim())) {
@@ -101,7 +94,6 @@ export default function CartDrawer({
           sellerIds,
           items: cart,
           subtotal,
-          isKycVerified,
         }),
       });
 
@@ -330,6 +322,15 @@ export default function CartDrawer({
                 {checkoutMessage}
               </div>
             )}
+            {user?.role === "BUYER" && (
+              <p style={{ fontSize: "0.85rem", lineHeight: 1.5 }}>
+                Tier 2 identity verification is required to check out.{" "}
+                <Link to="/account/verification" onClick={onClose}>
+                  Review your verification status
+                </Link>
+                .
+              </p>
+            )}
             <div style={{ display: "grid", gap: "8px", marginTop: "16px" }}>
               <label
                 htmlFor="paystack-buyer-email"
@@ -362,38 +363,11 @@ export default function CartDrawer({
               >
                 <button
                   onClick={handleInitiateEscrow}
-                  disabled={checkoutPending || !isKycVerified}
-                  className={`flex-1 w-full py-3 rounded-lg font-bold text-white transition ${
-                    isKycVerified
-                      ? "bg-blue-600 hover:bg-blue-700"
-                      : "bg-gray-400 cursor-not-allowed"
-                  }`}
+                  disabled={checkoutPending}
+                  className="flex-1 w-full py-3 rounded-lg font-bold text-white transition bg-blue-600 hover:bg-blue-700"
                   style={{ flex: 1 }}
                 >
-                  {checkoutPending
-                    ? "Preparing Paystack..."
-                    : isKycVerified
-                      ? "Lock Funds in Escrow"
-                      : "KYC Required to Lock Funds"}
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setIsKycVerified((verified) => !verified)}
-                  aria-pressed={isKycVerified}
-                  title="Temporary development control"
-                  style={{
-                    padding: "0 10px",
-                    border: "1px solid #cbd5e1",
-                    borderRadius: "6px",
-                    backgroundColor: "#f8fafc",
-                    color: "#475569",
-                    fontSize: "0.75rem",
-                    fontWeight: 700,
-                    cursor: "pointer",
-                    whiteSpace: "nowrap",
-                  }}
-                >
-                  {isKycVerified ? "Reset Dev KYC" : "Dev: Verify KYC"}
+                  {checkoutPending ? "Preparing Paystack..." : "Lock funds in escrow"}
                 </button>
               </div>
             </div>

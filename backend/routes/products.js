@@ -378,7 +378,7 @@ router.get("/store/:vendorId", async (req, res) => {
   try {
     const vendor = await User.findById(vendorId)
       .select(
-        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.tier vendorDetails.isVerified createdAt",
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName verification.tier verification.status createdAt",
       )
       .lean();
     if (!vendor || !["SELLER", "ADMIN"].includes(vendor.role)) {
@@ -402,8 +402,8 @@ router.get("/store/:vendorId", async (req, res) => {
         storeLogo: vendor.storeLogo || "",
         storeBanner: vendor.storeBanner || "",
         storeDescription: vendor.storeDescription || "",
-        tier: vendor.vendorDetails?.tier || null,
-        isVerified: Boolean(vendor.vendorDetails?.isVerified),
+        tier: vendor.verification?.tier || "TIER_1",
+        isVerified: vendor.verification?.status === "VERIFIED",
         memberSince: vendor.createdAt,
       },
       products: products.map((product) => ({

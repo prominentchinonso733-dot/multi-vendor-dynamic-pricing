@@ -3,8 +3,9 @@ const router = express.Router();
 const crypto = require("crypto");
 const https = require("https");
 const mongoose = require("mongoose");
-const jwt = require("jsonwebtoken");
 const EscrowContract = require("../models/EscrowContract");
+const User = require("../models/User");
+const authenticateToken = require("../middleware/authenticateToken");
 
 const verifyPaystackTransaction = (reference) =>
   new Promise((resolve, reject) => {
@@ -39,31 +40,6 @@ const verifyPaystackTransaction = (reference) =>
     request.on("error", reject);
     request.end();
   });
-
-const authenticateToken = (req, res, next) => {
-  const authorization = req.headers.authorization;
-  const [scheme, token] = authorization ? authorization.split(" ") : [];
-
-  if (scheme !== "Bearer" || !token) {
-    return res
-      .status(401)
-      .json({ success: false, message: "Authentication required." });
-  }
-  if (!process.env.JWT_SECRET) {
-    return res
-      .status(500)
-      .json({ success: false, message: "Authentication is not configured." });
-  }
-
-  try {
-    req.user = jwt.verify(token, process.env.JWT_SECRET);
-    return next();
-  } catch {
-    return res
-      .status(401)
-      .json({ success: false, message: "Invalid or expired token." });
-  }
-};
 
 const authenticateOptionalToken = (req, res, next) => {
   if (!req.headers.authorization) return next();
@@ -111,7 +87,7 @@ const toVendorOrder = (contract, sellerId) => {
 // POST /api/escrow/lock-funds
 router.post("/lock-funds", authenticateToken, async (req, res) => {
   try {
-    const { buyerId, items, subtotal, isKycVerified } = req.body;
+    const { buyerId, items, subtotal } = req.body;
     if (req.user.role !== "BUYER") {
       return res.status(403).json({
         success: false,
@@ -133,11 +109,22 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
         ? req.body.buyerEmail.trim().toLowerCase()
         : "";
 
-    // Server-side KYC Guardrail check
-    if (!isKycVerified) {
+    const buyer = await User.findById(authenticatedBuyerId)
+      .select("email accountStatus verification.tier verification.status")
+      .lean();
+    if (!buyer || buyer.accountStatus === "SUSPENDED") {
       return res.status(403).json({
         success: false,
-        message: "KYC Verification required to initiate escrow contract.",
+        message: "An active buyer account is required to place an order.",
+      });
+    }
+    if (
+      buyer.verification?.tier !== "TIER_2" ||
+      buyer.verification?.status !== "VERIFIED"
+    ) {
+      return res.status(403).json({
+        success: false,
+        message: "Tier 2 account verification is required to check out.",
       });
     }
 
@@ -145,6 +132,12 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
       return res.status(400).json({
         success: false,
         message: "A valid buyerEmail is required for payment.",
+      });
+    }
+    if (buyerEmail !== buyer.email) {
+      return res.status(400).json({
+        success: false,
+        message: "The payment email must match your signed-in account.",
       });
     }
 
@@ -374,6 +367,19 @@ router.patch(
       let fulfillment = contract.fulfillmentStatuses.find(
         (entry) => entry.sellerId.toString() === sellerId.toString(),
       );
+      const currentStatus = fulfillment?.status || "PENDING";
+      const nextStatuses = {
+        PENDING: "PROCESSING",
+        PROCESSING: "SHIPPED",
+        SHIPPED: "DELIVERED",
+        DELIVERED: null,
+      };
+      if (status !== currentStatus && nextStatuses[currentStatus] !== status) {
+        return res.status(409).json({
+          success: false,
+          message: `Order fulfillment must advance from ${currentStatus} to ${nextStatuses[currentStatus] || "no further status"}.`,
+        });
+      }
       if (!fulfillment) {
         contract.fulfillmentStatuses.push({ sellerId, status });
         fulfillment = contract.fulfillmentStatuses.at(-1);

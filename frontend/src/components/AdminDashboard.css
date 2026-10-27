@@ -1,0 +1,359 @@
+.admin-dashboard {
+  display: grid;
+  gap: 1.25rem;
+  max-width: 1440px;
+  margin: 0 auto;
+  padding: 1.5rem;
+  color: #17211b;
+}
+
+.admin-dashboard__header,
+.admin-dashboard__review-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.admin-dashboard__header h1 {
+  margin: 0;
+  font-size: clamp(1.7rem, 3vw, 2.4rem);
+}
+
+.admin-dashboard__header p:last-child,
+.admin-dashboard__review-header p {
+  margin: 0.4rem 0 0;
+  color: #68756c;
+}
+
+.admin-dashboard__escrow-link {
+  display: inline-block;
+  margin-top: 0.6rem;
+  color: #17613a;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.admin-dashboard__eyebrow {
+  margin: 0 0 0.45rem;
+  color: #52705c;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.1em;
+}
+
+.admin-dashboard__refresh,
+.admin-dashboard__rider-form button,
+.admin-dashboard__review-actions button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.4rem;
+  border: 0;
+  border-radius: 0.5rem;
+  background: #173c28;
+  color: #fff;
+  padding: 0.65rem 0.9rem;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-dashboard button:disabled {
+  cursor: wait;
+  opacity: 0.58;
+}
+
+.admin-dashboard__stats {
+  display: grid;
+  grid-template-columns: repeat(6, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.admin-dashboard__stats article {
+  display: grid;
+  gap: 0.4rem;
+  border: 1px solid #e2e8e3;
+  border-radius: 0.8rem;
+  background: #fff;
+  padding: 1rem;
+}
+
+.admin-dashboard__stats span {
+  color: #68756c;
+  font-size: 0.82rem;
+}
+
+.admin-dashboard__stats strong {
+  font-size: 1.65rem;
+}
+
+.admin-dashboard__tabs {
+  display: flex;
+  gap: 0.4rem;
+  overflow-x: auto;
+  border-bottom: 1px solid #e1e7e2;
+}
+
+.admin-dashboard__tab {
+  flex: 0 0 auto;
+  border: 0;
+  border-bottom: 3px solid transparent;
+  background: transparent;
+  padding: 0.8rem 0.75rem;
+  color: #5d6b61;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-dashboard__tab--active {
+  border-color: #1d5b36;
+  color: #173c28;
+}
+
+.admin-dashboard__content {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+
+.admin-dashboard__welcome {
+  display: flex;
+  align-items: flex-start;
+  gap: 1rem;
+  border-radius: 0.85rem;
+  background: #eff7f0;
+  padding: 1.25rem;
+}
+
+.admin-dashboard__welcome h2,
+.admin-dashboard__rider-form h2 {
+  margin: 0;
+  font-size: 1.1rem;
+}
+
+.admin-dashboard__welcome p {
+  margin: 0.4rem 0 0;
+  color: #526357;
+  line-height: 1.55;
+}
+
+.admin-dashboard__table-wrap {
+  overflow: auto;
+  border: 1px solid #e2e8e3;
+  border-radius: 0.75rem;
+  background: #fff;
+}
+
+.admin-dashboard__table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+  font-size: 0.84rem;
+}
+
+.admin-dashboard__table th,
+.admin-dashboard__table td {
+  padding: 0.8rem 0.75rem;
+  border-bottom: 1px solid #edf0ed;
+  vertical-align: middle;
+}
+
+.admin-dashboard__table th {
+  background: #f7f9f7;
+  color: #536157;
+  font-size: 0.75rem;
+  white-space: nowrap;
+}
+
+.admin-dashboard__table td {
+  max-width: 18rem;
+}
+
+.admin-dashboard__table select,
+.admin-dashboard__review-card input,
+.admin-dashboard__rider-form input {
+  min-height: 2.25rem;
+  max-width: 14rem;
+  border: 1px solid #ccd5ce;
+  border-radius: 0.4rem;
+  background: white;
+  padding: 0.4rem 0.55rem;
+  font: inherit;
+}
+
+.admin-dashboard__text-button {
+  border: 1px solid #cbd6cc;
+  border-radius: 0.4rem;
+  background: #fff;
+  padding: 0.4rem 0.55rem;
+  color: #294d34;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.admin-dashboard__pagination {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  color: #66736a;
+  font-size: 0.84rem;
+}
+
+.admin-dashboard__pagination div,
+.admin-dashboard__review-actions {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.admin-dashboard__pagination button {
+  border: 1px solid #ccd5ce;
+  border-radius: 0.4rem;
+  background: #fff;
+  padding: 0.45rem 0.65rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+.admin-dashboard__review-list {
+  display: grid;
+  gap: 0.8rem;
+}
+
+.admin-dashboard__review-card,
+.admin-dashboard__rider-form {
+  display: grid;
+  gap: 0.85rem;
+  border: 1px solid #e2e8e3;
+  border-radius: 0.75rem;
+  background: #fff;
+  padding: 1rem;
+}
+
+.admin-dashboard__review-card h3 {
+  margin: 0;
+}
+
+.admin-dashboard__review-card dl {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1.5rem;
+  margin: 0;
+}
+
+.admin-dashboard__review-card dl div {
+  display: grid;
+  gap: 0.25rem;
+}
+
+.admin-dashboard__review-card dt {
+  color: #68756c;
+  font-size: 0.78rem;
+}
+
+.admin-dashboard__review-card dd {
+  margin: 0;
+  font-weight: 700;
+}
+
+.admin-dashboard__review-card > label,
+.admin-dashboard__rider-form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.86rem;
+  font-weight: 650;
+}
+
+.admin-dashboard__review-card > .admin-dashboard__identity-confirmation {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.55rem;
+  font-weight: 500;
+  line-height: 1.45;
+}
+
+.admin-dashboard__identity-confirmation input {
+  width: auto;
+  min-height: auto;
+  margin: 0.15rem 0 0;
+}
+
+.admin-dashboard__review-card input,
+.admin-dashboard__rider-form input {
+  width: min(100%, 30rem);
+  max-width: none;
+}
+
+.admin-dashboard__status {
+  align-self: flex-start;
+  border-radius: 999px;
+  background: #fff4d6;
+  color: #865c00;
+  padding: 0.35rem 0.65rem;
+  font-size: 0.75rem;
+  font-weight: 800;
+  white-space: nowrap;
+}
+
+.admin-dashboard__review-actions .admin-dashboard__reject {
+  background: #fff;
+  color: #a4312b;
+  border: 1px solid #dfb5b2;
+}
+
+.admin-dashboard__hint,
+.admin-dashboard__empty {
+  color: #68756c;
+  font-size: 0.85rem;
+}
+
+.admin-dashboard__rider-form > div {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.admin-dashboard__rider-form button {
+  justify-self: start;
+}
+
+.admin-dashboard__message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.admin-dashboard__message--error {
+  color: #a4312b;
+}
+
+.admin-dashboard__message--success {
+  color: #167347;
+}
+
+@media (max-width: 1000px) {
+  .admin-dashboard__stats {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 620px) {
+  .admin-dashboard {
+    padding: 1rem;
+  }
+
+  .admin-dashboard__header,
+  .admin-dashboard__review-header,
+  .admin-dashboard__pagination {
+    flex-direction: column;
+    align-items: stretch;
+  }
+
+  .admin-dashboard__stats {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}

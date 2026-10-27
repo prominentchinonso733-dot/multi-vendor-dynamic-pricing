@@ -26,9 +26,14 @@ const AccountAuth = ({ role }) => {
       } else {
         await login({ email, password }, { expectedRole: role });
       }
-      navigate(role === "SELLER" ? "/vendor/dashboard" : "/", {
-        replace: true,
-      });
+      navigate(
+        role === "SELLER"
+          ? "/vendor/dashboard"
+          : role === "ADMIN"
+            ? "/admin"
+            : "/",
+        { replace: true },
+      );
     } catch (authError) {
       setError(authError.message || "Unable to sign in.");
     } finally {
@@ -53,7 +58,9 @@ const AccountAuth = ({ role }) => {
           ? isRegistering
             ? "Create your shopper account"
             : "Sign in to your account"
-          : "Vendor sign in"}
+          : role === "ADMIN"
+            ? "Admin sign in"
+            : "Vendor sign in"}
       </h1>
       <form onSubmit={submit} style={{ display: "grid", gap: "1rem" }}>
         {isRegistering && (
@@ -115,7 +122,7 @@ const AccountAuth = ({ role }) => {
 };
 
 AccountAuth.propTypes = {
-  role: PropTypes.oneOf(["BUYER", "SELLER"]).isRequired,
+  role: PropTypes.oneOf(["BUYER", "SELLER", "ADMIN"]).isRequired,
 };
 
 export default AccountAuth;

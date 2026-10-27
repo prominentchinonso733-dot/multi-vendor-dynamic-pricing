@@ -7,20 +7,22 @@ import CartDrawer from "./components/CartDrawer";
 import SellerDashboard from "./components/SellerDashboard";
 import VendorDashboard from "./components/VendorDashboard";
 import BuyerDashboard from "./components/BuyerDashboard";
+import AdminDashboard from "./components/AdminDashboard";
 import VendorStorefront from "./components/VendorStorefront";
 import AccountAuth from "./components/AccountAuth";
+import VerificationPanel from "./components/VerificationPanel";
 import { useAuth } from "./context/AuthContext";
 
 function RequireRole({ role, children }) {
   const { isAuthenticated, role: activeRole } = useAuth();
 
   if (!isAuthenticated) {
-    return (
-      <Navigate
-        to={role === "SELLER" ? "/vendor/login" : "/admin/login"}
-        replace
-      />
-    );
+    const loginPath = {
+      SELLER: "/vendor/login",
+      ADMIN: "/admin/login",
+      BUYER: "/account",
+    }[role];
+    return <Navigate to={loginPath} replace />;
   }
   if (activeRole !== role) {
     return (
@@ -48,6 +50,7 @@ function VendorLoginRoute() {
   const { role } = useAuth();
   if (role === "SELLER") return <Navigate to="/vendor/dashboard" replace />;
   if (role === "ADMIN") return <Navigate to="/admin" replace />;
+  if (role === "BUYER") return <Navigate to="/" replace />;
   return <AccountAuth role="SELLER" />;
 }
 
@@ -55,7 +58,8 @@ function AdminLoginRoute() {
   const { role } = useAuth();
   if (role === "ADMIN") return <Navigate to="/admin" replace />;
   if (role === "SELLER") return <Navigate to="/vendor/dashboard" replace />;
-  return <SellerDashboard />;
+  if (role === "BUYER") return <Navigate to="/" replace />;
+  return <AccountAuth role="ADMIN" />;
 }
 
 function App() {
@@ -63,7 +67,6 @@ function App() {
   const buyerId = role === "BUYER" ? user?.id : null;
   const [cart, setCart] = useState([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
-  const [isKycVerified, setIsKycVerified] = useState(false);
   const [ordersRefreshVersion, setOrdersRefreshVersion] = useState(0);
 
   const addToCart = (product) => {
@@ -110,6 +113,14 @@ function App() {
         <Routes>
           <Route path="/" element={<ProductList onAddToCart={addToCart} />} />
           <Route path="/account" element={<AccountAuth role="BUYER" />} />
+          <Route
+            path="/account/verification"
+            element={
+              <RequireRole role="BUYER">
+                <VerificationPanel />
+              </RequireRole>
+            }
+          />
           <Route path="/vendor/login" element={<VendorLoginRoute />} />
           <Route path="/admin/login" element={<AdminLoginRoute />} />
           <Route
@@ -122,6 +133,14 @@ function App() {
           />
           <Route
             path="/admin"
+            element={
+              <RequireRole role="ADMIN">
+                <AdminDashboard />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/admin/escrow"
             element={
               <RequireRole role="ADMIN">
                 <SellerDashboard />
@@ -155,8 +174,6 @@ function App() {
         onUpdateQuantity={updateQuantity}
         onRemoveItem={removeFromCart}
         buyerId={buyerId}
-        isKycVerified={isKycVerified}
-        setIsKycVerified={setIsKycVerified}
         onPaymentVerified={() =>
           setOrdersRefreshVersion((version) => version + 1)
         }

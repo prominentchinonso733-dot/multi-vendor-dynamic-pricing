@@ -8,6 +8,9 @@ export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) 
   const isVendor = role === "SELLER";
   const isAdmin = role === "ADMIN";
   const isCustomer = !role || role === "BUYER";
+  const isPortalLogin =
+    location.pathname === "/vendor/login" ||
+    location.pathname === "/admin/login";
 
   const linkClassName = (path) =>
     `site-nav__link${location.pathname === path ? " site-nav__link--active" : ""}`;
@@ -25,15 +28,28 @@ export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) 
         <span>Market<span className="site-brand__accent">place</span></span>
       </Link>
       <nav aria-label="Main navigation" className="site-nav">
-        {isCustomer && (
+        {isPortalLogin && (
+          <Link className={linkClassName("/")} to="/">
+            Marketplace
+          </Link>
+        )}
+        {isCustomer && !isPortalLogin && (
           <>
             <Link className={linkClassName("/")} to="/">
               Explore products
             </Link>
             {role === "BUYER" && (
-              <Link className={linkClassName("/orders")} to="/orders">
-                My orders
-              </Link>
+              <>
+                <Link className={linkClassName("/orders")} to="/orders">
+                  My orders
+                </Link>
+                <Link
+                  className={linkClassName("/account/verification")}
+                  to="/account/verification"
+                >
+                  Verification
+                </Link>
+              </>
             )}
             <button
               aria-label={`Open cart with ${cartCount} items`}
@@ -93,6 +109,9 @@ export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) 
             </Link>
             <Link className="site-nav__primary" to="/admin">
               Admin panel
+            </Link>
+            <Link className={linkClassName("/admin/escrow")} to="/admin/escrow">
+              Escrow disputes
             </Link>
             <span className="site-nav__identity">
               {user?.name || user?.email}

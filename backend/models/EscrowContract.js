@@ -41,6 +41,11 @@ const escrowContractSchema = new mongoose.Schema(
         ref: "User",
       },
     ],
+    deliveryPartnerId: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "User",
+      default: null,
+    },
     fulfillmentStatuses: [
       {
         sellerId: {

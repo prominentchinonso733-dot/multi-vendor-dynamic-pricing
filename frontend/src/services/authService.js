@@ -20,4 +20,14 @@ export const authService = {
     const { data } = await api.put("/auth/profile", profile);
     return data.profile;
   },
+
+  async getVerificationStatus(config = {}) {
+    const { data } = await api.get("/auth/verification", config);
+    return data.verification;
+  },
+
+  async submitVerificationRequest(details) {
+    const { data } = await api.post("/auth/verification", details);
+    return data.verification;
+  },
 };

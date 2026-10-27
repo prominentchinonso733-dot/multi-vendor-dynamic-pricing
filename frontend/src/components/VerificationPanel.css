@@ -1,0 +1,152 @@
+.verification-panel {
+  display: grid;
+  gap: 1rem;
+  border: 1px solid #dfe5ec;
+  border-radius: 0.9rem;
+  background: #fff;
+  padding: 1.25rem;
+  color: #182230;
+}
+
+.verification-panel__heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 1rem;
+}
+
+.verification-panel__heading h2 {
+  margin: 0;
+  font-size: 1.2rem;
+}
+
+.verification-panel__eyebrow {
+  margin: 0 0 0.35rem;
+  color: #667085;
+  font-size: 0.72rem;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+}
+
+.verification-panel__badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  border-radius: 999px;
+  background: #eff2f6;
+  padding: 0.4rem 0.65rem;
+  font-size: 0.78rem;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.verification-panel__badge--verified {
+  background: #e8f7ef;
+  color: #167347;
+}
+
+.verification-panel__badge--pending {
+  background: #fff4d6;
+  color: #865c00;
+}
+
+.verification-panel__badge--rejected {
+  background: #fff0ef;
+  color: #a4312b;
+}
+
+.verification-panel__tiers {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+
+.verification-panel__tier {
+  display: grid;
+  gap: 0.3rem;
+  border: 1px solid #e6eaf0;
+  border-radius: 0.65rem;
+  padding: 0.75rem;
+  font-size: 0.83rem;
+}
+
+.verification-panel__tier span,
+.verification-panel__form > p {
+  color: #667085;
+  line-height: 1.5;
+}
+
+.verification-panel__tier--active {
+  border-color: #70c69a;
+  background: #f0faf4;
+}
+
+.verification-panel__form {
+  display: grid;
+  gap: 0.75rem;
+}
+
+.verification-panel__form label {
+  display: grid;
+  gap: 0.35rem;
+  font-size: 0.88rem;
+  font-weight: 600;
+}
+
+.verification-panel__form input,
+.verification-panel__form select {
+  min-height: 2.5rem;
+  border: 1px solid #cbd3dd;
+  border-radius: 0.45rem;
+  padding: 0.5rem 0.65rem;
+  font: inherit;
+}
+
+.verification-panel__form button {
+  justify-self: start;
+  border: 0;
+  border-radius: 0.5rem;
+  background: #123d2a;
+  color: #fff;
+  padding: 0.7rem 1rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.verification-panel__form button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.verification-panel__message {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0;
+}
+
+.verification-panel__message--error {
+  color: #a4312b;
+}
+
+.verification-panel__message--success,
+.verification-panel__confirmed {
+  color: #167347;
+}
+
+.verification-panel__review-note {
+  margin: 0;
+  border-left: 3px solid #e4ad37;
+  padding-left: 0.7rem;
+  color: #57400f;
+}
+
+@media (max-width: 600px) {
+  .verification-panel__heading {
+    flex-direction: column;
+  }
+
+  .verification-panel__tiers {
+    grid-template-columns: 1fr;
+  }
+}

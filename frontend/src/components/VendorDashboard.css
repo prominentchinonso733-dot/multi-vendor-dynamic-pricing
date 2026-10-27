@@ -601,6 +601,33 @@
   text-align: center;
 }
 
+.vendor-pricing__live-preview {
+  margin: 14px 0 0;
+  padding: 12px 14px;
+  border: 1px solid #d5e0dc;
+  background: #f7faf8;
+  color: #526357;
+  font-size: 0.88rem;
+  line-height: 1.5;
+}
+
+.vendor-pricing__live-preview--up {
+  border-color: #b9d9c6;
+  background: #f0faf4;
+  color: #17613a;
+}
+
+.vendor-pricing__live-preview--down {
+  border-color: #efd0ab;
+  background: #fff8ef;
+  color: #805016;
+}
+
+.vendor-pricing__live-preview strong {
+  color: #132b35;
+  font-size: 1.05rem;
+}
+
 .vendor-pricing__spinning {
   animation: vendor-pricing-spin 900ms linear infinite;
 }
