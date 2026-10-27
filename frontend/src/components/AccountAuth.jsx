@@ -2,6 +2,7 @@ import { useState } from "react";
 import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
+import { getRoleHomeRoute } from "../services/roleRoutes";
 
 const AccountAuth = ({ role }) => {
   const { login, register } = useAuth();
@@ -21,19 +22,17 @@ const AccountAuth = ({ role }) => {
     setIsPending(true);
 
     try {
+      let authenticatedUser;
       if (isRegistering) {
-        await register({ name, email, password, role: "BUYER" });
+        authenticatedUser = await register({ name, email, password, role: "BUYER" });
       } else {
-        await login({ email, password }, { expectedRole: role });
+        authenticatedUser = await login({ email, password }, { expectedRole: role });
       }
-      navigate(
-        role === "SELLER"
-          ? "/vendor/dashboard"
-          : role === "ADMIN"
-            ? "/admin"
-            : "/",
-        { replace: true },
-      );
+      const destination = getRoleHomeRoute(authenticatedUser?.role);
+      if (!destination) {
+        throw new Error("This account does not have a supported destination.");
+      }
+      navigate(destination, { replace: true });
     } catch (authError) {
       setError(authError.message || "Unable to sign in.");
     } finally {

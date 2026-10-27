@@ -1,5 +1,6 @@
 import { createContext, useCallback, useContext, useState } from "react";
 import { authService } from "../services/authService";
+import { normalizeRole } from "../services/roleRoutes";
 
 const AuthContext = createContext(null);
 
@@ -8,15 +9,6 @@ const ROLE_SESSION_KEYS = {
   SELLER: { token: "vendorToken", user: "vendorUser" },
   BUYER: { token: "buyerToken", user: "buyerUser" },
 };
-
-const normalizeRole = (role) =>
-  ({
-    ROLE_CUSTOMER: "BUYER",
-    ROLE_VENDOR: "SELLER",
-    ROLE_ADMIN: "ADMIN",
-  })[String(role || "").toUpperCase()] ||
-  String(role || "").toUpperCase() ||
-  null;
 
 const normalizeUser = (user) =>
   user && typeof user === "object"

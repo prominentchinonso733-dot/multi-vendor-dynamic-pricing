@@ -12,6 +12,7 @@ import VendorStorefront from "./components/VendorStorefront";
 import AccountAuth from "./components/AccountAuth";
 import VerificationPanel from "./components/VerificationPanel";
 import { useAuth } from "./context/AuthContext";
+import { getRoleHomeRoute } from "./services/roleRoutes";
 
 function RequireRole({ role, children }) {
   const { isAuthenticated, role: activeRole } = useAuth();
@@ -25,18 +26,7 @@ function RequireRole({ role, children }) {
     return <Navigate to={loginPath} replace />;
   }
   if (activeRole !== role) {
-    return (
-      <Navigate
-        to={
-          activeRole === "SELLER"
-            ? "/vendor/dashboard"
-            : activeRole === "ADMIN"
-              ? "/admin"
-              : "/"
-        }
-        replace
-      />
-    );
+    return <Navigate to={getRoleHomeRoute(activeRole) || "/"} replace />;
   }
   return children;
 }
