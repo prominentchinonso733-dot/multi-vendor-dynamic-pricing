@@ -44,7 +44,8 @@
 
 .admin-dashboard__refresh,
 .admin-dashboard__rider-form button,
-.admin-dashboard__review-actions button {
+.admin-dashboard__review-actions button,
+.admin-dashboard__review-card > button {
   display: inline-flex;
   align-items: center;
   justify-content: center;

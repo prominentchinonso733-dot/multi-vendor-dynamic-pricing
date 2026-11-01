@@ -16,6 +16,18 @@ const currencyFormatter = new Intl.NumberFormat("en-NG", {
   currency: "NGN",
   maximumFractionDigits: 0,
 });
+const downloadReceipt = (receipt) => {
+  if (!receipt) return;
+  const file = new Blob([JSON.stringify(receipt, null, 2)], {
+    type: "application/json",
+  });
+  const url = URL.createObjectURL(file);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = `${receipt.receiptNumber || "marketplace-receipt"}.json`;
+  link.click();
+  URL.revokeObjectURL(url);
+};
 const dateFormatter = new Intl.DateTimeFormat("en-GB", {
   dateStyle: "medium",
   timeStyle: "short",
@@ -335,7 +347,7 @@ export default function BuyerDashboard({
                       <>
                         {getFulfillmentStatuses(order).every(
                           (fulfillment) => fulfillment.status === "DELIVERED",
-                        ) && (
+                        ) && order.deliveryStatus === "DELIVERED" && (
                           <button
                             className="buyer-dashboard__confirm"
                             type="button"
@@ -353,6 +365,11 @@ export default function BuyerDashboard({
                         ) && (
                           <span className="buyer-dashboard__review-note">
                             Waiting for all vendors to mark delivery
+                          </span>
+                        )}
+                        {order.deliveryStatus !== "DELIVERED" && (
+                          <span className="buyer-dashboard__review-note">
+                            Delivery partner: {getStatusLabel(order.deliveryStatus || "PENDING")}
                           </span>
                         )}
                         <button
@@ -393,18 +410,19 @@ export default function BuyerDashboard({
               <th scope="col">Order total</th>
               <th scope="col">Status</th>
               <th scope="col">Date completed</th>
+              <th scope="col">Receipt</th>
             </tr>
           </thead>
           <tbody>
             {loading && completedOrders.length === 0 ? (
               <tr>
-                <td className="buyer-dashboard__empty" colSpan="5">
+                <td className="buyer-dashboard__empty" colSpan="6">
                   Loading completed orders...
                 </td>
               </tr>
             ) : completedOrders.length === 0 ? (
               <tr>
-                <td className="buyer-dashboard__empty" colSpan="5">
+                <td className="buyer-dashboard__empty" colSpan="6">
                   No completed orders to display.
                 </td>
               </tr>
@@ -464,6 +482,69 @@ export default function BuyerDashboard({
                         </time>
                       ) : (
                         "-"
+                      )}
+                    </td>
+                    <td>
+                      {order.receipt ? (
+                        <details className="buyer-dashboard__receipt">
+                          <summary>View / download</summary>
+                          <div className="buyer-dashboard__receipt-content">
+                            <strong>Receipt {order.receipt.receiptNumber}</strong>
+                            <p>
+                              Escrow status: {getStatusLabel(order.receipt.escrowStatus)}
+                            </p>
+                            <ul>
+                              {(order.receipt.items || []).map((item, index) => (
+                                <li key={`${item.name}-${index}`}>
+                                  <span>
+                                    {item.name} ×{item.quantity} · {item.vendor}
+                                  </span>
+                                  <span>
+                                    {currencyFormatter.format(Number(item.lineTotal) || 0)}
+                                  </span>
+                                  <small>
+                                    Tier {item.vendorTier?.replace("TIER_", "") || "1"} commission:{" "}
+                                    {currencyFormatter.format(Number(item.platformFee) || 0)} ·
+                                    vendor net: {currencyFormatter.format(Number(item.vendorNetAmount) || 0)}
+                                  </small>
+                                </li>
+                              ))}
+                            </ul>
+                            {order.receipt.vendorPayouts?.length > 0 && (
+                              <>
+                                <strong>Vendor payout summary</strong>
+                                <ul>
+                                  {order.receipt.vendorPayouts.map((payout) => (
+                                    <li key={payout.vendorId}>
+                                      <span>{payout.vendor || "Vendor"}</span>
+                                      <small>
+                                        Gross: {currencyFormatter.format(Number(payout.grossAmount) || 0)} ·
+                                        platform fee: {currencyFormatter.format(Number(payout.platformFee) || 0)} ·
+                                        net payout: {currencyFormatter.format(Number(payout.netAmount) || 0)}
+                                      </small>
+                                    </li>
+                                  ))}
+                                </ul>
+                              </>
+                            )}
+                            <p>
+                              Subtotal: {currencyFormatter.format(Number(order.receipt.subtotal) || 0)}
+                              <br />
+                              Escrow fee: {currencyFormatter.format(Number(order.receipt.escrowFee) || 0)}
+                              <br />
+                              Total paid: {currencyFormatter.format(Number(order.receipt.totalPaid) || 0)}
+                            </p>
+                            <button
+                              className="buyer-dashboard__receipt-download"
+                              onClick={() => downloadReceipt(order.receipt)}
+                              type="button"
+                            >
+                              Download receipt
+                            </button>
+                          </div>
+                        </details>
+                      ) : (
+                        "Unavailable"
                       )}
                     </td>
                   </tr>

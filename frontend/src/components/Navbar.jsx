@@ -8,9 +8,11 @@ export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) 
   const isVendor = role === "SELLER";
   const isAdmin = role === "ADMIN";
   const isCustomer = !role || role === "BUYER";
+  const isRider = role === "DELIVERY_PARTNER";
   const isPortalLogin =
     location.pathname === "/vendor/login" ||
-    location.pathname === "/admin/login";
+    location.pathname === "/admin/login" ||
+    location.pathname === "/rider/login";
 
   const linkClassName = (path) =>
     `site-nav__link${location.pathname === path ? " site-nav__link--active" : ""}`;
@@ -112,6 +114,23 @@ export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) 
             </Link>
             <Link className={linkClassName("/admin/escrow")} to="/admin/escrow">
               Escrow disputes
+            </Link>
+            <span className="site-nav__identity">
+              {user?.name || user?.email}
+            </span>
+            <button
+              className="site-nav__link site-nav__button"
+              onClick={handleLogout}
+              type="button"
+            >
+              Sign out
+            </button>
+          </>
+        )}
+        {isRider && (
+          <>
+            <Link className={linkClassName("/rider/dashboard")} to="/rider/dashboard">
+              Delivery assignments
             </Link>
             <span className="site-nav__identity">
               {user?.name || user?.email}

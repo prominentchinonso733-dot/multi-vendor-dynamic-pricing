@@ -15,6 +15,7 @@ const UserSchema = new mongoose.Schema(
       enum: ["ACTIVE", "SUSPENDED"],
       default: "ACTIVE",
     },
+    vendorLimitRevision: { type: Number, default: 0, select: false },
     verification: {
       tier: { type: String, enum: ["TIER_1", "TIER_2"], default: "TIER_1" },
       status: {
@@ -53,7 +54,6 @@ const UserSchema = new mongoose.Schema(
         bankCode: { type: String },
         accountName: { type: String },
       },
-      verificationDocuments: [{ type: String }], // Tier 2 Verification Uploads
       isVerified: { type: Boolean, default: false },
       commissionRate: { type: Number, default: 0.1 }, // Default 10% platform fee
     },

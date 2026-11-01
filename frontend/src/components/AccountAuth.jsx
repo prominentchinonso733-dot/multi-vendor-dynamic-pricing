@@ -59,7 +59,9 @@ const AccountAuth = ({ role }) => {
             : "Sign in to your account"
           : role === "ADMIN"
             ? "Admin sign in"
-            : "Vendor sign in"}
+            : role === "DELIVERY_PARTNER"
+              ? "Delivery partner sign in"
+              : "Vendor sign in"}
       </h1>
       <form onSubmit={submit} style={{ display: "grid", gap: "1rem" }}>
         {isRegistering && (
@@ -121,7 +123,7 @@ const AccountAuth = ({ role }) => {
 };
 
 AccountAuth.propTypes = {
-  role: PropTypes.oneOf(["BUYER", "SELLER", "ADMIN"]).isRequired,
+  role: PropTypes.oneOf(["BUYER", "SELLER", "ADMIN", "DELIVERY_PARTNER"]).isRequired,
 };
 
 export default AccountAuth;

@@ -1,0 +1,168 @@
+.rider-dashboard {
+  width: 100%;
+  max-width: 1050px;
+  margin: 0 auto;
+  padding: 32px 20px 52px;
+  color: #172b36;
+  text-align: left;
+}
+
+.rider-dashboard__header,
+.rider-dashboard__order > header,
+.rider-dashboard__order > footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.rider-dashboard__header {
+  margin-bottom: 24px;
+  padding-bottom: 22px;
+  border-bottom: 1px solid #dce5e5;
+}
+
+.rider-dashboard__header h1 {
+  margin: 0;
+  color: #132b35;
+  font-family: Georgia, "Times New Roman", serif;
+  font-size: 2rem;
+}
+
+.rider-dashboard__header p {
+  margin: 8px 0 0;
+  color: #5c6f76;
+}
+
+.rider-dashboard__eyebrow {
+  color: #177b73 !important;
+  font-size: 0.72rem;
+  font-weight: 800;
+}
+
+.rider-dashboard__refresh,
+.rider-dashboard__order button {
+  display: inline-flex;
+  min-height: 40px;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 0 14px;
+  border: 0;
+  border-radius: 4px;
+  background: #176f5d;
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rider-dashboard__refresh {
+  border: 1px solid #c9d8d8;
+  background: white;
+  color: #344d55;
+}
+
+.rider-dashboard__refresh:disabled,
+.rider-dashboard__order button:disabled {
+  cursor: wait;
+  opacity: 0.65;
+}
+
+.rider-dashboard__orders {
+  display: grid;
+  gap: 16px;
+}
+
+.rider-dashboard__order {
+  padding: 20px;
+  border: 1px solid #dce5e5;
+  border-radius: 6px;
+  background: white;
+}
+
+.rider-dashboard__order > header strong,
+.rider-dashboard__label {
+  display: block;
+}
+
+.rider-dashboard__label {
+  margin-bottom: 4px;
+  color: #6b7b7f;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+}
+
+.rider-dashboard__status {
+  padding: 6px 9px;
+  background: #fff8e6;
+  color: #805b0b;
+  font-size: 0.75rem;
+  font-weight: 800;
+}
+
+.rider-dashboard__order ul {
+  display: grid;
+  gap: 8px;
+  margin: 18px 0 12px;
+  padding: 0;
+  list-style: none;
+}
+
+.rider-dashboard__order li,
+.rider-dashboard__vendors {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: space-between;
+  gap: 8px;
+  color: #536a70;
+  font-size: 0.86rem;
+}
+
+.rider-dashboard__vendors {
+  justify-content: flex-start;
+  padding: 10px 0;
+  border-top: 1px solid #edf1f1;
+}
+
+.rider-dashboard__order > footer {
+  margin-top: 12px;
+  padding-top: 14px;
+  border-top: 1px solid #edf1f1;
+  font-weight: 800;
+}
+
+.rider-dashboard__message {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  padding: 11px 13px;
+  border: 1px solid;
+}
+
+.rider-dashboard__message--error {
+  border-color: #e7b7ad;
+  background: #fff4f1;
+  color: #9b392b;
+}
+
+.rider-dashboard__message--success {
+  border-color: #a8d2c4;
+  background: #eff9f4;
+  color: #17634d;
+}
+
+.rider-dashboard__empty {
+  padding: 28px;
+  border: 1px solid #dce5e5;
+  background: white;
+  color: #5c6f76;
+  text-align: center;
+}
+
+@media (max-width: 620px) {
+  .rider-dashboard__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

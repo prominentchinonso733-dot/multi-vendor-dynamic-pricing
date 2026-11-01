@@ -1,6 +1,5 @@
 /* eslint-disable react/prop-types */
 import { useEffect, useState } from "react";
-import { Link } from "react-router-dom";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL } from "../api";
 
@@ -50,7 +49,8 @@ export default function CartDrawer({
     (sum, item) => sum + item.price * item.quantity,
     0,
   );
-  const escrowFee = subtotal > 0 ? Math.round(subtotal * 0.025) : 0; // 2.5% Escrow Protection Fee
+  const escrowFee =
+    subtotal > 0 ? Math.round(subtotal * 0.025 * 100) / 100 : 0;
   const grandTotal = subtotal + escrowFee;
 
   const handleInitiateEscrow = async () => {
@@ -296,7 +296,7 @@ export default function CartDrawer({
                 marginBottom: "8px",
               }}
             >
-              <span>Escrow Vault Fee (2.5%)</span>
+              <span>Estimated buyer escrow fee (2.5%)</span>
               <span>₦ {escrowFee.toLocaleString()}</span>
             </div>
             <div
@@ -307,7 +307,7 @@ export default function CartDrawer({
                 marginBottom: "8px",
               }}
             >
-              <span>Total Hold Amount</span>
+              <span>Estimated total (server-confirmed)</span>
               <span className="text-blue-600">
                 ₦ {grandTotal.toLocaleString()}
               </span>
@@ -324,11 +324,9 @@ export default function CartDrawer({
             )}
             {user?.role === "BUYER" && (
               <p style={{ fontSize: "0.85rem", lineHeight: 1.5 }}>
-                Tier 2 identity verification is required to check out.{" "}
-                <Link to="/account/verification" onClick={onClose}>
-                  Review your verification status
-                </Link>
-                .
+                Vendor platform commission depends on the seller&apos;s
+                approved tier. Checkout validates product prices, stock, and
+                transaction limits on the server.
               </p>
             )}
             <div style={{ display: "grid", gap: "8px", marginTop: "16px" }}>
@@ -343,8 +341,8 @@ export default function CartDrawer({
                 autoComplete="email"
                 type="email"
                 required
+                readOnly
                 value={buyerEmail}
-                onChange={(event) => setBuyerEmail(event.target.value)}
                 placeholder="you@example.com"
                 style={{
                   minHeight: "42px",

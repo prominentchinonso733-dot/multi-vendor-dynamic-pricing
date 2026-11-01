@@ -69,6 +69,7 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [pendingAction, setPendingAction] = useState("");
+  const [downloadingDocumentUserId, setDownloadingDocumentUserId] = useState("");
   const [reviewNotes, setReviewNotes] = useState({});
   const [identityChecks, setIdentityChecks] = useState({});
   const [riderDraft, setRiderDraft] = useState({
@@ -164,6 +165,36 @@ export default function AdminDashboard() {
       `Identity request ${decision === "APPROVE" ? "approved" : "rejected"}.`,
     );
 
+  const downloadIdentityDocument = async (user) => {
+    setDownloadingDocumentUserId(user._id);
+    setError("");
+    try {
+      const { blob, contentType } =
+        await adminService.downloadVerificationDocument(user._id);
+      const extension =
+        contentType === "application/pdf"
+          ? "pdf"
+          : contentType === "image/png"
+            ? "png"
+            : "jpg";
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `verification-${user._id}.${extension}`;
+      link.click();
+      URL.revokeObjectURL(url);
+    } catch (downloadError) {
+      setError(
+        getApiErrorMessage(
+          downloadError,
+          "Unable to download the identity document.",
+        ),
+      );
+    } finally {
+      setDownloadingDocumentUserId("");
+    }
+  };
+
   const createRider = async (event) => {
     event.preventDefault();
     const success = await runAction(
@@ -247,7 +278,7 @@ export default function AdminDashboard() {
               <th>Total</th>
               <th>Payment</th>
               <th>Fulfillment</th>
-              <th>Rider</th>
+              <th>Rider / delivery status</th>
               <th>Created</th>
             </tr>
           </thead>
@@ -272,7 +303,11 @@ export default function AdminDashboard() {
                   <td>
                     <select
                       aria-label={`Assign delivery partner for ${order.paymentReference}`}
-                      disabled={pendingAction === `assign-${order._id}`}
+                      disabled={
+                        pendingAction === `assign-${order._id}` ||
+                        !["FUNDS_LOCKED", "LOCKED"].includes(order.status) ||
+                        (order.deliveryStatus || "PENDING") !== "PENDING"
+                      }
                       onChange={(event) => assignRider(order._id, event.target.value)}
                       value={riderId || ""}
                     >
@@ -295,6 +330,7 @@ export default function AdminDashboard() {
                         <option value={riderId}>{riderName}</option>
                       )}
                     </select>
+                    <small>{displayStatus(order.deliveryStatus || "PENDING")}</small>
                   </td>
                   <td>{formatDate(order.createdAt)}</td>
                 </tr>
@@ -332,6 +368,20 @@ export default function AdminDashboard() {
             <div><dt>Legal name</dt><dd>{user.verification?.legalName || "—"}</dd></div>
             <div><dt>Document type</dt><dd>{displayStatus(user.verification?.documentType)}</dd></div>
           </dl>
+          <button
+            disabled={
+              !user.verification?.documentAvailable ||
+              downloadingDocumentUserId === user._id
+            }
+            onClick={() => downloadIdentityDocument(user)}
+            type="button"
+          >
+            {downloadingDocumentUserId === user._id
+              ? "Preparing secure download..."
+              : user.verification?.documentAvailable
+                ? "Download identity document"
+                : "Identity document unavailable"}
+          </button>
           <label>
             Review note (optional)
             <input
@@ -340,7 +390,7 @@ export default function AdminDashboard() {
               value={reviewNotes[user._id] || ""}
             />
           </label>
-          <p className="admin-dashboard__hint">Approve only after completing the identity check through the organization&apos;s approved external process.</p>
+          <p className="admin-dashboard__hint">Review the uploaded document before deciding. Identity document files are deleted after approval or rejection.</p>
           <label className="admin-dashboard__identity-confirmation">
             <input
               checked={identityChecks[user._id] === true}
@@ -350,7 +400,7 @@ export default function AdminDashboard() {
             I confirm the applicant&apos;s identity was checked through the approved process.
           </label>
           <div className="admin-dashboard__review-actions">
-            <button disabled={pendingAction === `verification-${user._id}` || identityChecks[user._id] !== true} onClick={() => reviewIdentity(user, "APPROVE")} type="button">Approve Tier 2</button>
+            <button disabled={pendingAction === `verification-${user._id}` || identityChecks[user._id] !== true || !user.verification?.documentAvailable} onClick={() => reviewIdentity(user, "APPROVE")} type="button">Approve Tier 2</button>
             <button className="admin-dashboard__reject" disabled={pendingAction === `verification-${user._id}`} onClick={() => reviewIdentity(user, "REJECT")} type="button">Reject</button>
           </div>
         </article>

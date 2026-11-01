@@ -2,6 +2,7 @@ const crypto = require("crypto");
 const express = require("express");
 const mongoose = require("mongoose");
 const EscrowContract = require("../models/EscrowContract");
+const confirmEscrowPayment = require("../services/confirmEscrowPayment");
 
 const router = express.Router();
 
@@ -113,29 +114,21 @@ router.post("/paystack", async (req, res) => {
         });
     }
 
-    const updatedContract = await EscrowContract.findOneAndUpdate(
-      {
-        _id: contract._id,
-        paymentReference: payment.reference,
-        status: "PAYMENT_PENDING",
-      },
-      { $set: { status: "FUNDS_LOCKED" } },
-      { new: true, runValidators: true },
+    const paymentResult = await confirmEscrowPayment(
+      contract._id,
+      payment.reference,
     );
-
-    if (!updatedContract) {
-      const latestContract = await EscrowContract.findById(contract._id);
-      if (latestContract?.status === "FUNDS_LOCKED") {
-        return res.status(200).json({ received: true, alreadyProcessed: true });
-      }
+    if (!paymentResult.contract) {
       return res
         .status(409)
         .json({ success: false, message: "Escrow order could not be locked." });
     }
 
-    return res
-      .status(200)
-      .json({ received: true, status: updatedContract.status });
+    return res.status(200).json({
+      received: true,
+      status: paymentResult.contract.status,
+      alreadyProcessed: paymentResult.alreadyProcessed,
+    });
   } catch (error) {
     return res.status(500).json({ success: false, error: error.message });
   }

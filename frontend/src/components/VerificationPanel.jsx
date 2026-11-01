@@ -23,6 +23,7 @@ export default function VerificationPanel({ compact = false }) {
   const [verification, setVerification] = useState(null);
   const [legalName, setLegalName] = useState("");
   const [documentType, setDocumentType] = useState("NIN");
+  const [documentFile, setDocumentFile] = useState(null);
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -41,10 +42,6 @@ export default function VerificationPanel({ compact = false }) {
         if (!controller.signal.aborted) {
           setError(getApiErrorMessage(loadError, "Unable to load verification."));
         }
-
-        VerificationPanel.propTypes = {
-          compact: PropTypes.bool,
-        };
       })
       .finally(() => {
         if (!controller.signal.aborted) setLoading(false);
@@ -58,11 +55,13 @@ export default function VerificationPanel({ compact = false }) {
     setError("");
     setNotice("");
     try {
-      const updated = await authService.submitVerificationRequest({
-        legalName,
-        documentType,
-      });
+      const request = new FormData();
+      request.set("legalName", legalName);
+      request.set("documentType", documentType);
+      request.set("document", documentFile);
+      const updated = await authService.submitVerificationRequest(request);
       setVerification(updated);
+      setDocumentFile(null);
       setNotice("Request submitted. Tier 2 remains pending until review is complete.");
     } catch (submitError) {
       setError(
@@ -134,10 +133,9 @@ export default function VerificationPanel({ compact = false }) {
       ) : (
         <form className="verification-panel__form" onSubmit={submit}>
           <p>
-            Submit your legal name and document type for staff review. Do not enter
-            an identity number or upload identity documents here; identity checks
-            must be completed through the marketplace&apos;s approved verification
-            process before staff can approve Tier 2.
+            Submit a clear copy for admin review. The file is encrypted before
+            storage, is available only to admins while your request is pending,
+            and is deleted after review. Do not enter your identity number here.
           </p>
           <label>
             Full legal name
@@ -161,6 +159,17 @@ export default function VerificationPanel({ compact = false }) {
               ))}
             </select>
           </label>
+          <label>
+            Identity document file (PDF, JPEG, or PNG; up to 5 MB)
+            <input
+              accept="application/pdf,image/jpeg,image/png"
+              onChange={(event) =>
+                setDocumentFile(event.target.files?.[0] || null)
+              }
+              required
+              type="file"
+            />
+          </label>
           <button disabled={pending} type="submit">
             {pending ? "Submitting..." : status === "REJECTED" ? "Resubmit request" : "Request Tier 2 review"}
           </button>
@@ -169,3 +178,7 @@ export default function VerificationPanel({ compact = false }) {
     </section>
   );
 }
+
+VerificationPanel.propTypes = {
+  compact: PropTypes.bool,
+};

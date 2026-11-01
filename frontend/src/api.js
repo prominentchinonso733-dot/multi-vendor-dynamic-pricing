@@ -31,6 +31,7 @@ api.interceptors.request.use((config) => {
     ADMIN: "adminToken",
     SELLER: "vendorToken",
     BUYER: "buyerToken",
+    DELIVERY_PARTNER: "riderToken",
   };
   const activeRole =
     typeof localStorage !== "undefined"

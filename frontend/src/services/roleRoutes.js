@@ -7,12 +7,17 @@ const ROLE_ALIASES = {
   BUYER: "BUYER",
   CUSTOMER: "BUYER",
   ROLE_CUSTOMER: "BUYER",
+  RIDER: "DELIVERY_PARTNER",
+  DELIVERY: "DELIVERY_PARTNER",
+  ROLE_RIDER: "DELIVERY_PARTNER",
+  ROLE_DELIVERY_PARTNER: "DELIVERY_PARTNER",
 };
 
 const ROLE_HOME_ROUTES = {
   ADMIN: "/admin",
   SELLER: "/vendor/dashboard",
   BUYER: "/",
+  DELIVERY_PARTNER: "/rider/dashboard",
 };
 
 export const normalizeRole = (role) => {

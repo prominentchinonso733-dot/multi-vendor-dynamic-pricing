@@ -11,6 +11,17 @@ export const adminService = {
     return data.users;
   },
 
+  async downloadVerificationDocument(userId) {
+    const response = await api.get(
+      `/admin/verification/${encodeURIComponent(userId)}/document`,
+      { responseType: "blob" },
+    );
+    return {
+      blob: response.data,
+      contentType: response.headers["content-type"],
+    };
+  },
+
   async updateAccountStatus(userId, status) {
     const { data } = await api.patch(
       `/admin/users/${encodeURIComponent(userId)}/status`,

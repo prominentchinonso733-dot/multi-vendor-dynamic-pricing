@@ -2,8 +2,53 @@ const express = require("express");
 const router = express.Router();
 const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
+const mongoose = require("mongoose");
+const multer = require("multer");
 const User = require("../models/User");
+const VerificationDocument = require("../models/VerificationDocument");
 const authenticateToken = require("../middleware/authenticateToken");
+const { getVendorPolicy } = require("../services/financialPolicy");
+const {
+  SUPPORTED_CONTENT_TYPES,
+  detectContentType,
+  encryptDocument,
+} = require("../services/verificationDocuments");
+
+const uploadVerificationDocument = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 2, fieldSize: 2048 },
+  fileFilter: (_req, file, callback) => {
+    if (!SUPPORTED_CONTENT_TYPES.has(file.mimetype)) {
+      const error = new Error("Upload a PDF, JPEG, or PNG identity document.");
+      error.code = "INVALID_DOCUMENT_TYPE";
+      return callback(error);
+    }
+    return callback(null, true);
+  },
+}).single("document");
+
+const parseVerificationDocument = (req, res, next) => {
+  uploadVerificationDocument(req, res, (error) => {
+    if (!error) return next();
+    if (error.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        success: false,
+        message: "Identity documents must be 5 MB or smaller.",
+      });
+    }
+    if (
+      error.code === "INVALID_DOCUMENT_TYPE" ||
+      error instanceof multer.MulterError
+    ) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    console.error("Identity document upload could not be parsed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to process the identity document upload.",
+    });
+  });
+};
 
 const storeProfileFields = [
   "storeName",
@@ -176,77 +221,132 @@ router.get("/verification", authenticateToken, async (req, res) => {
   }
 });
 
-router.post("/verification", authenticateToken, async (req, res) => {
-  const legalName =
-    typeof req.body?.legalName === "string" ? req.body.legalName.trim() : "";
-  const documentType = req.body?.documentType;
-  const allowedDocumentTypes = [
-    "NIN",
-    "BVN",
-    "DRIVERS_LICENSE",
-    "PASSPORT",
-  ];
-  if (legalName.length < 2 || legalName.length > 120) {
-    return res.status(400).json({
-      success: false,
-      message: "Legal name must be between 2 and 120 characters.",
-    });
-  }
-  if (!allowedDocumentTypes.includes(documentType)) {
-    return res.status(400).json({
-      success: false,
-      message: "Choose a supported identity document type.",
-    });
-  }
-
-  try {
-    const user = await User.findOne({
-      _id: req.user._id,
-      role: { $in: ["BUYER", "SELLER"] },
-      accountStatus: { $ne: "SUSPENDED" },
-      "verification.status": { $nin: ["PENDING", "VERIFIED"] },
-    });
-    if (!user) {
-      return res.status(409).json({
+router.post(
+  "/verification",
+  authenticateToken,
+  parseVerificationDocument,
+  async (req, res) => {
+    const legalName =
+      typeof req.body?.legalName === "string" ? req.body.legalName.trim() : "";
+    const documentType = req.body?.documentType;
+    const allowedDocumentTypes = [
+      "NIN",
+      "BVN",
+      "DRIVERS_LICENSE",
+      "PASSPORT",
+    ];
+    if (legalName.length < 2 || legalName.length > 120) {
+      return res.status(400).json({
         success: false,
-        message:
-          "This account already has a pending verification or is verified.",
+        message: "Legal name must be between 2 and 120 characters.",
+      });
+    }
+    if (!allowedDocumentTypes.includes(documentType)) {
+      return res.status(400).json({
+        success: false,
+        message: "Choose a supported identity document type.",
+      });
+    }
+    if (!req.file) {
+      return res.status(400).json({
+        success: false,
+        message: "Upload one PDF, JPEG, or PNG identity document.",
+      });
+    }
+    if (detectContentType(req.file.buffer) !== req.file.mimetype) {
+      return res.status(400).json({
+        success: false,
+        message: "The uploaded file content does not match its file type.",
       });
     }
 
-    user.verification = {
-      ...(user.verification?.toObject?.() || user.verification || {}),
-      tier: "TIER_1",
-      status: "PENDING",
-      legalName,
-      documentType,
-      submittedAt: new Date(),
-      reviewedAt: undefined,
-      reviewedBy: undefined,
-      reviewNote: "",
-    };
-    await user.save();
-    return res.status(202).json({
-      success: true,
-      message: "Verification request submitted for review.",
-      verification: {
-        tier: user.verification.tier,
-        status: user.verification.status,
-        legalName: user.verification.legalName,
-        documentType: user.verification.documentType,
-        submittedAt: user.verification.submittedAt,
-        reviewedAt: null,
-        reviewNote: "",
-      },
-    });
-  } catch (error) {
-    console.error("Account verification request could not be submitted:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Unable to submit verification request.",
-    });
-  }
-});
+    try {
+      const userId = req.user._id || req.user.id;
+      let encryptedDocument;
+      try {
+        encryptedDocument = encryptDocument(req.file.buffer, userId);
+      } finally {
+        req.file.buffer.fill(0);
+      }
+      const session = await mongoose.startSession();
+      let verification;
+      try {
+        await session.withTransaction(async () => {
+          const user = await User.findOne({
+            _id: userId,
+            role: { $in: ["BUYER", "SELLER"] },
+            accountStatus: { $ne: "SUSPENDED" },
+            "verification.status": { $nin: ["PENDING", "VERIFIED"] },
+          }).session(session);
+          if (!user) {
+            const error = new Error(
+              "This account already has a pending verification or is verified.",
+            );
+            error.statusCode = 409;
+            throw error;
+          }
+
+          user.verification = {
+            ...(user.verification?.toObject?.() || user.verification || {}),
+            tier: "TIER_1",
+            status: "PENDING",
+            legalName,
+            documentType,
+            submittedAt: new Date(),
+            reviewedAt: undefined,
+            reviewedBy: undefined,
+            reviewNote: "",
+          };
+          await user.save({ session });
+          await VerificationDocument.findOneAndUpdate(
+            { userId: user._id },
+            { $set: { userId: user._id, ...encryptedDocument } },
+            { upsert: true, new: true, runValidators: true, session },
+          );
+          verification = {
+            tier: user.verification.tier,
+            status: user.verification.status,
+            legalName: user.verification.legalName,
+            documentType: user.verification.documentType,
+            submittedAt: user.verification.submittedAt,
+            reviewedAt: null,
+            reviewNote: "",
+          };
+        });
+      } finally {
+        await session.endSession();
+      }
+
+      return res.status(202).json({
+        success: true,
+        message: "Verification request submitted for review.",
+        verification,
+      });
+    } catch (error) {
+      if (error.code === "DOCUMENT_ENCRYPTION_KEY_INVALID") {
+        return res.status(503).json({
+          success: false,
+          message:
+            "Secure identity document uploads are not configured. Contact support.",
+        });
+      }
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      console.error(
+        "Account verification request could not be submitted:",
+        error,
+      );
+      return res.status(500).json({
+        success: false,
+        message: "Unable to submit verification request.",
+      });
+    }
+  },
+);
 
 router.get("/profile", authenticateToken, async (req, res) => {
   if (req.user.role !== "SELLER") {
@@ -277,6 +377,10 @@ router.get("/profile", authenticateToken, async (req, res) => {
           tier: user.verification?.tier || "TIER_1",
           status: user.verification?.status || "NOT_STARTED",
         },
+        isVerified:
+          user.verification?.tier === "TIER_2" &&
+          user.verification?.status === "VERIFIED",
+        financialPolicy: getVendorPolicy(user),
       },
     });
   } catch (error) {
@@ -368,6 +472,10 @@ router.put("/profile", authenticateToken, async (req, res) => {
           tier: user.verification?.tier || "TIER_1",
           status: user.verification?.status || "NOT_STARTED",
         },
+        isVerified:
+          user.verification?.tier === "TIER_2" &&
+          user.verification?.status === "VERIFIED",
+        financialPolicy: getVendorPolicy(user),
       },
     });
   } catch (error) {

@@ -27,7 +27,9 @@ export const authService = {
   },
 
   async submitVerificationRequest(details) {
-    const { data } = await api.post("/auth/verification", details);
+    const { data } = await api.post("/auth/verification", details, {
+      headers: { "Content-Type": "multipart/form-data" },
+    });
     return data.verification;
   },
 };

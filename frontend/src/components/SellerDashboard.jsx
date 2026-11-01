@@ -152,7 +152,7 @@ export default function SellerDashboard() {
       setNotice(
         decision === "RELEASE"
           ? `Dispute resolved: funds released for ${data.contract.paymentReference}.`
-          : `Dispute resolved: buyer refunded for ${data.contract.paymentReference}.`,
+          : `Dispute marked for refund for ${data.contract.paymentReference}. Process the gateway refund in Paystack.`,
       );
     } catch (resolveError) {
       setError(resolveError.message || "Unable to resolve the dispute.");

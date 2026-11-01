@@ -13,4 +13,9 @@ export const escrowService = {
     );
     return data.contract;
   },
+
+  async getVendorWallet(config = {}) {
+    const { data } = await api.get("/escrow/wallet", config);
+    return data.wallet;
+  },
 };

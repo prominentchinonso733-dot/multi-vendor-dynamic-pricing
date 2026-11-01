@@ -11,6 +11,7 @@ import AdminDashboard from "./components/AdminDashboard";
 import VendorStorefront from "./components/VendorStorefront";
 import AccountAuth from "./components/AccountAuth";
 import VerificationPanel from "./components/VerificationPanel";
+import RiderDashboard from "./components/RiderDashboard";
 import { useAuth } from "./context/AuthContext";
 import { getRoleHomeRoute } from "./services/roleRoutes";
 
@@ -22,6 +23,7 @@ function RequireRole({ role, children }) {
       SELLER: "/vendor/login",
       ADMIN: "/admin/login",
       BUYER: "/account",
+      DELIVERY_PARTNER: "/rider/login",
     }[role];
     return <Navigate to={loginPath} replace />;
   }
@@ -32,7 +34,7 @@ function RequireRole({ role, children }) {
 }
 
 RequireRole.propTypes = {
-  role: PropTypes.oneOf(["SELLER", "ADMIN", "BUYER"]).isRequired,
+  role: PropTypes.oneOf(["SELLER", "ADMIN", "BUYER", "DELIVERY_PARTNER"]).isRequired,
   children: PropTypes.node.isRequired,
 };
 
@@ -41,6 +43,7 @@ function VendorLoginRoute() {
   if (role === "SELLER") return <Navigate to="/vendor/dashboard" replace />;
   if (role === "ADMIN") return <Navigate to="/admin" replace />;
   if (role === "BUYER") return <Navigate to="/" replace />;
+  if (role === "DELIVERY_PARTNER") return <Navigate to="/rider/dashboard" replace />;
   return <AccountAuth role="SELLER" />;
 }
 
@@ -49,7 +52,26 @@ function AdminLoginRoute() {
   if (role === "ADMIN") return <Navigate to="/admin" replace />;
   if (role === "SELLER") return <Navigate to="/vendor/dashboard" replace />;
   if (role === "BUYER") return <Navigate to="/" replace />;
+  if (role === "DELIVERY_PARTNER") return <Navigate to="/rider/dashboard" replace />;
   return <AccountAuth role="ADMIN" />;
+}
+
+function RiderLoginRoute() {
+  const { role } = useAuth();
+  if (role === "DELIVERY_PARTNER") return <Navigate to="/rider/dashboard" replace />;
+  if (role === "ADMIN") return <Navigate to="/admin" replace />;
+  if (role === "SELLER") return <Navigate to="/vendor/dashboard" replace />;
+  if (role === "BUYER") return <Navigate to="/" replace />;
+  return <AccountAuth role="DELIVERY_PARTNER" />;
+}
+
+function BuyerLoginRoute() {
+  const { role } = useAuth();
+  if (role === "BUYER") return <Navigate to="/" replace />;
+  if (role === "ADMIN") return <Navigate to="/admin" replace />;
+  if (role === "SELLER") return <Navigate to="/vendor/dashboard" replace />;
+  if (role === "DELIVERY_PARTNER") return <Navigate to="/rider/dashboard" replace />;
+  return <AccountAuth role="BUYER" />;
 }
 
 function App() {
@@ -102,7 +124,7 @@ function App() {
       <main className="app-main">
         <Routes>
           <Route path="/" element={<ProductList onAddToCart={addToCart} />} />
-          <Route path="/account" element={<AccountAuth role="BUYER" />} />
+          <Route path="/account" element={<BuyerLoginRoute />} />
           <Route
             path="/account/verification"
             element={
@@ -113,6 +135,7 @@ function App() {
           />
           <Route path="/vendor/login" element={<VendorLoginRoute />} />
           <Route path="/admin/login" element={<AdminLoginRoute />} />
+          <Route path="/rider/login" element={<RiderLoginRoute />} />
           <Route
             path="/vendor/dashboard"
             element={
@@ -134,6 +157,14 @@ function App() {
             element={
               <RequireRole role="ADMIN">
                 <SellerDashboard />
+              </RequireRole>
+            }
+          />
+          <Route
+            path="/rider/dashboard"
+            element={
+              <RequireRole role="DELIVERY_PARTNER">
+                <RiderDashboard />
               </RequireRole>
             }
           />

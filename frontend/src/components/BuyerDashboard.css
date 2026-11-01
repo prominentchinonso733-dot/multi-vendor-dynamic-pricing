@@ -196,6 +196,58 @@
   max-width: 270px;
 }
 
+.buyer-dashboard__receipt summary {
+  color: #14786f;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.buyer-dashboard__receipt-content {
+  min-width: 260px;
+  max-width: 420px;
+  padding: 12px;
+  border: 1px solid #dce5e5;
+  background: white;
+  color: #344b53;
+  white-space: normal;
+}
+
+.buyer-dashboard__receipt-content p {
+  line-height: 1.6;
+}
+
+.buyer-dashboard__receipt-content ul {
+  display: grid;
+  gap: 10px;
+  margin: 12px 0;
+  padding: 0;
+  list-style: none;
+}
+
+.buyer-dashboard__receipt-content li {
+  display: grid;
+  gap: 4px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid #edf1f1;
+}
+
+.buyer-dashboard__receipt-content small {
+  color: #5c6f76;
+}
+
+.buyer-dashboard__receipt-download {
+  min-height: 36px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 4px;
+  background: #14786f;
+  color: white;
+  font: inherit;
+  font-size: 0.82rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
 .buyer-dashboard__status {
   display: inline-block;
   padding: 5px 8px;

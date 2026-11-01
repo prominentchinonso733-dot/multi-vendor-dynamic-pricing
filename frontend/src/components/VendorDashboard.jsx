@@ -157,6 +157,30 @@ export default function VendorDashboard({ onPriceUpdated }) {
   const [ordersNotice, setOrdersNotice] = useState("");
   const [pendingOrderStatusId, setPendingOrderStatusId] = useState(null);
   const [ordersRefreshVersion, setOrdersRefreshVersion] = useState(0);
+  const [accountSummary, setAccountSummary] = useState(null);
+  const [walletBalance, setWalletBalance] = useState(0);
+  const [accountSummaryError, setAccountSummaryError] = useState("");
+
+  useEffect(() => {
+    const controller = new AbortController();
+    Promise.all([
+      authService.getStoreProfile({ signal: controller.signal }),
+      escrowService.getVendorWallet({ signal: controller.signal }),
+    ])
+      .then(([profile, wallet]) => {
+        setAccountSummary(profile);
+        setWalletBalance(Number(wallet?.balance) || 0);
+        setAccountSummaryError("");
+      })
+      .catch((error) => {
+        if (!controller.signal.aborted) {
+          setAccountSummaryError(
+            getApiErrorMessage(error, "Unable to load tier and wallet details."),
+          );
+        }
+      });
+    return () => controller.abort();
+  }, [ordersRefreshVersion]);
 
   useEffect(() => {
     if (!selectedImage) {
@@ -722,6 +746,39 @@ export default function VendorDashboard({ onPriceUpdated }) {
         )}
       </header>
 
+      {accountSummary && (
+        <section
+          aria-label="Vendor verification and financial limits"
+          className="vendor-pricing__financial-summary"
+        >
+          <div>
+            <strong>
+              {accountSummary.isVerified ? "Tier 2 · Verified Store" : "Tier 1 · Starter"}
+            </strong>
+            <span>
+              {((accountSummary.financialPolicy?.commissionRate || 0) * 100).toFixed(0)}% platform commission
+            </span>
+          </div>
+          <div>
+            <span>Per-order cap</span>
+            <strong>{currencyFormatter.format(accountSummary.financialPolicy?.orderValueLimit || 0)}</strong>
+          </div>
+          <div>
+            <span>Daily sales cap</span>
+            <strong>{currencyFormatter.format(accountSummary.financialPolicy?.dailyVolumeLimit || 0)}</strong>
+          </div>
+          <div>
+            <span>Available wallet balance</span>
+            <strong>{currencyFormatter.format(walletBalance)}</strong>
+          </div>
+        </section>
+      )}
+      {accountSummaryError && (
+        <p className="vendor-pricing__message vendor-pricing__message--error" role="alert">
+          {accountSummaryError}
+        </p>
+      )}
+
       {/* Keep store profile settings alongside, but separate from, pricing tools. */}
       <nav
         aria-label="Vendor dashboard sections"
@@ -889,9 +946,18 @@ export default function VendorDashboard({ onPriceUpdated }) {
                         <option value="PENDING">Pending</option>
                         <option value="PROCESSING">Processing</option>
                         <option value="SHIPPED">Shipped</option>
-                        <option value="DELIVERED">Delivered</option>
+                        {status === "DELIVERED" && (
+                          <option disabled value="DELIVERED">Delivered by rider</option>
+                        )}
                       </select>
                     </label>
+                    {order.vendorPayout && (
+                      <p className="vendor-pricing__payout">
+                        Tier {order.vendorPayout.tier.replace("TIER_", "")} · platform fee{" "}
+                        {currencyFormatter.format(order.vendorPayout.platformFee)} · net payout{" "}
+                        {currencyFormatter.format(order.vendorPayout.netAmount)}
+                      </p>
+                    )}
                   </article>
                 );
               })}

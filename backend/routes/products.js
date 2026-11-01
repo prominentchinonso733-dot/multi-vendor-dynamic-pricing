@@ -403,7 +403,9 @@ router.get("/store/:vendorId", async (req, res) => {
         storeBanner: vendor.storeBanner || "",
         storeDescription: vendor.storeDescription || "",
         tier: vendor.verification?.tier || "TIER_1",
-        isVerified: vendor.verification?.status === "VERIFIED",
+        isVerified:
+          vendor.verification?.tier === "TIER_2" &&
+          vendor.verification?.status === "VERIFIED",
         memberSince: vendor.createdAt,
       },
       products: products.map((product) => ({

@@ -8,14 +8,27 @@ const ROLE_SESSION_KEYS = {
   ADMIN: { token: "adminToken", user: "adminUser" },
   SELLER: { token: "vendorToken", user: "vendorUser" },
   BUYER: { token: "buyerToken", user: "buyerUser" },
+  DELIVERY_PARTNER: { token: "riderToken", user: "riderUser" },
 };
 
-const normalizeUser = (user) =>
-  user && typeof user === "object"
-    ? { ...user, role: normalizeRole(user.role) }
-    : null;
+const normalizeUser = (user) => {
+  if (!user || typeof user !== "object") return null;
+  const role = normalizeRole(user.role);
+  return {
+    ...user,
+    role:
+      role === "RIDER" || role === "DELIVERY"
+        ? "DELIVERY_PARTNER"
+        : role,
+  };
+};
 
-const emptySessions = () => ({ ADMIN: null, SELLER: null, BUYER: null });
+const emptySessions = () => ({
+  ADMIN: null,
+  SELLER: null,
+  BUYER: null,
+  DELIVERY_PARTNER: null,
+});
 
 const readStoredAuth = () => {
   try {

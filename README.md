@@ -13,16 +13,29 @@ A modern web application that enables multiple vendors to list and sell products
 - `/` is the public product catalog and cart. Customer navigation only exposes customer shopping, orders, and verification.
 - `/vendor/login` and `/vendor/dashboard` provide the vendor sign-in and seller-only product, stock, pricing, fulfillment, and store-settings tools.
 - `/admin/login`, `/admin`, and `/admin/escrow` provide the separate administrator sign-in, paginated marketplace oversight, and escrow dispute operations.
+- `/rider/login` and `/rider/dashboard` provide an isolated delivery-partner sign-in and assigned-order pickup/delivery workflow.
 - `/account/verification` shows the signed-in customer's verification tier and request status. Vendor verification is available from **Store Settings**.
-- `DELIVERY_PARTNER` accounts are created by an administrator and can be assigned to escrow orders from **Delivery & riders**.
+- `DELIVERY_PARTNER` accounts are created by an administrator and can be assigned to paid escrow orders from **Delivery & riders**. Vendors mark packages as shipped; only the assigned rider can advance delivery from `PENDING` to `PICKED_UP` to `DELIVERED`.
 
 Backend role checks protect the vendor and admin APIs independently of the frontend route guards. Suspended accounts are denied sign-in and their existing bearer tokens are rejected by authenticated API routes.
 
 ### Tier 1 and Tier 2 verification
 
-New accounts start at Tier 1. Submitting a legal name and identity-document type creates a Tier 2 review request; it does not mark the account as verified. An administrator may approve a request only after completing the identity check through the organization's approved external process. Checkout verifies the account's stored Tier 2 approval on the server and does not trust a browser-supplied verification flag.
+New accounts start at Tier 1. Submitting a legal name, identity-document type, and one PDF/JPEG/PNG document (up to 5 MB) creates a Tier 2 review request; it does not mark the account as verified. Documents are encrypted in the application with AES-256-GCM before being stored in MongoDB. Only an authenticated admin can download a document while its request is pending. The encrypted document is deleted in the same transaction that records the admin's approval or rejection. Checkout verifies the account's stored Tier 2 approval on the server and does not trust a browser-supplied verification flag.
 
-This repository does not include an identity-verification provider integration or secure document intake. The current workflow deliberately does not collect identity numbers or documents and cannot perform automated KYC. Configure and integrate an approved identity provider before presenting Tier 2 as an automated or fully production-ready verification service.
+Set `VERIFICATION_DOCUMENT_ENCRYPTION_KEY` to a persistent, randomly generated 32-byte key encoded as 64 hexadecimal characters. Generate a key with `node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"` and keep it only in the deployment secret store (for example `k8s/secrets.env` before creating the Kubernetes secret). Do not commit it. The same key must remain available while documents are pending; clear the pending review queue before rotating it. Admin document downloads are attachment-only, non-cacheable responses. Uploaded identity files must still be checked by staff through the organization's approved identity-verification process; this application does not independently validate BVN/NIN records or provide automated KYC.
+
+### Vendor fees, limits, receipts, and escrow release
+
+The backend is authoritative for order prices, quantities, vendor tiers, transaction caps, and fees. Tier 1 vendors are limited to **₦100,000 per order** and **₦500,000 in daily gross sales** with a **10% vendor commission**. Approved Tier 2 vendors have a **₦1,000,000 per-order** and **₦5,000,000 daily** cap and a **5% commission**. All new vendors start at Tier 1. The buyer escrow fee remains **2.5% of the server-calculated order subtotal**. These defaults are defined in `backend/services/financialPolicy.js`.
+
+The checkout API creates an expiring payment order from current database prices and stock, not client-supplied amounts. A successful Paystack verification or signed webhook locks funds and decrements inventory. If payment arrives after the order hold expires or its inventory is no longer available, the order is flagged for admin dispute review rather than silently treated as a successful checkout.
+
+Vendors can mark their fulfillment `PENDING` → `PROCESSING` → `SHIPPED`. The assigned rider then confirms pickup and delivery. A buyer can finalize the receipt and release only after rider delivery is confirmed. The finalization stores an itemized receipt with subtotal, escrow fee, each vendor's tier and commission, net payout, total paid, and escrow status. Buyers can view and download it from **My Orders**. Released vendor amounts are credited to the internal NGN wallet ledger; this project does **not** initiate bank payouts.
+
+Wallet credits, stock changes, and identity-document submission/review use MongoDB transactions. Run against a MongoDB replica set (including MongoDB Atlas) for payment confirmation and settlement. Configure an actual payout provider and reconciliation process before representing wallet balances as withdrawn funds.
+
+An administrator's **Refund** dispute decision records the refund outcome and creates the corresponding receipt, but does not call Paystack's refund API. Complete and reconcile the gateway refund in Paystack before using that resolution in production.
 
 The admin overview is available at `GET /api/admin/overview` and accepts `usersPage`, `ordersPage`, and `usersRole` (`accounts`, `vendors`, or `riders`) query parameters. Admin-only endpoints also support account suspension, identity review, delivery-partner creation, and order-to-rider assignment.
 

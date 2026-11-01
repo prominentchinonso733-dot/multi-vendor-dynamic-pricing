@@ -4,7 +4,9 @@ const mongoose = require("mongoose");
 const User = require("../models/User");
 const Product = require("../models/Product");
 const EscrowContract = require("../models/EscrowContract");
+const VerificationDocument = require("../models/VerificationDocument");
 const authenticateToken = require("../middleware/authenticateToken");
+const { decryptDocument } = require("../services/verificationDocuments");
 
 const router = express.Router();
 router.use(authenticateToken, (req, res, next) => {
@@ -118,12 +120,102 @@ router.get("/verification/pending", async (_req, res) => {
       .select("name email role createdAt verification")
       .sort({ "verification.submittedAt": 1 })
       .lean();
-    return res.json({ success: true, users });
+    const documents = await VerificationDocument.find({
+      userId: { $in: users.map((user) => user._id) },
+    })
+      .select("userId")
+      .lean();
+    const usersWithDocument = new Set(
+      documents.map((document) => document.userId.toString()),
+    );
+    return res.json({
+      success: true,
+      users: users.map((user) => ({
+        ...user,
+        verification: {
+          ...user.verification,
+          documentAvailable: usersWithDocument.has(user._id.toString()),
+        },
+      })),
+    });
   } catch (error) {
     console.error("Pending identity reviews could not be loaded:", error);
     return res.status(500).json({
       success: false,
       message: "Unable to load pending identity reviews.",
+    });
+  }
+});
+
+router.get("/verification/:userId/document", async (req, res) => {
+  const { userId } = req.params;
+  if (!mongoose.isValidObjectId(userId)) {
+    return res
+      .status(400)
+      .json({ success: false, message: "A valid userId is required." });
+  }
+
+  try {
+    const user = await User.findOne({
+      _id: userId,
+      accountStatus: { $ne: "SUSPENDED" },
+      "verification.status": "PENDING",
+    })
+      .select("_id")
+      .lean();
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "Pending identity document not found.",
+      });
+    }
+
+    const document = await VerificationDocument.findOne({ userId });
+    if (!document) {
+      return res.status(404).json({
+        success: false,
+        message: "Pending identity document not found.",
+      });
+    }
+
+    let content;
+    try {
+      content = decryptDocument(document, userId);
+    } catch (error) {
+      if (error.code === "DOCUMENT_ENCRYPTION_KEY_INVALID") {
+        return res.status(503).json({
+          success: false,
+          message: "Secure identity document access is not configured.",
+        });
+      }
+      throw error;
+    }
+    const extension = {
+      "application/pdf": "pdf",
+      "image/jpeg": "jpg",
+      "image/png": "png",
+    }[document.contentType];
+    if (!extension) {
+      return res.status(500).json({
+        success: false,
+        message: "The stored identity document has an unsupported file type.",
+      });
+    }
+    document.lastAccessedAt = new Date();
+    document.lastAccessedBy = req.user._id;
+    await document.save();
+    res.set({
+      "Cache-Control": "private, no-store",
+      "Content-Disposition": `attachment; filename="verification-document.${extension}"`,
+      "Content-Type": document.contentType,
+      "X-Content-Type-Options": "nosniff",
+    });
+    return res.send(content);
+  } catch (error) {
+    console.error("Admin could not retrieve an identity document:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to retrieve the identity document.",
     });
   }
 });
@@ -203,34 +295,61 @@ router.patch("/verification/:userId", async (req, res) => {
   try {
     const status = decision === "APPROVE" ? "VERIFIED" : "REJECTED";
     const tier = decision === "APPROVE" ? "TIER_2" : "TIER_1";
-    const user = await User.findOneAndUpdate(
-      {
-        _id: userId,
-        role: { $in: ["BUYER", "SELLER"] },
-        accountStatus: { $ne: "SUSPENDED" },
-        "verification.status": "PENDING",
-      },
-      {
-        $set: {
-          "verification.status": status,
-          "verification.tier": tier,
-          "verification.reviewedAt": new Date(),
-          "verification.reviewedBy": req.user._id,
-          "verification.reviewNote": reviewNote.trim(),
-          ...(decision === "APPROVE" && {
-            "vendorDetails.tier": tier,
-            "vendorDetails.isVerified": true,
-          }),
-          ...(decision === "REJECT" && {
-            "vendorDetails.isVerified": false,
-          }),
-        },
-      },
-      { new: true, runValidators: true },
-    )
-      .select("name email role verification")
-      .lean();
+    const session = await mongoose.startSession();
+    let user;
+    try {
+      await session.withTransaction(async () => {
+        if (
+          decision === "APPROVE" &&
+          !(await VerificationDocument.exists({ userId }).session(session))
+        ) {
+          const error = new Error(
+            "A securely uploaded identity document is required for approval.",
+          );
+          error.statusCode = 409;
+          throw error;
+        }
 
+        user = await User.findOneAndUpdate(
+          {
+            _id: userId,
+            role: { $in: ["BUYER", "SELLER"] },
+            accountStatus: { $ne: "SUSPENDED" },
+            "verification.status": "PENDING",
+          },
+          {
+            $set: {
+              "verification.status": status,
+              "verification.tier": tier,
+              "verification.reviewedAt": new Date(),
+              "verification.reviewedBy": req.user._id,
+              "verification.reviewNote": reviewNote.trim(),
+              ...(decision === "APPROVE" && {
+                "vendorDetails.tier": tier,
+                "vendorDetails.isVerified": true,
+                "vendorDetails.commissionRate": 0.05,
+              }),
+              ...(decision === "REJECT" && {
+                "vendorDetails.tier": "TIER_1",
+                "vendorDetails.isVerified": false,
+                "vendorDetails.commissionRate": 0.1,
+              }),
+            },
+          },
+          { new: true, runValidators: true, session },
+        )
+          .select("name email role verification")
+          .lean();
+        if (!user) {
+          const error = new Error("Pending verification request not found.");
+          error.statusCode = 404;
+          throw error;
+        }
+        await VerificationDocument.deleteOne({ userId }, { session });
+      });
+    } finally {
+      await session.endSession();
+    }
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -239,6 +358,12 @@ router.patch("/verification/:userId", async (req, res) => {
     }
     return res.json({ success: true, user });
   } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
     console.error("Admin could not review identity verification:", error);
     return res.status(500).json({
       success: false,
@@ -327,19 +452,24 @@ router.patch("/orders/:orderId/rider", async (req, res) => {
         });
       }
     }
-    const order = await EscrowContract.findByIdAndUpdate(
-      orderId,
-      { $set: { deliveryPartnerId: riderId } },
-      { new: true, runValidators: true },
-    )
+    const order = await EscrowContract.findOne({
+      _id: orderId,
+      status: { $in: ["FUNDS_LOCKED", "LOCKED"] },
+      deliveryStatus: "PENDING",
+    });
+    if (!order) {
+      return res.status(409).json({
+        success: false,
+        message: "Only active, not-yet-picked-up orders can be assigned.",
+      });
+    }
+    order.deliveryPartnerId = riderId;
+    order.deliveryUpdatedAt = new Date();
+    await order.save();
+    const populatedOrder = await EscrowContract.findById(order._id)
       .populate("deliveryPartnerId", "name email")
       .lean();
-    if (!order) {
-      return res
-        .status(404)
-        .json({ success: false, message: "Order not found." });
-    }
-    return res.json({ success: true, order });
+    return res.json({ success: true, order: populatedOrder });
   } catch (error) {
     console.error("Admin could not assign a delivery partner:", error);
     return res.status(500).json({

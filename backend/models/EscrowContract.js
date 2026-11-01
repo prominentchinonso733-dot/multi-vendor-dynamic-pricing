@@ -15,6 +15,11 @@ const escrowContractSchema = new mongoose.Schema(
         quantity: Number,
         vendor: String,
         vendorId: String,
+        lineTotal: Number,
+        platformFee: Number,
+        commissionRate: Number,
+        vendorTier: String,
+        vendorNetAmount: Number,
       },
     ],
     subtotal: {
@@ -29,6 +34,21 @@ const escrowContractSchema = new mongoose.Schema(
       type: Number,
       required: true,
     },
+    currency: { type: String, default: "NGN", required: true },
+    vendorPayouts: [
+      {
+        vendorId: {
+          type: mongoose.Schema.Types.ObjectId,
+          ref: "User",
+          required: true,
+        },
+        grossAmount: { type: Number, required: true, min: 0 },
+        platformFee: { type: Number, required: true, min: 0 },
+        netAmount: { type: Number, required: true, min: 0 },
+        tier: { type: String, enum: ["TIER_1", "TIER_2"], required: true },
+        commissionRate: { type: Number, required: true, min: 0, max: 1 },
+      },
+    ],
     buyerEmail: {
       type: String,
       trim: true,
@@ -44,6 +64,17 @@ const escrowContractSchema = new mongoose.Schema(
     deliveryPartnerId: {
       type: mongoose.Schema.Types.ObjectId,
       ref: "User",
+      default: null,
+    },
+    deliveryStatus: {
+      type: String,
+      enum: ["PENDING", "PICKED_UP", "DELIVERED"],
+      default: "PENDING",
+    },
+    deliveryUpdatedAt: { type: Date },
+    receiptFinalizedAt: { type: Date },
+    receipt: {
+      type: mongoose.Schema.Types.Mixed,
       default: null,
     },
     fulfillmentStatuses: [
@@ -90,6 +121,14 @@ const escrowContractSchema = new mongoose.Schema(
       required: true,
       unique: true,
     },
+    paymentExpiresAt: { type: Date },
+    disputeEvents: [
+      {
+        reason: { type: String, trim: true, maxlength: 500 },
+        raisedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
+        raisedAt: { type: Date, default: Date.now },
+      },
+    ],
     completedAt: {
       type: Date,
     },
