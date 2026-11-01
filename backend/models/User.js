@@ -42,6 +42,18 @@ const UserSchema = new mongoose.Schema(
     vendorDetails: {
       businessName: { type: String },
       tier: { type: String, enum: ["TIER_1", "TIER_2"], default: "TIER_1" },
+      tier1Verified: { type: Boolean, default: false },
+      verificationData: {
+        legalName: { type: String, trim: true, maxlength: 120 },
+        ninNumber: { type: String, select: false },
+        ninLast4: { type: String, select: false },
+        ninVerifiedAt: { type: Date },
+        bankName: { type: String, trim: true, maxlength: 100 },
+        bankAccountName: { type: String, trim: true, maxlength: 120 },
+        bankAccountNumber: { type: String, select: false },
+        bankAccountLast4: { type: String },
+        bankCode: { type: String, trim: true, maxlength: 20 },
+      },
       subscriptionStatus: {
         type: String,
         enum: ["ACTIVE", "INACTIVE", "PENDING"],

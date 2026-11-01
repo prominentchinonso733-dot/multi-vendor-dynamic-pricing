@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
-import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
+import { AlertCircle, CheckCircle2, RefreshCw, ShieldCheck } from "lucide-react";
 import { getApiErrorMessage, getAssetUrl } from "../api";
 import { authService } from "../services/authService";
 import { pricingService } from "../services/pricingService";
@@ -8,6 +8,7 @@ import { productsService } from "../services/productsService";
 import { escrowService } from "../services/escrowService";
 import { useAuth } from "../context/AuthContext";
 import VerificationPanel from "./VerificationPanel";
+import Tier1VerificationPanel from "./Tier1VerificationPanel";
 import "./VendorDashboard.css";
 
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
@@ -160,6 +161,8 @@ export default function VendorDashboard({ onPriceUpdated }) {
   const [accountSummary, setAccountSummary] = useState(null);
   const [walletBalance, setWalletBalance] = useState(0);
   const [accountSummaryError, setAccountSummaryError] = useState("");
+  const canListProducts =
+    accountSummary?.tier1Verified === true || accountSummary?.isVerified === true;
 
   useEffect(() => {
     const controller = new AbortController();
@@ -735,13 +738,21 @@ export default function VendorDashboard({ onPriceUpdated }) {
             className="vendor-pricing__calculate"
             disabled={createPending || loading}
             onClick={() => {
+              if (!canListProducts) {
+                setActiveSection("store-settings");
+                return;
+              }
               setShowCreateForm((visible) => !visible);
               setCreateError("");
               setCreateNotice("");
             }}
             type="button"
           >
-            {showCreateForm ? "Cancel" : "Add product"}
+            {showCreateForm
+              ? "Cancel"
+              : canListProducts
+                ? "Add product"
+                : "Verify to add products"}
           </button>
         )}
       </header>
@@ -753,7 +764,11 @@ export default function VendorDashboard({ onPriceUpdated }) {
         >
           <div>
             <strong>
-              {accountSummary.isVerified ? "Tier 2 · Verified Store" : "Tier 1 · Starter"}
+              {accountSummary.isVerified
+                ? "Tier 2 · Verified Store"
+                : accountSummary.tier1Verified
+                  ? "Tier 1 · Soft-check verified"
+                  : "Tier 1 · Verification required"}
             </strong>
             <span>
               {((accountSummary.financialPolicy?.commissionRate || 0) * 100).toFixed(0)}% platform commission
@@ -966,6 +981,24 @@ export default function VendorDashboard({ onPriceUpdated }) {
         </section>
       ) : activeSection !== "store-settings" ? (
         <>
+          {!canListProducts && (
+            <div
+              className="vendor-pricing__message vendor-pricing__message--error"
+              role="status"
+            >
+              <ShieldCheck aria-hidden="true" size={18} />
+              <span>
+                Complete Tier 1 verification in Store Settings before listing
+                products or changing listing prices.
+              </span>
+              <button
+                onClick={() => setActiveSection("store-settings")}
+                type="button"
+              >
+                Verify now
+              </button>
+            </div>
+          )}
           {createNotice && (
             <div
               className="vendor-pricing__message vendor-pricing__message--success"
@@ -976,7 +1009,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
             </div>
           )}
 
-          {showCreateForm && (
+          {showCreateForm && canListProducts && (
             <form
               className="vendor-pricing__create-form"
               onSubmit={createProduct}
@@ -1648,6 +1681,15 @@ export default function VendorDashboard({ onPriceUpdated }) {
             </div>
           </div>
 
+          <Tier1VerificationPanel
+            onVerified={(tier1Verification) =>
+              setAccountSummary((current) => ({
+                ...current,
+                tier1Verified: true,
+                tier1Verification,
+              }))
+            }
+          />
           <VerificationPanel compact />
 
           {profileError && (

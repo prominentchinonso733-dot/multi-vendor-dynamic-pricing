@@ -415,9 +415,18 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
     const sellers = await User.find({
       _id: { $in: [...new Set(products.map((product) => product.vendor.toString()))] },
       role: "SELLER",
-      accountStatus: "ACTIVE",
+      accountStatus: { $ne: "SUSPENDED" },
+      $or: [
+        { "vendorDetails.tier1Verified": true },
+        {
+          "verification.tier": "TIER_2",
+          "verification.status": "VERIFIED",
+        },
+      ],
     })
-      .select("name email role accountStatus verification storeName vendorDetails.businessName")
+      .select(
+        "name email role accountStatus verification storeName vendorDetails.businessName vendorDetails.tier1Verified",
+      )
       .lean();
     const sellersById = new Map(sellers.map((seller) => [seller._id.toString(), seller]));
     if (

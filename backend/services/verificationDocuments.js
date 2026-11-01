@@ -80,9 +80,50 @@ const decryptDocument = (document, userId) => {
   ]);
 };
 
+const encryptSensitiveValue = (value, userId, purpose) => {
+  const iv = crypto.randomBytes(12);
+  const cipher = crypto.createCipheriv("aes-256-gcm", getEncryptionKey(), iv);
+  cipher.setAAD(Buffer.from(`${userId}:${purpose}`));
+  const encrypted = Buffer.concat([cipher.update(value, "utf8"), cipher.final()]);
+  return [
+    "enc",
+    "v1",
+    iv.toString("base64url"),
+    cipher.getAuthTag().toString("base64url"),
+    encrypted.toString("base64url"),
+  ].join(":");
+};
+
+const decryptSensitiveValue = (encodedValue, userId, purpose) => {
+  const [prefix, version, encodedIv, encodedTag, encodedContent] =
+    String(encodedValue || "").split(":");
+  if (
+    prefix !== "enc" ||
+    version !== "v1" ||
+    !encodedIv ||
+    !encodedTag ||
+    !encodedContent
+  ) {
+    throw new Error("Stored sensitive information has an invalid format.");
+  }
+  const decipher = crypto.createDecipheriv(
+    "aes-256-gcm",
+    getEncryptionKey(),
+    Buffer.from(encodedIv, "base64url"),
+  );
+  decipher.setAAD(Buffer.from(`${userId}:${purpose}`));
+  decipher.setAuthTag(Buffer.from(encodedTag, "base64url"));
+  return Buffer.concat([
+    decipher.update(Buffer.from(encodedContent, "base64url")),
+    decipher.final(),
+  ]).toString("utf8");
+};
+
 module.exports = {
   SUPPORTED_CONTENT_TYPES,
+  decryptSensitiveValue,
   decryptDocument,
   detectContentType,
+  encryptSensitiveValue,
   encryptDocument,
 };

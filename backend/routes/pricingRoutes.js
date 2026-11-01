@@ -1,6 +1,7 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const Product = require("../models/Product");
+const User = require("../models/User");
 const authenticateToken = require("../middleware/authenticateToken");
 
 const router = express.Router();
@@ -10,6 +11,36 @@ router.post("/calculate", authenticateToken, async (req, res) => {
     return res
       .status(403)
       .json({ success: false, message: "Seller or admin role required." });
+  }
+  if (req.user.role === "SELLER") {
+    try {
+      const eligibleSeller = await User.exists({
+        _id: req.user._id,
+        role: "SELLER",
+        accountStatus: { $ne: "SUSPENDED" },
+        $or: [
+          { "vendorDetails.tier1Verified": true },
+          {
+            "verification.tier": "TIER_2",
+            "verification.status": "VERIFIED",
+          },
+        ],
+      });
+      if (!eligibleSeller) {
+        return res.status(403).json({
+          success: false,
+          code: "TIER1_VERIFICATION_REQUIRED",
+          message:
+            "Complete Tier 1 bank and identity soft-check verification before changing listing prices.",
+        });
+      }
+    } catch (error) {
+      console.error("Seller pricing eligibility could not be checked:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Unable to verify seller pricing eligibility.",
+      });
+    }
   }
 
   const {

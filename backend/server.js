@@ -23,11 +23,13 @@ app.use(
 // Register Escrow Routes
 const escrowRoutes = require("./routes/escrowRoutes");
 const authRoutes = require("./routes/auth");
+const vendorRoutes = require("./controllers/vendorController");
 const productsRoutes = require("./routes/products");
 const pricingRoutes = require("./routes/pricingRoutes");
 const webhookRoutes = require("./routes/webhooks");
 const adminRoutes = require("./routes/adminRoutes");
 app.use("/api/auth", authRoutes);
+app.use("/api/vendor", vendorRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/escrow", escrowRoutes);
 app.use("/api/products", productsRoutes);

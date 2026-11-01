@@ -115,6 +115,41 @@ const requireProductManager = (req, res, next) => {
   return next();
 };
 
+const requireTier1Verification = async (req, res, next) => {
+  if (req.user.role === "ADMIN") return next();
+  try {
+    const seller = await User.findOne({
+      _id: req.user._id,
+      role: "SELLER",
+      accountStatus: { $ne: "SUSPENDED" },
+      $or: [
+        { "vendorDetails.tier1Verified": true },
+        {
+          "verification.tier": "TIER_2",
+          "verification.status": "VERIFIED",
+        },
+      ],
+    })
+      .select("_id")
+      .lean();
+    if (!seller) {
+      return res.status(403).json({
+        success: false,
+        code: "TIER1_VERIFICATION_REQUIRED",
+        message:
+          "Complete Tier 1 bank and identity soft-check verification before listing products.",
+      });
+    }
+    return next();
+  } catch (error) {
+    console.error("Seller listing eligibility could not be checked:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to verify seller listing eligibility.",
+    });
+  }
+};
+
 const canManageProduct = (user, product) =>
   user.role === "ADMIN" ||
   (user.role === "SELLER" && product.vendor.toString() === user.id);
@@ -156,6 +191,7 @@ router.post(
   "/",
   authenticateToken,
   requireProductManager,
+  requireTier1Verification,
   parseProductUpload,
   async (req, res) => {
   const toNumber = (value) =>
@@ -378,10 +414,18 @@ router.get("/store/:vendorId", async (req, res) => {
   try {
     const vendor = await User.findById(vendorId)
       .select(
-        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName verification.tier verification.status createdAt",
+        "name email role accountStatus storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.tier1Verified verification.tier verification.status createdAt",
       )
       .lean();
-    if (!vendor || !["SELLER", "ADMIN"].includes(vendor.role)) {
+    const isTier2Verified =
+      vendor?.verification?.tier === "TIER_2" &&
+      vendor?.verification?.status === "VERIFIED";
+    if (
+      !vendor ||
+      vendor.role !== "SELLER" ||
+      vendor.accountStatus === "SUSPENDED" ||
+      (!vendor.vendorDetails?.tier1Verified && !isTier2Verified)
+    ) {
       return res
         .status(404)
         .json({ success: false, message: "Vendor store not found." });
@@ -403,9 +447,8 @@ router.get("/store/:vendorId", async (req, res) => {
         storeBanner: vendor.storeBanner || "",
         storeDescription: vendor.storeDescription || "",
         tier: vendor.verification?.tier || "TIER_1",
-        isVerified:
-          vendor.verification?.tier === "TIER_2" &&
-          vendor.verification?.status === "VERIFIED",
+        isVerified: isTier2Verified,
+        isTier1Verified: vendor.vendorDetails?.tier1Verified === true,
         memberSince: vendor.createdAt,
       },
       products: products.map((product) => ({
@@ -430,9 +473,22 @@ router.get("/store/:vendorId", async (req, res) => {
 router.get("/", async (_req, res) => {
   try {
     const products = await Product.find()
-      .populate("vendor", "name storeName vendorDetails.businessName")
+      .populate({
+        path: "vendor",
+        select:
+          "name storeName role accountStatus vendorDetails.businessName vendorDetails.tier1Verified verification.tier verification.status",
+        match: {
+          role: "SELLER",
+          accountStatus: { $ne: "SUSPENDED" },
+          $or: [
+            { "vendorDetails.tier1Verified": true },
+            { "verification.tier": "TIER_2", "verification.status": "VERIFIED" },
+          ],
+        },
+      })
       .sort({ createdAt: -1 })
-      .lean();
+      .lean()
+      .then((entries) => entries.filter((product) => product.vendor));
     return res.json(
       products.map((product) => ({
         ...product,

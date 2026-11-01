@@ -32,4 +32,14 @@ export const authService = {
     });
     return data.verification;
   },
+
+  async getTier1Banks(config = {}) {
+    const { data } = await api.get("/vendor/banks", config);
+    return data.banks;
+  },
+
+  async verifyTier1Vendor(details) {
+    const { data } = await api.post("/vendor/verify-tier1", details);
+    return data.verification;
+  },
 };

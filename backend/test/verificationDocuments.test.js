@@ -1,8 +1,10 @@
 const assert = require("node:assert/strict");
 const { afterEach, test } = require("node:test");
 const {
+  decryptSensitiveValue,
   decryptDocument,
   detectContentType,
+  encryptSensitiveValue,
   encryptDocument,
 } = require("../services/verificationDocuments");
 const { getVendorPolicy, toMinorUnits, fromMinorUnits } = require("../services/financialPolicy");
@@ -51,6 +53,24 @@ test("rejects encryption without a valid configured key", () => {
   assert.throws(
     () => encryptDocument(Buffer.from("%PDF-1.7\n"), "account"),
     { code: "DOCUMENT_ENCRYPTION_KEY_INVALID" },
+  );
+});
+
+test("encrypts sensitive vendor identity values with account-specific context", () => {
+  process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY = "b".repeat(64);
+  const accountId = "seller-account-456";
+  const encrypted = encryptSensitiveValue(
+    "12345678901",
+    accountId,
+    "vendor-nin",
+  );
+  assert.notEqual(encrypted, "12345678901");
+  assert.equal(
+    decryptSensitiveValue(encrypted, accountId, "vendor-nin"),
+    "12345678901",
+  );
+  assert.throws(() =>
+    decryptSensitiveValue(encrypted, accountId, "vendor-bank-account"),
   );
 });
 

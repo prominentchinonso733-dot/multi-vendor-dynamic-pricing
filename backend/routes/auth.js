@@ -358,7 +358,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
       .select(
-        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.isVendor verification",
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.isVendor vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.verificationData.bankName vendorDetails.verificationData.bankAccountName vendorDetails.verificationData.bankAccountLast4 vendorDetails.verificationData.bankCode verification",
       )
       .lean();
     if (!user || !hasVendorAccess(user)) {
@@ -380,6 +380,19 @@ router.get("/profile", authenticateToken, async (req, res) => {
         isVerified:
           user.verification?.tier === "TIER_2" &&
           user.verification?.status === "VERIFIED",
+        tier1Verified: user.vendorDetails?.tier1Verified === true,
+        tier1Verification: {
+          legalName: user.vendorDetails?.verificationData?.legalName || "",
+          bankName: user.vendorDetails?.verificationData?.bankName || "",
+          bankAccountName:
+            user.vendorDetails?.verificationData?.bankAccountName || "",
+          bankCode: user.vendorDetails?.verificationData?.bankCode || "",
+          bankAccountLast4:
+            user.vendorDetails?.verificationData?.bankAccountLast4 || "",
+          ninLast4: user.vendorDetails?.verificationData?.ninLast4 || "",
+          ninVerifiedAt:
+            user.vendorDetails?.verificationData?.ninVerifiedAt || null,
+        },
         financialPolicy: getVendorPolicy(user),
       },
     });
@@ -453,7 +466,7 @@ router.put("/profile", authenticateToken, async (req, res) => {
       { new: true, runValidators: true },
     )
       .select(
-        "name email role storeName storeLogo storeBanner storeDescription verification",
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.verificationData.bankName vendorDetails.verificationData.bankAccountName vendorDetails.verificationData.bankAccountLast4 vendorDetails.verificationData.bankCode verification",
       )
       .lean();
     if (!user) {
@@ -475,6 +488,19 @@ router.put("/profile", authenticateToken, async (req, res) => {
         isVerified:
           user.verification?.tier === "TIER_2" &&
           user.verification?.status === "VERIFIED",
+        tier1Verified: user.vendorDetails?.tier1Verified === true,
+        tier1Verification: {
+          legalName: user.vendorDetails?.verificationData?.legalName || "",
+          bankName: user.vendorDetails?.verificationData?.bankName || "",
+          bankAccountName:
+            user.vendorDetails?.verificationData?.bankAccountName || "",
+          bankCode: user.vendorDetails?.verificationData?.bankCode || "",
+          bankAccountLast4:
+            user.vendorDetails?.verificationData?.bankAccountLast4 || "",
+          ninLast4: user.vendorDetails?.verificationData?.ninLast4 || "",
+          ninVerifiedAt:
+            user.vendorDetails?.verificationData?.ninVerifiedAt || null,
+        },
         financialPolicy: getVendorPolicy(user),
       },
     });
