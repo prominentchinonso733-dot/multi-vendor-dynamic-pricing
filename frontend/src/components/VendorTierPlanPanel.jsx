@@ -31,11 +31,12 @@ const nairaFormatter = new Intl.NumberFormat("en-NG", {
 
 export default function VendorTierPlanPanel({
   vendorTier,
+  selectedTier,
+  onTierChange,
   subscriptionStatus,
   onUpdated,
 }) {
   const [plans, setPlans] = useState([]);
-  const [selectedTier, setSelectedTier] = useState(vendorTier || "TIER_1");
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState("");
   const [error, setError] = useState("");
@@ -65,10 +66,6 @@ export default function VendorTierPlanPanel({
       });
     return () => controller.abort();
   }, []);
-
-  useEffect(() => {
-    if (vendorTier) setSelectedTier(vendorTier);
-  }, [vendorTier]);
 
   const startPayment = async () => {
     if (!PAYSTACK_PUBLIC_KEY) {
@@ -177,7 +174,7 @@ export default function VendorTierPlanPanel({
                 <input
                   checked={selectedTier === plan.tier}
                   name="vendor-tier"
-                  onChange={() => setSelectedTier(plan.tier)}
+                  onChange={() => onTierChange(plan.tier)}
                   type="radio"
                   value={plan.tier}
                 />
@@ -223,7 +220,7 @@ export default function VendorTierPlanPanel({
                   ? "Complete payment in Paystack"
                   : isCurrentTier
                     ? "Current tier active"
-                    : `Pay $${selectedPlan?.priceUSD ?? ""} entry fee`}
+                    : `Pay $${selectedPlan?.priceUSD ?? ""} entry fee${selectedTier === "TIER_2" ? " & Submit Tier 2 Review" : ""}`}
           </button>
         </>
       )}
@@ -233,6 +230,8 @@ export default function VendorTierPlanPanel({
 
 VendorTierPlanPanel.propTypes = {
   vendorTier: PropTypes.oneOf(["TIER_1", "TIER_2"]),
+  selectedTier: PropTypes.oneOf(["TIER_1", "TIER_2"]).isRequired,
+  onTierChange: PropTypes.func.isRequired,
   subscriptionStatus: PropTypes.string,
   onUpdated: PropTypes.func,
 };

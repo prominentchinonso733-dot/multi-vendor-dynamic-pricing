@@ -160,6 +160,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
   const [pendingOrderStatusId, setPendingOrderStatusId] = useState(null);
   const [ordersRefreshVersion, setOrdersRefreshVersion] = useState(0);
   const [accountSummary, setAccountSummary] = useState(null);
+  const [selectedTier, setSelectedTier] = useState("TIER_1");
   const [walletBalance, setWalletBalance] = useState(0);
   const [accountSummaryError, setAccountSummaryError] = useState("");
   const canListProducts =
@@ -189,6 +190,12 @@ export default function VendorDashboard({ onPriceUpdated }) {
       });
     return () => controller.abort();
   }, [ordersRefreshVersion]);
+
+  useEffect(() => {
+    if (accountSummary?.vendorTier) {
+      setSelectedTier(accountSummary.vendorTier);
+    }
+  }, [accountSummary?.vendorTier]);
 
   useEffect(() => {
     if (!selectedImage) {
@@ -1698,10 +1705,12 @@ export default function VendorDashboard({ onPriceUpdated }) {
                 subscriptionStatus: payment.subscriptionStatus,
               }))
             }
+            onTierChange={setSelectedTier}
             subscriptionStatus={accountSummary?.subscriptionStatus}
+            selectedTier={selectedTier}
             vendorTier={accountSummary?.vendorTier || "TIER_1"}
           />
-          {accountSummary?.vendorTier === "TIER_2" ? (
+          {selectedTier === "TIER_2" ? (
             <VerificationPanel compact />
           ) : (
             <Tier1VerificationPanel
