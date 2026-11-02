@@ -88,20 +88,8 @@ const validateDraft = (draft) => {
 const getPricePreview = (draft, currentPrice) => {
   if (!draft || validateDraft(draft)) return null;
   const basePrice = Number(draft.basePrice);
-  const competitorPrice =
-    draft.competitorPrice.trim() === ""
-      ? null
-      : Number(draft.competitorPrice);
   const demandScore = Number(draft.demandScore);
-  const stock = Number(draft.stock);
-  const referencePrice =
-    competitorPrice === null ? basePrice : Math.min(basePrice, competitorPrice);
-  const demandMultiplier = 1 + (demandScore - 50) / 500;
-  const stockMultiplier =
-    stock >= 1 && stock <= 5 ? 1.05 : stock >= 50 ? 0.95 : 1;
-  const calculatedPrice =
-    Math.round(referencePrice * demandMultiplier * stockMultiplier * 100) /
-    100;
+  const calculatedPrice = basePrice * (1 + (demandScore - 50) / 100);
   const price = Math.min(
     Number(draft.priceCeiling),
     Math.max(Number(draft.priceFloor), calculatedPrice),

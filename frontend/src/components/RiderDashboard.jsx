@@ -157,21 +157,31 @@ export default function RiderDashboard() {
                     )) || 0,
                   )}
                 </span>
-                {order.deliveryStatus === "PENDING" ? (
+                {order.deliveryStatus === "PENDING" && (
                   <button
                     disabled={pendingId !== null}
                     onClick={() => updateDelivery(order, "PICKED_UP")}
                     type="button"
                   >
-                    {pendingId === order._id ? "Updating..." : "Confirm pickup"}
+                    {pendingId === order._id ? "Updating..." : "Pick Up Package"}
                   </button>
-                ) : (
+                )}
+                {order.deliveryStatus === "PICKED_UP" && (
+                  <button
+                    disabled={pendingId !== null}
+                    onClick={() => updateDelivery(order, "IN_TRANSIT")}
+                    type="button"
+                  >
+                    {pendingId === order._id ? "Updating..." : "In Transit"}
+                  </button>
+                )}
+                {order.deliveryStatus === "IN_TRANSIT" && (
                   <button
                     disabled={pendingId !== null}
                     onClick={() => updateDelivery(order, "DELIVERED")}
                     type="button"
                   >
-                    {pendingId === order._id ? "Updating..." : "Confirm delivery"}
+                    {pendingId === order._id ? "Updating..." : "Mark as Delivered"}
                   </button>
                 )}
               </footer>

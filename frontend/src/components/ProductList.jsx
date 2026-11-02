@@ -201,9 +201,23 @@ export default function ProductList({ onAddToCart }) {
                     ? "Tier 2 Verified Vendor"
                     : "Tier 1 Vendor"}
                 </span>
-                <p className="marketplace-card__price">
-                  ₦{(Number(product.price ?? product.currentPrice) || 0).toLocaleString()}
-                </p>
+                <div className="marketplace-card__pricing">
+                  <p className="marketplace-card__price-before">
+                    Before Price{" "}
+                    <s>
+                      ₦{(Number(product.basePrice) || 0).toLocaleString()}
+                    </s>
+                  </p>
+                  <p className="marketplace-card__price">
+                    After Price{" "}
+                    <strong>
+                      ₦
+                      {(
+                        Number(product.price ?? product.currentPrice) || 0
+                      ).toLocaleString()}
+                    </strong>
+                  </p>
+                </div>
                 <div className="marketplace-card__actions">
                   {product.vendorId ? (
                     <Link

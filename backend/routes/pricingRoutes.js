@@ -4,6 +4,7 @@ const Product = require("../models/Product");
 const User = require("../models/User");
 const authenticateToken = require("../middleware/authenticateToken");
 const { getEligibleVendorFilter } = require("../services/vendorTiers");
+const calculateCurrentPrice = require("../services/dynamicPricing");
 
 const router = express.Router();
 
@@ -127,28 +128,21 @@ router.post("/calculate", authenticateToken, async (req, res) => {
       });
     }
 
-    const normalizedDemand = Math.min(100, Math.max(0, demandScore));
-    const demandMultiplier = 1 + (normalizedDemand - 50) / 500;
-    const stockMultiplier =
-      stock >= 1 && stock <= 5 ? 1.05 : stock >= 50 ? 0.95 : 1;
-    const referencePrice =
-      competitorPrice === undefined || competitorPrice === null
-        ? basePrice
-        : Math.min(basePrice, competitorPrice);
-    const demandAdjustmentPercent = (normalizedDemand - 50) / 5;
-    const stockAdjustmentPercent =
-      stock >= 1 && stock <= 5 ? 5 : stock >= 50 ? -5 : 0;
-    const calculatedPrice = referencePrice * demandMultiplier * stockMultiplier;
-    const roundedPrice = Math.round(calculatedPrice * 100) / 100;
-    const currentPrice = Math.min(
+    const normalizedDemand = demandScore;
+    const referencePrice = basePrice;
+    const calculatedPrice =
+      basePrice * (1 + (normalizedDemand - 50) / 100);
+    const currentPrice = calculateCurrentPrice({
+      basePrice,
+      demandScore: normalizedDemand,
+      priceFloor,
       priceCeiling,
-      Math.max(priceFloor, roundedPrice),
-    );
+    });
 
     const floorCeilingStatus =
-      roundedPrice <= priceFloor
+      calculatedPrice <= priceFloor
         ? "FLOOR"
-        : roundedPrice >= priceCeiling
+        : calculatedPrice >= priceCeiling
           ? "CEILING"
           : "WITHIN_RANGE";
 
@@ -171,15 +165,15 @@ router.post("/calculate", authenticateToken, async (req, res) => {
       priceFloor,
       priceCeiling,
       referencePrice,
-      calculatedPrice: roundedPrice,
+      calculatedPrice,
       currentPrice,
       adjustments: {
         competitorPriceApplied:
           competitorPrice !== undefined &&
           competitorPrice !== null &&
           competitorPrice < basePrice,
-        demandPercent: demandAdjustmentPercent,
-        stockPercent: stockAdjustmentPercent,
+        demandPercent: normalizedDemand - 50,
+        stockPercent: 0,
       },
       floorCeilingStatus,
     });

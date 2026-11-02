@@ -11,6 +11,7 @@ const VendorWalletTransaction = require("../models/VendorWalletTransaction");
 const VendorWithdrawal = require("../models/VendorWithdrawal");
 const authenticateToken = require("../middleware/authenticateToken");
 const confirmEscrowPayment = require("../services/confirmEscrowPayment");
+const calculateCurrentPrice = require("../services/dynamicPricing");
 const { getEligibleVendorFilter } = require("../services/vendorTiers");
 const {
   getWalletForUpdate,
@@ -171,6 +172,7 @@ const releaseEscrowToWallets = async (
   contractId,
   filter = {},
   allowedStatuses = ["LOCKED", "FUNDS_LOCKED"],
+  contractUpdates = {},
 ) => {
   const session = await mongoose.startSession();
   let releasedContract;
@@ -183,7 +185,13 @@ const releaseEscrowToWallets = async (
           status: { $in: allowedStatuses },
           ...filter,
         },
-        { $set: { status: "RELEASED", completedAt: new Date() } },
+        {
+          $set: {
+            status: "RELEASED",
+            completedAt: new Date(),
+            ...contractUpdates,
+          },
+        },
         { new: true, session, runValidators: true },
       );
       if (!contract) return;
@@ -483,7 +491,7 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
           statusCode: 409,
         });
       }
-      const unitPriceMinor = toMinorUnits(product.currentPrice);
+      const unitPriceMinor = toMinorUnits(calculateCurrentPrice(product));
       if (unitPriceMinor < 1) {
         throw Object.assign(new Error(`${product.title} has an invalid price.`), {
           statusCode: 409,
@@ -928,10 +936,10 @@ router.patch("/:contractId/rider-status", authenticateToken, async (req, res) =>
       message: "A valid contractId is required.",
     });
   }
-  if (!["PICKED_UP", "DELIVERED"].includes(status)) {
+  if (!["PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(status)) {
     return res.status(400).json({
       success: false,
-      message: "Status must be PICKED_UP or DELIVERED.",
+      message: "Status must be PICKED_UP, IN_TRANSIT, or DELIVERED.",
     });
   }
 
@@ -950,7 +958,8 @@ router.patch("/:contractId/rider-status", authenticateToken, async (req, res) =>
 
     const nextStatus = {
       PENDING: "PICKED_UP",
-      PICKED_UP: "DELIVERED",
+      PICKED_UP: "IN_TRANSIT",
+      IN_TRANSIT: "DELIVERED",
       DELIVERED: null,
     };
     if (nextStatus[contract.deliveryStatus] !== status) {
@@ -971,14 +980,43 @@ router.patch("/:contractId/rider-status", authenticateToken, async (req, res) =>
       });
     }
 
+    if (status === "DELIVERED") {
+      const completedAt = new Date();
+      const fulfillmentStatuses = contract.fulfillmentStatuses.map(
+        (fulfillment) => ({
+          ...fulfillment.toObject(),
+          status: "DELIVERED",
+          updatedAt: completedAt,
+        }),
+      );
+      const completedContract = await releaseEscrowToWallets(
+        contract._id,
+        {
+          deliveryPartnerId: req.user._id || req.user.id,
+          deliveryStatus: contract.deliveryStatus,
+        },
+        ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"],
+        {
+          deliveryStatus: "DELIVERED",
+          deliveryUpdatedAt: completedAt,
+          fulfillmentStatuses,
+        },
+      );
+      if (!completedContract) {
+        return res.status(409).json({
+          success: false,
+          message: "The delivery has already been completed or changed.",
+        });
+      }
+      return res.json({
+        success: true,
+        message: "Delivery marked delivered and escrow funds released.",
+        contract: completedContract,
+      });
+    }
+
     contract.deliveryStatus = status;
     contract.deliveryUpdatedAt = new Date();
-    if (status === "DELIVERED") {
-      for (const fulfillment of contract.fulfillmentStatuses) {
-        fulfillment.status = "DELIVERED";
-        fulfillment.updatedAt = contract.deliveryUpdatedAt;
-      }
-    }
     await contract.save();
     return res.json({
       success: true,

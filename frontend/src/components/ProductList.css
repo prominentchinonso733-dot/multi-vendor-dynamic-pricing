@@ -229,10 +229,22 @@
 }
 
 .marketplace-card__price {
-  margin: 15px 0;
+  margin: 5px 0 15px;
   color: #176f5d;
-  font-size: 1.2rem;
+  font-size: 0.76rem;
   font-weight: 800;
+}
+
+.marketplace-card__price strong {
+  display: block;
+  margin-top: 3px;
+  font-size: 1.2rem;
+}
+
+.marketplace-card__price-before {
+  margin: 15px 0 0;
+  color: #75847e;
+  font-size: 0.72rem;
 }
 
 .marketplace-card__actions {

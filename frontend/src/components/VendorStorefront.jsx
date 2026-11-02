@@ -201,7 +201,16 @@ export default function VendorStorefront({ onAddToCart }) {
                     : "Tier 1 Vendor"}
                 </span>
                 {product.description && <p>{product.description}</p>}
-                <strong>{currencyFormatter.format(product.price)}</strong>
+                <div className="vendor-store__pricing">
+                  <p>
+                    Before Price{" "}
+                    <s>{currencyFormatter.format(product.basePrice)}</s>
+                  </p>
+                  <p>
+                    After Price{" "}
+                    <strong>{currencyFormatter.format(product.price)}</strong>
+                  </p>
+                </div>
                 <button
                   className="vendor-store__add-button"
                   onClick={() => onAddToCart(product)}

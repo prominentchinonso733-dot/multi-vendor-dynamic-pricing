@@ -222,7 +222,15 @@
   font-size: 0.84rem;
 }
 
-.vendor-store__product-content > strong {
+.vendor-store__pricing p {
+  margin: 0;
+  color: #71817a;
+  font-size: 0.75rem;
+}
+
+.vendor-store__pricing p strong {
+  display: block;
+  margin-top: 3px;
   color: #14786f;
   font-size: 1.15rem;
 }

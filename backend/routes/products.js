@@ -7,6 +7,7 @@ const Product = require("../models/Product");
 const User = require("../models/User");
 const authenticateToken = require("../middleware/authenticateToken");
 const mongoose = require("mongoose");
+const calculateCurrentPrice = require("../services/dynamicPricing");
 const {
   getEligibleVendorFilter,
   getVendorTier,
@@ -270,10 +271,12 @@ router.post(
   }
 
   try {
-    const currentPrice = Math.min(
+    const currentPrice = calculateCurrentPrice({
+      basePrice,
+      demandScore,
+      priceFloor,
       priceCeiling,
-      Math.max(priceFloor, basePrice),
-    );
+    });
 
     const product = await Product.create({
       vendor: req.user._id,
@@ -346,6 +349,7 @@ router.patch(
         product.imagePublicId = req.file.filename;
         product.image = undefined;
       }
+      product.currentPrice = calculateCurrentPrice(product);
       await product.save();
 
       if (req.file && oldImagePublicId) {
@@ -393,7 +397,11 @@ router.get("/mine", authenticateToken, async (req, res) => {
   try {
     const filter = req.user.role === "ADMIN" ? {} : { vendor: req.user._id };
     const products = await Product.find(filter).sort({ updatedAt: -1 }).lean();
-    return res.json({ success: true, products });
+    const pricedProducts = products.map((product) => ({
+      ...product,
+      currentPrice: calculateCurrentPrice(product),
+    }));
+    return res.json({ success: true, products: pricedProducts });
   } catch (error) {
     console.error("Vendor products could not be loaded:", error);
     return res.status(500).json({
@@ -452,7 +460,8 @@ router.get("/store/:vendorId", async (req, res) => {
         ...product,
         id: product._id.toString(),
         name: product.title,
-        price: product.currentPrice,
+        currentPrice: calculateCurrentPrice(product),
+        price: calculateCurrentPrice(product),
         vendorId: vendor._id.toString(),
         vendor:
           vendor.storeName || vendor.vendorDetails?.businessName || vendor.name,
@@ -490,7 +499,8 @@ router.get("/", async (_req, res) => {
         ...product,
         id: product._id.toString(),
         name: product.title,
-        price: product.currentPrice,
+        currentPrice: calculateCurrentPrice(product),
+        price: calculateCurrentPrice(product),
         vendorId: product.vendor?._id?.toString(),
         vendor:
           product.vendor?.storeName ||
