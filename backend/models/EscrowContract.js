@@ -71,9 +71,18 @@ const escrowContractSchema = new mongoose.Schema(
     },
     deliveryStatus: {
       type: String,
-      enum: ["PENDING", "ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"],
+      enum: [
+        "PENDING",
+        "ASSIGNED",
+        "ACCEPTED",
+        "PICKED_UP",
+        "IN_TRANSIT",
+        "DELIVERED",
+      ],
       default: "PENDING",
     },
+    pickupAddress: { type: String, trim: true, maxlength: 500 },
+    isMockDelivery: { type: Boolean, default: false },
     deliveryUpdatedAt: { type: Date },
     receiptFinalizedAt: { type: Date },
     receipt: {

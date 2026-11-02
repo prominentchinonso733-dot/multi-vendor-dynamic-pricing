@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
+const bcrypt = require("bcryptjs");
 const https = require("https");
 const mongoose = require("mongoose");
 const EscrowContract = require("../models/EscrowContract");
@@ -14,6 +15,7 @@ const confirmEscrowPayment = require("../services/confirmEscrowPayment");
 const calculateCurrentPrice = require("../services/dynamicPricing");
 const { getEligibleVendorFilter } = require("../services/vendorTiers");
 const {
+  creditPending,
   getWalletForUpdate,
   refundEscrow,
   releaseEscrow,
@@ -915,6 +917,159 @@ router.patch(
   },
 );
 
+router.post("/rider/seed", authenticateToken, async (req, res) => {
+  if (!["DELIVERY_PARTNER", "ADMIN"].includes(req.user.role)) {
+    return res.status(403).json({
+      success: false,
+      message: "Delivery partner or admin role required.",
+    });
+  }
+  if (
+    process.env.NODE_ENV === "production" &&
+    process.env.ENABLE_MOCK_DELIVERIES !== "true"
+  ) {
+    return res.status(403).json({
+      success: false,
+      message: "Mock deliveries are disabled in production.",
+    });
+  }
+
+  const riderId = req.user._id || req.user.id;
+  const session = await mongoose.startSession();
+  let contract;
+  try {
+    await session.withTransaction(async () => {
+      const activeDelivery = await EscrowContract.exists({
+        deliveryPartnerId: riderId,
+        status: { $in: ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"] },
+        deliveryStatus: { $ne: "DELIVERED" },
+      }).session(session);
+      if (activeDelivery) {
+        const error = new Error(
+          "Complete your active delivery before creating another mock order.",
+        );
+        error.statusCode = 409;
+        throw error;
+      }
+
+      const demoEmail = `rider-demo-vendor-${String(riderId)}@invalid.local`;
+      let demoVendor = await User.findOne({ email: demoEmail }).session(session);
+      if (!demoVendor) {
+        [demoVendor] = await User.create(
+          [
+            {
+              name: "Rider Demo Vendor",
+              email: demoEmail,
+              password: await bcrypt.hash(
+                crypto.randomBytes(48).toString("hex"),
+                10,
+              ),
+              role: "SELLER",
+              accountStatus: "SUSPENDED",
+            },
+          ],
+          { session },
+        );
+      }
+
+      const contractId = new mongoose.Types.ObjectId();
+      const paymentReference = `MOCK_${crypto.randomUUID()}`;
+      const payout = {
+        vendorId: demoVendor._id,
+        grossAmount: 2500,
+        platformFee: 0,
+        netAmount: 2500,
+        tier: "TIER_1",
+        commissionRate: 0,
+      };
+      [contract] = await EscrowContract.create(
+        [
+          {
+            _id: contractId,
+            buyerId: riderId,
+            customerName: "Demo Customer",
+            customerPhone: "+234 800 000 0000",
+            buyerEmail: req.user.email || demoEmail,
+            deliveryAddress: "Lekki Phase 1, Lekki, Lagos, Nigeria",
+            pickupAddress: "Ikeja City Mall, Alausa, Ikeja, Lagos, Nigeria",
+            items: [
+              {
+                productId: "DEMO-PACKAGE",
+                name: "Demo delivery package",
+                price: 2500,
+                quantity: 1,
+                vendor: "Rider Demo Vendor",
+                vendorId: demoVendor._id.toString(),
+                lineTotal: 2500,
+                platformFee: 0,
+                commissionRate: 0,
+                vendorTier: "TIER_1",
+                vendorNetAmount: 2500,
+              },
+            ],
+            subtotal: 2500,
+            vaultFee: 0,
+            totalHoldAmount: 2500,
+            currency: CURRENCY,
+            vendorPayouts: [payout],
+            sellerIds: [demoVendor._id],
+            deliveryPartnerId: riderId,
+            deliveryStatus: "ASSIGNED",
+            fulfillmentStatuses: [
+              { sellerId: demoVendor._id, status: "SHIPPED" },
+            ],
+            status: "FUNDS_LOCKED",
+            paymentReference,
+            isMockDelivery: true,
+          },
+        ],
+        { session },
+      );
+
+      await VendorWalletTransaction.create(
+        [
+          {
+            vendorId: demoVendor._id,
+            contractId,
+            paymentReference,
+            type: "ESCROW_HOLD",
+            grossAmount: payout.grossAmount,
+            platformFee: payout.platformFee,
+            amount: payout.netAmount,
+            currency: CURRENCY,
+            tier: payout.tier,
+            commissionRate: payout.commissionRate,
+          },
+        ],
+        { session },
+      );
+      const wallet = await getWalletForUpdate(demoVendor._id, session);
+      creditPending(wallet, toMinorUnits(payout.netAmount));
+      await wallet.save({ session });
+    });
+
+    return res.status(201).json({
+      success: true,
+      message: "Mock delivery assignment created.",
+      contract,
+    });
+  } catch (error) {
+    if (error.statusCode) {
+      return res.status(error.statusCode).json({
+        success: false,
+        message: error.message,
+      });
+    }
+    console.error("Mock delivery assignment could not be created:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to create a mock delivery assignment.",
+    });
+  } finally {
+    await session.endSession();
+  }
+});
+
 router.get("/rider/orders", authenticateToken, async (req, res) => {
   const isAdmin = req.user.role === "ADMIN";
   if (!isAdmin && req.user.role !== "DELIVERY_PARTNER") {
@@ -934,7 +1089,7 @@ router.get("/rider/orders", authenticateToken, async (req, res) => {
 
     const contracts = await EscrowContract.find(filter)
       .select(
-        "paymentReference items vendorPayouts subtotal status deliveryStatus deliveryUpdatedAt fulfillmentStatuses createdAt buyerId customerName deliveryAddress customerPhone",
+        "paymentReference items vendorPayouts subtotal status deliveryStatus deliveryUpdatedAt fulfillmentStatuses createdAt buyerId customerName deliveryAddress customerPhone pickupAddress isMockDelivery",
       )
       .populate("buyerId", "name phone")
       .sort({ createdAt: -1 })
@@ -947,6 +1102,7 @@ router.get("/rider/orders", authenticateToken, async (req, res) => {
         customerPhone:
           contract.customerPhone || contract.buyerId?.phone || "Not provided",
         deliveryAddress: contract.deliveryAddress || "Address not provided",
+        pickupAddress: contract.pickupAddress || "Vendor pickup, Lagos",
       })),
     });
   } catch (error) {
@@ -1001,7 +1157,8 @@ router.patch("/:contractId/rider-status", authenticateToken, async (req, res) =>
 
     const nextStatus = {
       PENDING: "ACCEPTED",
-      ACCEPTED: "PICKED_UP",
+      ASSIGNED: "ACCEPTED",
+      ACCEPTED: "IN_TRANSIT",
       PICKED_UP: "IN_TRANSIT",
       IN_TRANSIT: "DELIVERED",
       DELIVERED: null,

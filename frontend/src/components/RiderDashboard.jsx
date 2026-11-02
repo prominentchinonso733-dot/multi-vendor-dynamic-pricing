@@ -1,9 +1,10 @@
-import { useCallback, useEffect, useState } from "react";
+import { Suspense, lazy, useCallback, useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { API_BASE_URL } from "../api";
 import { useAuth } from "../context/AuthContext";
-import RiderDeliveryMap from "./RiderDeliveryMap";
 import "./RiderDashboard.css";
+
+const RiderDeliveryMap = lazy(() => import("./RiderDeliveryMap"));
 
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
   style: "currency",
@@ -19,6 +20,8 @@ export default function RiderDashboard() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [refreshVersion, setRefreshVersion] = useState(0);
+  const [selectedOrderId, setSelectedOrderId] = useState("");
+  const [seedPending, setSeedPending] = useState(false);
 
   const loadOrders = useCallback(
     async (signal) => {
@@ -30,7 +33,13 @@ export default function RiderDashboard() {
         if (!response.ok || !data.success) {
           throw new Error(data.message || "Unable to load delivery assignments.");
         }
-        setOrders(Array.isArray(data.contracts) ? data.contracts : []);
+        const assignments = Array.isArray(data.contracts) ? data.contracts : [];
+        setOrders(assignments);
+        setSelectedOrderId((selectedId) =>
+          assignments.some((order) => order._id === selectedId)
+            ? selectedId
+            : assignments[0]?._id || "",
+        );
         setError("");
       } catch (loadError) {
         if (loadError.name !== "AbortError") {
@@ -73,6 +82,13 @@ export default function RiderDashboard() {
               entry._id === order._id ? data.contract : entry,
             ),
       );
+      if (status === "DELIVERED") {
+        setSelectedOrderId((selectedId) =>
+          selectedId === order._id
+            ? orders.find((entry) => entry._id !== order._id)?._id || ""
+            : selectedId,
+        );
+      }
       const noticeStatus = {
         ACCEPTED: "accepted",
         PICKED_UP: "picked up",
@@ -86,6 +102,40 @@ export default function RiderDashboard() {
       setPendingId(null);
     }
   };
+
+  const seedDelivery = async () => {
+    setSeedPending(true);
+    setError("");
+    setNotice("");
+    try {
+      const response = await authFetch(`${API_BASE_URL}/escrow/rider/seed`, {
+        method: "POST",
+      });
+      const data = await response.json();
+      if (!response.ok || !data.success || !data.contract) {
+        throw new Error(data.message || "Unable to create a mock delivery.");
+      }
+      const order = {
+        ...data.contract,
+        customerName: data.contract.customerName || "Demo Customer",
+        customerPhone: data.contract.customerPhone || "Not provided",
+        pickupAddress: data.contract.pickupAddress || "Ikeja, Lagos",
+        deliveryAddress:
+          data.contract.deliveryAddress || "Lekki Phase 1, Lagos",
+      };
+      setOrders([order]);
+      setSelectedOrderId(order._id);
+      setNotice("Mock delivery created with a ₦2,500 demo escrow payout.");
+    } catch (seedError) {
+      setError(seedError.message || "Unable to create a mock delivery.");
+    } finally {
+      setSeedPending(false);
+    }
+  };
+
+  const selectedOrder = orders.find(
+    (order) => order._id === selectedOrderId,
+  );
 
   return (
     <section className="rider-dashboard" aria-labelledby="rider-dashboard-title">
@@ -105,6 +155,22 @@ export default function RiderDashboard() {
         </button>
       </header>
 
+      {!loading && selectedOrder && (
+        <Suspense
+          fallback={
+            <p className="rider-dashboard__map-loading" role="status">
+              Loading Lagos delivery map...
+            </p>
+          }
+        >
+          <RiderDeliveryMap
+            assignmentId={selectedOrder._id}
+            destination={selectedOrder.deliveryAddress || "Customer destination"}
+            pickup={selectedOrder.pickupAddress || "Vendor pickup, Lagos"}
+          />
+        </Suspense>
+      )}
+
       {error && (
         <p className="rider-dashboard__message rider-dashboard__message--error" role="alert">
           <AlertCircle size={18} aria-hidden="true" /> {error}
@@ -119,7 +185,16 @@ export default function RiderDashboard() {
       {loading ? (
         <p role="status">Loading assigned deliveries...</p>
       ) : orders.length === 0 ? (
-        <p className="rider-dashboard__empty">You have no active delivery assignments.</p>
+        <div className="rider-dashboard__empty">
+          <p>You have no active delivery assignments.</p>
+          <button
+            disabled={seedPending}
+            onClick={seedDelivery}
+            type="button"
+          >
+            {seedPending ? "Creating mock delivery..." : "Create Mock Order / Seed Delivery"}
+          </button>
+        </div>
       ) : (
         <div className="rider-dashboard__orders">
           {orders.map((order) => (
@@ -133,6 +208,15 @@ export default function RiderDashboard() {
                 <span className="rider-dashboard__status">
                   {(order.deliveryStatus || "PENDING").replaceAll("_", " ")}
                 </span>
+                <button
+                  aria-pressed={selectedOrderId === order._id}
+                  className="rider-dashboard__map-select"
+                  disabled={selectedOrderId === order._id}
+                  onClick={() => setSelectedOrderId(order._id)}
+                  type="button"
+                >
+                  {selectedOrderId === order._id ? "Showing route" : "Show route"}
+                </button>
               </header>
               <dl className="rider-dashboard__customer">
                 <div>
@@ -154,10 +238,6 @@ export default function RiderDashboard() {
                   </dd>
                 </div>
               </dl>
-              <RiderDeliveryMap
-                destination={order.deliveryAddress || "Customer destination"}
-                pickup={order.items?.map((item) => item.vendor).filter(Boolean).join(", ") || "Lagos vendor pickup"}
-              />
               <span className="rider-dashboard__label">Package details</span>
               <ul>
                 {(order.items || []).map((item, index) => (
@@ -202,7 +282,7 @@ export default function RiderDashboard() {
                     ) || 0,
                   )}
                 </span>
-                {order.deliveryStatus === "PENDING" && (
+                {["PENDING", "ASSIGNED"].includes(order.deliveryStatus) && (
                   <button
                     disabled={pendingId !== null}
                     onClick={() => updateDelivery(order, "ACCEPTED")}
@@ -214,10 +294,10 @@ export default function RiderDashboard() {
                 {order.deliveryStatus === "ACCEPTED" && (
                   <button
                     disabled={pendingId !== null}
-                    onClick={() => updateDelivery(order, "PICKED_UP")}
+                    onClick={() => updateDelivery(order, "IN_TRANSIT")}
                     type="button"
                   >
-                    {pendingId === order._id ? "Updating..." : "Picked Up Package"}
+                    {pendingId === order._id ? "Updating..." : "In Transit"}
                   </button>
                 )}
                 {order.deliveryStatus === "PICKED_UP" && (

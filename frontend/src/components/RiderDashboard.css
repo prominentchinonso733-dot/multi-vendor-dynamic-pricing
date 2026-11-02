@@ -69,6 +69,20 @@
   opacity: 0.65;
 }
 
+.rider-dashboard__map-select {
+  min-height: 34px !important;
+  padding: 0 10px !important;
+  border: 1px solid #c9d8d8 !important;
+  background: #fff !important;
+  color: #176f5d !important;
+  font-size: 0.75rem !important;
+}
+
+.rider-dashboard__map-select:disabled {
+  opacity: 1 !important;
+  cursor: default !important;
+}
+
 .rider-dashboard__orders {
   display: grid;
   gap: 16px;
@@ -189,11 +203,44 @@
 }
 
 .rider-dashboard__empty {
+  display: grid;
+  justify-items: center;
+  gap: 12px;
   padding: 28px;
   border: 1px solid #dce5e5;
   background: white;
   color: #5c6f76;
   text-align: center;
+}
+
+.rider-dashboard__empty p {
+  margin: 0;
+}
+
+.rider-dashboard__map-loading {
+  display: grid;
+  min-height: 350px;
+  place-items: center;
+  border: 1px solid #dce5e5;
+  background: #f9fbf8;
+  color: #5c6f76;
+}
+
+.rider-dashboard__empty button {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 4px;
+  background: #176f5d;
+  color: white;
+  font: inherit;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.rider-dashboard__empty button:disabled {
+  cursor: wait;
+  opacity: 0.65;
 }
 
 @media (max-width: 620px) {
