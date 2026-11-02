@@ -17,7 +17,7 @@ const { VENDOR_TIER_PRICES_USD } = require("../services/vendorTiers");
 
 const uploadVerificationDocument = multer({
   storage: multer.memoryStorage(),
-  limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 2, fieldSize: 2048 },
+  limits: { fileSize: 5 * 1024 * 1024, files: 1, fields: 4, fieldSize: 2048 },
   fileFilter: (_req, file, callback) => {
     if (!SUPPORTED_CONTENT_TYPES.has(file.mimetype)) {
       const error = new Error("Upload a PDF, JPEG, or PNG identity document.");
@@ -247,6 +247,7 @@ router.post(
       "BVN",
       "DRIVERS_LICENSE",
       "PASSPORT",
+      "VOTER_CARD",
     ];
     if (legalName.length < 2 || legalName.length > 120) {
       return res.status(400).json({
@@ -275,6 +276,19 @@ router.post(
 
     try {
       const userId = req.user._id || req.user.id;
+      const isVendor = req.user.role === "SELLER";
+      if (isVendor) {
+        const seller = await User.findById(userId)
+          .select("vendorDetails.payoutDetails.bankCode")
+          .lean();
+        if (!seller?.vendorDetails?.payoutDetails?.bankCode) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Verify and save a payout bank account before submitting Tier 2 review.",
+          });
+        }
+      }
       let encryptedDocument;
       try {
         encryptedDocument = encryptDocument(req.file.buffer, userId);
@@ -301,7 +315,7 @@ router.post(
 
           user.verification = {
             ...(user.verification?.toObject?.() || user.verification || {}),
-            tier: "TIER_1",
+            tier: isVendor ? "TIER_2" : "TIER_1",
             status: "PENDING",
             legalName,
             documentType,
@@ -371,7 +385,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
       .select(
-        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.isVendor vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.verificationData.bankName vendorDetails.verificationData.bankAccountName vendorDetails.verificationData.bankAccountLast4 vendorDetails.verificationData.bankCode verification",
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.isVendor vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.payoutDetails.bankName vendorDetails.payoutDetails.bankCode vendorDetails.payoutDetails.accountName vendorDetails.payoutDetails.accountLast4 verification",
       )
       .lean();
     if (!user || !hasVendorAccess(user)) {
@@ -400,16 +414,18 @@ router.get("/profile", authenticateToken, async (req, res) => {
         tier1Verified: user.vendorDetails?.tier1Verified === true,
         tier1Verification: {
           legalName: user.vendorDetails?.verificationData?.legalName || "",
-          bankName: user.vendorDetails?.verificationData?.bankName || "",
-          bankAccountName:
-            user.vendorDetails?.verificationData?.bankAccountName || "",
-          bankCode: user.vendorDetails?.verificationData?.bankCode || "",
-          bankAccountLast4:
-            user.vendorDetails?.verificationData?.bankAccountLast4 || "",
           ninLast4: user.vendorDetails?.verificationData?.ninLast4 || "",
           ninVerifiedAt:
             user.vendorDetails?.verificationData?.ninVerifiedAt || null,
         },
+        payoutDetails: user.vendorDetails?.payoutDetails?.bankCode
+          ? {
+              bankName: user.vendorDetails.payoutDetails.bankName || "",
+              accountName: user.vendorDetails.payoutDetails.accountName || "",
+              accountLast4:
+                user.vendorDetails.payoutDetails.accountLast4 || "",
+            }
+          : null,
         financialPolicy: getVendorPolicy(user),
       },
     });
@@ -483,7 +499,7 @@ router.put("/profile", authenticateToken, async (req, res) => {
       { new: true, runValidators: true },
     )
       .select(
-        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.verificationData.bankName vendorDetails.verificationData.bankAccountName vendorDetails.verificationData.bankAccountLast4 vendorDetails.verificationData.bankCode verification",
+      "name email role storeName storeLogo storeBanner storeDescription vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.payoutDetails.bankName vendorDetails.payoutDetails.bankCode vendorDetails.payoutDetails.accountName vendorDetails.payoutDetails.accountLast4 verification",
       )
       .lean();
     if (!user) {
@@ -512,16 +528,18 @@ router.put("/profile", authenticateToken, async (req, res) => {
         tier1Verified: user.vendorDetails?.tier1Verified === true,
         tier1Verification: {
           legalName: user.vendorDetails?.verificationData?.legalName || "",
-          bankName: user.vendorDetails?.verificationData?.bankName || "",
-          bankAccountName:
-            user.vendorDetails?.verificationData?.bankAccountName || "",
-          bankCode: user.vendorDetails?.verificationData?.bankCode || "",
-          bankAccountLast4:
-            user.vendorDetails?.verificationData?.bankAccountLast4 || "",
           ninLast4: user.vendorDetails?.verificationData?.ninLast4 || "",
           ninVerifiedAt:
             user.vendorDetails?.verificationData?.ninVerifiedAt || null,
         },
+        payoutDetails: user.vendorDetails?.payoutDetails?.bankCode
+          ? {
+              bankName: user.vendorDetails.payoutDetails.bankName || "",
+              accountName: user.vendorDetails.payoutDetails.accountName || "",
+              accountLast4:
+                user.vendorDetails.payoutDetails.accountLast4 || "",
+            }
+          : null,
         financialPolicy: getVendorPolicy(user),
       },
     });

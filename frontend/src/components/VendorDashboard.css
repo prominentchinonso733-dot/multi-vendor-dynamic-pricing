@@ -564,6 +564,80 @@
   color: #17634d;
 }
 
+.vendor-pricing__withdraw {
+  justify-self: start;
+  min-height: 34px;
+  margin-top: 6px;
+  padding: 0 10px;
+  border: 1px solid #14786f;
+  background: #fff;
+  color: #14786f;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.vendor-pricing__withdraw:disabled {
+  cursor: not-allowed;
+  opacity: 0.55;
+}
+
+.vendor-pricing__modal-backdrop {
+  position: fixed;
+  z-index: 20;
+  inset: 0;
+  display: grid;
+  place-items: center;
+  padding: 20px;
+  background: rgb(15 31 35 / 55%);
+}
+
+.vendor-pricing__withdraw-modal {
+  width: min(100%, 440px);
+  padding: 24px;
+  background: #fff;
+  box-shadow: 0 18px 55px rgb(0 0 0 / 22%);
+}
+
+.vendor-pricing__withdraw-modal h2 {
+  margin-top: 0;
+  color: #132b35;
+  font-size: 1.25rem;
+}
+
+.vendor-pricing__withdraw-modal form {
+  display: grid;
+  gap: 14px;
+}
+
+.vendor-pricing__withdraw-modal label {
+  display: grid;
+  gap: 6px;
+  color: #344d55;
+  font-size: 0.88rem;
+  font-weight: 700;
+}
+
+.vendor-pricing__withdraw-modal input,
+.vendor-pricing__withdraw-modal select {
+  box-sizing: border-box;
+  width: 100%;
+  min-height: 42px;
+  padding: 8px 10px;
+  border: 1px solid #b8c8c8;
+  border-radius: 3px;
+  font: inherit;
+}
+
+.vendor-pricing__withdraw-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 4px;
+}
+
 .vendor-pricing__form-message {
   grid-column: 1 / -1;
   margin-top: 0;

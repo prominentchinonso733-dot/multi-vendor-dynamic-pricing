@@ -10,6 +10,7 @@ const documentTypes = [
   ["BVN", "Bank Verification Number (BVN)"],
   ["DRIVERS_LICENSE", "Driver's licence"],
   ["PASSPORT", "International passport"],
+  ["VOTER_CARD", "Voter's Card"],
 ];
 
 const statusLabels = {
@@ -19,11 +20,17 @@ const statusLabels = {
   REJECTED: "Action required",
 };
 
-export default function VerificationPanel({ compact = false }) {
+export default function VerificationPanel({
+  compact = false,
+  requirePayoutBank = false,
+}) {
   const [verification, setVerification] = useState(null);
   const [legalName, setLegalName] = useState("");
   const [documentType, setDocumentType] = useState("NIN");
   const [documentFile, setDocumentFile] = useState(null);
+  const [banks, setBanks] = useState([]);
+  const [bankCode, setBankCode] = useState("");
+  const [accountNumber, setAccountNumber] = useState("");
   const [loading, setLoading] = useState(true);
   const [pending, setPending] = useState(false);
   const [error, setError] = useState("");
@@ -31,12 +38,17 @@ export default function VerificationPanel({ compact = false }) {
 
   useEffect(() => {
     const controller = new AbortController();
-    authService
-      .getVerificationStatus({ signal: controller.signal })
-      .then((status) => {
+    Promise.all([
+      authService.getVerificationStatus({ signal: controller.signal }),
+      requirePayoutBank
+        ? authService.getTier1Banks({ signal: controller.signal })
+        : Promise.resolve([]),
+    ])
+      .then(([status, payoutBanks]) => {
         setVerification(status);
         setLegalName(status.legalName || "");
         if (status.documentType) setDocumentType(status.documentType);
+        setBanks(payoutBanks);
       })
       .catch((loadError) => {
         if (!controller.signal.aborted) {
@@ -47,7 +59,7 @@ export default function VerificationPanel({ compact = false }) {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, []);
+  }, [requirePayoutBank]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -55,6 +67,13 @@ export default function VerificationPanel({ compact = false }) {
     setError("");
     setNotice("");
     try {
+      if (requirePayoutBank) {
+        await authService.saveVendorPayoutBank({
+          legalName,
+          bankCode,
+          accountNumber,
+        });
+      }
       const request = new FormData();
       request.set("legalName", legalName);
       request.set("documentType", documentType);
@@ -154,9 +173,14 @@ export default function VerificationPanel({ compact = false }) {
               onChange={(event) => setDocumentType(event.target.value)}
               value={documentType}
             >
-              {documentTypes.map(([value, label]) => (
+              {documentTypes
+                .filter(
+                  ([value]) =>
+                    !requirePayoutBank || value !== "DRIVERS_LICENSE",
+                )
+                .map(([value, label]) => (
                 <option key={value} value={value}>{label}</option>
-              ))}
+                ))}
             </select>
           </label>
           <label>
@@ -170,6 +194,46 @@ export default function VerificationPanel({ compact = false }) {
               type="file"
             />
           </label>
+          {requirePayoutBank && (
+            <>
+              <label>
+                Payout bank name
+                <select
+                  onChange={(event) => setBankCode(event.target.value)}
+                  required
+                  value={bankCode}
+                >
+                  <option value="">Select payout bank</option>
+                  {banks.map((bank) => (
+                    <option key={bank.code} value={bank.code}>
+                      {bank.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <label>
+                Payout account number
+                <input
+                  autoComplete="off"
+                  inputMode="numeric"
+                  maxLength={10}
+                  minLength={10}
+                  onChange={(event) =>
+                    setAccountNumber(
+                      event.target.value.replace(/\D/g, "").slice(0, 10),
+                    )
+                  }
+                  pattern="\d{10}"
+                  required
+                  value={accountNumber}
+                />
+              </label>
+              <p>
+                Paystack will soft-check that the payout account name matches
+                your legal name. Your account number is encrypted at rest.
+              </p>
+            </>
+          )}
           <button disabled={pending} type="submit">
             {pending ? "Submitting..." : status === "REJECTED" ? "Resubmit request" : "Request Tier 2 review"}
           </button>
@@ -181,4 +245,5 @@ export default function VerificationPanel({ compact = false }) {
 
 VerificationPanel.propTypes = {
   compact: PropTypes.bool,
+  requirePayoutBank: PropTypes.bool,
 };

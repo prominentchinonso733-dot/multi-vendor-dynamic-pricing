@@ -43,6 +43,11 @@ export const authService = {
     return data.verification;
   },
 
+  async saveVendorPayoutBank(details) {
+    const { data } = await api.post("/vendor/save-payout-bank", details);
+    return data.payoutDetails;
+  },
+
   async getVendorTierPlans(config = {}) {
     const { data } = await api.get("/vendor/tier-entry/options", config);
     return data;

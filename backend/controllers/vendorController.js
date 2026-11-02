@@ -2,8 +2,23 @@ const express = require("express");
 const https = require("https");
 const { randomUUID } = require("crypto");
 const User = require("../models/User");
+const VendorWallet = require("../models/VendorWallet");
+const VendorWithdrawal = require("../models/VendorWithdrawal");
 const authenticateToken = require("../middleware/authenticateToken");
-const { encryptSensitiveValue } = require("../services/verificationDocuments");
+const {
+  decryptSensitiveValue,
+  encryptSensitiveValue,
+} = require("../services/verificationDocuments");
+const {
+  CURRENCY,
+  fromMinorUnits,
+  toMinorUnits,
+} = require("../services/financialPolicy");
+const {
+  getWalletForUpdate,
+  reserveAvailable,
+  restoreAvailable,
+} = require("../services/vendorWallet");
 const {
   VENDOR_TIER_PRICES_USD,
   getVendorTierAmountMinor,
@@ -109,6 +124,49 @@ const normalizeName = (value) =>
     .sort()
     .join(" ");
 
+const resolvePayoutDetails = async (bankCode, accountNumber, legalName) => {
+  if (!/^[a-zA-Z0-9_-]{2,20}$/.test(bankCode)) {
+    throw Object.assign(new Error("Choose a valid payout bank."), {
+      statusCode: 400,
+    });
+  }
+  if (!/^\d{10}$/.test(accountNumber)) {
+    throw Object.assign(
+      new Error("Payout account number must contain exactly 10 digits."),
+      { statusCode: 400 },
+    );
+  }
+
+  const banks = await paystackRequest(
+    "/bank?country=nigeria&use_cursor=false&perPage=100",
+  );
+  const selectedBank = Array.isArray(banks)
+    ? banks.find((bank) => bank.active && String(bank.code) === bankCode)
+    : null;
+  if (!selectedBank) {
+    throw Object.assign(new Error("Choose an active Nigerian payout bank."), {
+      statusCode: 400,
+    });
+  }
+
+  const accountResult = await paystackRequest(
+    `/bank/resolve?account_number=${encodeURIComponent(accountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
+  );
+  const accountName =
+    typeof accountResult?.account_name === "string"
+      ? accountResult.account_name.trim()
+      : "";
+  if (!accountName || normalizeName(accountName) !== normalizeName(legalName)) {
+    throw Object.assign(
+      new Error(
+        "The legal name does not match the payout account name. Check your details and try again.",
+      ),
+      { statusCode: 422 },
+    );
+  }
+  return { selectedBank, accountName };
+};
+
 const sendProviderError = (error, res) => {
   if (error.code === "PAYSTACK_NOT_CONFIGURED") {
     return res.status(503).json({
@@ -128,10 +186,10 @@ const sendProviderError = (error, res) => {
       error.code,
     )
   ) {
-    console.error("Vendor Tier 1 verification could not be saved:", error);
+    console.error("Vendor identity or payout details could not be saved:", error);
     return res.status(500).json({
       success: false,
-      message: "Unable to save Tier 1 verification.",
+      message: "Unable to save vendor verification or payout details.",
     });
   }
   console.error("Vendor bank verification provider request failed:", error);
@@ -439,7 +497,7 @@ router.post(
   },
 );
 
-router.get("/banks", authenticateToken, requireSeller, async (_req, res) => {
+router.get("/banks", async (_req, res) => {
   try {
     const banks = await paystackRequest(
       "/bank?country=nigeria&use_cursor=false&perPage=100",
@@ -472,13 +530,6 @@ router.post(
         : "";
     const ninNumber =
       typeof req.body?.ninNumber === "string" ? req.body.ninNumber.trim() : "";
-    const bankAccountNumber =
-      typeof req.body?.bankAccountNumber === "string"
-        ? req.body.bankAccountNumber.trim()
-        : "";
-    const bankCode =
-      typeof req.body?.bankCode === "string" ? req.body.bankCode.trim() : "";
-
     if (legalName.length < 2 || legalName.length > 120) {
       return res.status(400).json({
         success: false,
@@ -491,64 +542,12 @@ router.post(
         message: "NIN must contain exactly 11 digits.",
       });
     }
-    if (!/^\d{10}$/.test(bankAccountNumber)) {
-      return res.status(400).json({
-        success: false,
-        message: "Payout account number must contain exactly 10 digits.",
-      });
-    }
-    if (!/^[a-zA-Z0-9_-]{2,20}$/.test(bankCode)) {
-      return res.status(400).json({
-        success: false,
-        message: "Choose a valid payout bank.",
-      });
-    }
-
     try {
-      const selectedBank = await paystackRequest(
-        `/bank?country=nigeria&use_cursor=false&perPage=100`,
-      ).then((banks) =>
-        Array.isArray(banks)
-          ? banks.find(
-              (entry) => entry.active && String(entry.code) === bankCode,
-            )
-          : null,
-      );
-      if (!selectedBank) {
-        return res.status(400).json({
-          success: false,
-          message: "Choose an active Nigerian payout bank.",
-        });
-      }
-
-      const accountResult = await paystackRequest(
-        `/bank/resolve?account_number=${encodeURIComponent(bankAccountNumber)}&bank_code=${encodeURIComponent(bankCode)}`,
-      );
-      const bankAccountName =
-        typeof accountResult?.account_name === "string"
-          ? accountResult.account_name.trim()
-          : "";
-      if (
-        !bankAccountName ||
-        normalizeName(bankAccountName) !== normalizeName(legalName)
-      ) {
-        return res.status(422).json({
-          success: false,
-          message:
-            "The legal name does not match the payout account name. Check your details and try again.",
-        });
-      }
-
       const userId = req.user._id || req.user.id;
       const ninCiphertext = encryptSensitiveValue(
         ninNumber,
         userId,
         "vendor-nin",
-      );
-      const accountCiphertext = encryptSensitiveValue(
-        bankAccountNumber,
-        userId,
-        "vendor-bank-account",
       );
       const verifiedAt = new Date();
       const user = await User.findOneAndUpdate(
@@ -565,13 +564,6 @@ router.post(
             "vendorDetails.verificationData.ninNumber": ninCiphertext,
             "vendorDetails.verificationData.ninLast4": ninNumber.slice(-4),
             "vendorDetails.verificationData.ninVerifiedAt": verifiedAt,
-            "vendorDetails.verificationData.bankName": selectedBank.name,
-            "vendorDetails.verificationData.bankAccountName": bankAccountName,
-            "vendorDetails.verificationData.bankAccountNumber":
-              accountCiphertext,
-            "vendorDetails.verificationData.bankAccountLast4":
-              bankAccountNumber.slice(-4),
-            "vendorDetails.verificationData.bankCode": bankCode,
           },
         },
         { new: true, runValidators: true },
@@ -587,13 +579,10 @@ router.post(
       return res.json({
         success: true,
         message:
-          "Tier 1 soft-check verified. Your NIN format was checked and your bank account name matched.",
+          "Tier 1 verification complete. NIN format was checked only; no NIMC validation was performed.",
         verification: {
           tier1Verified: true,
           legalName,
-          bankName: selectedBank.name,
-          bankAccountName,
-          bankAccountLast4: bankAccountNumber.slice(-4),
           ninLast4: ninNumber.slice(-4),
           ninVerifiedAt: verifiedAt,
         },
@@ -607,6 +596,349 @@ router.post(
         });
       }
       return sendProviderError(error, res);
+    }
+  },
+);
+
+router.post(
+  "/save-payout-bank",
+  authenticateToken,
+  requireSeller,
+  async (req, res) => {
+    const bankCode =
+      typeof req.body?.bankCode === "string" ? req.body.bankCode.trim() : "";
+    const accountNumber =
+      typeof req.body?.accountNumber === "string"
+        ? req.body.accountNumber.trim()
+        : "";
+    const legalName =
+      typeof req.body?.legalName === "string"
+        ? req.body.legalName.trim()
+        : "";
+    if (legalName.length < 2 || legalName.length > 120) {
+      return res.status(400).json({
+        success: false,
+        message: "Full legal name must be between 2 and 120 characters.",
+      });
+    }
+
+    try {
+      const { selectedBank, accountName } = await resolvePayoutDetails(
+        bankCode,
+        accountNumber,
+        legalName,
+      );
+      const userId = req.user._id || req.user.id;
+      const user = await User.findOneAndUpdate(
+        {
+          _id: userId,
+          role: "SELLER",
+          accountStatus: { $ne: "SUSPENDED" },
+        },
+        {
+          $set: {
+            "vendorDetails.payoutDetails.bankName": selectedBank.name,
+            "vendorDetails.payoutDetails.bankCode": String(selectedBank.code),
+            "vendorDetails.payoutDetails.accountName": accountName,
+            "vendorDetails.payoutDetails.accountNumber":
+              encryptSensitiveValue(
+                accountNumber,
+                userId,
+                "vendor-bank-account",
+              ),
+            "vendorDetails.payoutDetails.accountLast4":
+              accountNumber.slice(-4),
+          },
+          $unset: {
+            "vendorDetails.payoutDetails.transferRecipientCode": "",
+          },
+        },
+        { new: true, runValidators: true },
+      ).select("_id");
+      if (!user) {
+        return res.status(404).json({
+          success: false,
+          message: "Active vendor account not found.",
+        });
+      }
+      return res.json({
+        success: true,
+        payoutDetails: {
+          bankName: selectedBank.name,
+          accountName,
+          accountLast4: accountNumber.slice(-4),
+        },
+      });
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      if (error.code === "DOCUMENT_ENCRYPTION_KEY_INVALID") {
+        return res.status(503).json({
+          success: false,
+          message: "Secure payout storage is not configured. Contact support.",
+        });
+      }
+      return sendProviderError(error, res);
+    }
+  },
+);
+
+router.post(
+  "/wallet/withdraw",
+  authenticateToken,
+  requireSeller,
+  async (req, res) => {
+    const userId = req.user._id || req.user.id;
+    const bankCode =
+      typeof req.body?.bankCode === "string" ? req.body.bankCode.trim() : "";
+    const accountNumber =
+      typeof req.body?.accountNumber === "string"
+        ? req.body.accountNumber.trim()
+        : "";
+    const suppliedBankDetails = Boolean(bankCode || accountNumber);
+    if (suppliedBankDetails && (!bankCode || !accountNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: "Provide both a bank and a payout account number.",
+      });
+    }
+
+    let seller;
+    let payoutDetails;
+    try {
+      seller = await User.findOne({
+        _id: userId,
+        role: "SELLER",
+        accountStatus: { $ne: "SUSPENDED" },
+      }).select(
+        "name vendorDetails.verificationData.legalName vendorDetails.payoutDetails",
+      )
+        .select("+vendorDetails.payoutDetails.accountNumber")
+        .select("+vendorDetails.payoutDetails.transferRecipientCode");
+      if (!seller) {
+        return res.status(404).json({
+          success: false,
+          message: "Active vendor account not found.",
+        });
+      }
+      const legalName =
+        seller.vendorDetails?.verificationData?.legalName || seller.name;
+      if (suppliedBankDetails) {
+        const { selectedBank, accountName } = await resolvePayoutDetails(
+          bankCode,
+          accountNumber,
+          legalName,
+        );
+        seller.vendorDetails.payoutDetails = {
+          bankName: selectedBank.name,
+          bankCode: String(selectedBank.code),
+          accountName,
+          accountNumber: encryptSensitiveValue(
+            accountNumber,
+            userId,
+            "vendor-bank-account",
+          ),
+          accountLast4: accountNumber.slice(-4),
+        };
+        await seller.save();
+      }
+
+      payoutDetails = seller.vendorDetails?.payoutDetails;
+      if (
+        !payoutDetails?.bankCode ||
+        !payoutDetails?.accountNumber ||
+        !payoutDetails?.bankName
+      ) {
+        return res.status(400).json({
+          success: false,
+          message: "Save and verify a payout bank account before withdrawing.",
+        });
+      }
+      if (!payoutDetails.transferRecipientCode) {
+        const accountNumberValue = decryptSensitiveValue(
+          payoutDetails.accountNumber,
+          userId,
+          "vendor-bank-account",
+        );
+        const recipient = await paystackRequest("/transferrecipient", {
+          method: "POST",
+          body: {
+            type: "nuban",
+            name: payoutDetails.accountName,
+            account_number: accountNumberValue,
+            bank_code: payoutDetails.bankCode,
+            currency: CURRENCY,
+          },
+        });
+        if (!recipient?.recipient_code) {
+          throw new Error("Paystack returned an invalid payout recipient.");
+        }
+        payoutDetails.transferRecipientCode = recipient.recipient_code;
+        await seller.save();
+      }
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      if (error.code === "DOCUMENT_ENCRYPTION_KEY_INVALID") {
+        return res.status(503).json({
+          success: false,
+          message: "Secure payout storage is not configured. Contact support.",
+        });
+      }
+      return sendProviderError(error, res);
+    }
+
+    const reference = `vendor_withdrawal_${randomUUID()}`;
+    const session = await VendorWallet.startSession();
+    let withdrawal;
+    try {
+      await session.withTransaction(async () => {
+        const wallet = await getWalletForUpdate(userId, session);
+        const availableMinor = reserveAvailable(wallet);
+        if (availableMinor < 1) {
+          const error = new Error("There are no available funds to withdraw.");
+          error.statusCode = 409;
+          throw error;
+        }
+        const amount = fromMinorUnits(availableMinor);
+        await wallet.save({ session });
+        [withdrawal] = await VendorWithdrawal.create(
+          [
+            {
+              vendorId: userId,
+              reference,
+              amount,
+              currency: CURRENCY,
+              bankName: payoutDetails.bankName,
+              accountLast4: payoutDetails.accountLast4,
+            },
+          ],
+          { session },
+        );
+      });
+    } catch (error) {
+      await session.endSession();
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      console.error("Vendor withdrawal could not be reserved:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Unable to reserve funds for withdrawal.",
+      });
+    }
+    await session.endSession();
+
+    try {
+      const transfer = await paystackRequest("/transfer", {
+        method: "POST",
+        body: {
+          source: "balance",
+          amount: toMinorUnits(withdrawal.amount),
+          recipient: payoutDetails.transferRecipientCode,
+          reference,
+          reason: "Vendor wallet withdrawal",
+        },
+      });
+      if (transfer.reference !== reference) {
+        const error = new Error(
+          "Paystack transfer reference did not match the withdrawal.",
+        );
+        error.code = "PAYSTACK_TRANSFER_REFERENCE_MISMATCH";
+        throw error;
+      }
+      const status = transfer.status === "success" ? "COMPLETED" : "PROCESSING";
+      const awaitingAuthorization = transfer.status === "otp";
+      await VendorWithdrawal.updateOne(
+        { _id: withdrawal._id, status: "PROCESSING" },
+        {
+          $set: {
+            status,
+            transferCode: transfer.transfer_code,
+            ...(status === "COMPLETED" && { completedAt: new Date() }),
+          },
+        },
+      );
+      return res.status(status === "COMPLETED" ? 200 : 202).json({
+        success: true,
+        withdrawal: {
+          reference,
+          amount: withdrawal.amount,
+          currency: withdrawal.currency,
+          status,
+        },
+        message:
+          status === "COMPLETED"
+            ? "Withdrawal sent to your saved payout account."
+            : awaitingAuthorization
+              ? "Paystack requires transfer authorization. Funds remain reserved while the payout is pending."
+              : "Withdrawal is being processed by Paystack.",
+      });
+    } catch (error) {
+      if (
+        ["PAYSTACK_LOOKUP_FAILED", "PAYSTACK_NOT_CONFIGURED"].includes(
+          error.code,
+        )
+      ) {
+        const failureSession = await VendorWallet.startSession();
+        try {
+          await failureSession.withTransaction(async () => {
+            const failedWithdrawal =
+              await VendorWithdrawal.findOneAndUpdate(
+                { _id: withdrawal._id, status: "PROCESSING" },
+                {
+                  $set: {
+                    status: "FAILED",
+                    failureReason: "Paystack rejected the transfer.",
+                    resolvedAt: new Date(),
+                  },
+                },
+                { new: true, session: failureSession },
+              );
+            if (failedWithdrawal) {
+              const wallet = await getWalletForUpdate(userId, failureSession);
+              restoreAvailable(
+                wallet,
+                toMinorUnits(withdrawal.amount),
+              );
+              await wallet.save({ session: failureSession });
+            }
+          });
+        } finally {
+          await failureSession.endSession();
+        }
+        return res
+          .status(error.code === "PAYSTACK_NOT_CONFIGURED" ? 503 : 502)
+          .json({
+            success: false,
+            message:
+              "Paystack rejected the transfer. The reserved amount has been returned to your available balance.",
+          });
+      }
+
+      console.error("Vendor transfer status could not be confirmed:", error);
+      return res.status(202).json({
+        success: true,
+        withdrawal: {
+          reference,
+          amount: withdrawal.amount,
+          currency: withdrawal.currency,
+          status: "PROCESSING",
+        },
+        message:
+          "Transfer status is still being confirmed. Funds remain reserved while Paystack processes the withdrawal.",
+      });
     }
   },
 );

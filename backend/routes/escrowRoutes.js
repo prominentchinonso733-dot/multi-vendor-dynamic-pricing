@@ -8,9 +8,15 @@ const Product = require("../models/Product");
 const User = require("../models/User");
 const VendorWallet = require("../models/VendorWallet");
 const VendorWalletTransaction = require("../models/VendorWalletTransaction");
+const VendorWithdrawal = require("../models/VendorWithdrawal");
 const authenticateToken = require("../middleware/authenticateToken");
 const confirmEscrowPayment = require("../services/confirmEscrowPayment");
 const { getEligibleVendorFilter } = require("../services/vendorTiers");
+const {
+  getWalletForUpdate,
+  refundEscrow,
+  releaseEscrow,
+} = require("../services/vendorWallet");
 const {
   BUYER_ESCROW_FEE_RATE,
   CURRENCY,
@@ -187,6 +193,13 @@ const releaseEscrowToWallets = async (
       }
 
       for (const payout of contract.vendorPayouts || []) {
+        const holdTransaction = await VendorWalletTransaction.findOne({
+          vendorId: payout.vendorId,
+          contractId: contract._id,
+          type: "ESCROW_HOLD",
+        })
+          .session(session)
+          .lean();
         await VendorWalletTransaction.create(
           [
             {
@@ -204,15 +217,9 @@ const releaseEscrowToWallets = async (
           ],
           { session },
         );
-        const wallet = await VendorWallet.findOneAndUpdate(
-          { vendorId: payout.vendorId },
-          {
-            $inc: { balance: payout.netAmount },
-            $setOnInsert: { currency: contract.currency || CURRENCY },
-          },
-          { upsert: true, new: true, session, runValidators: true },
-        );
-        wallet.balance = fromMinorUnits(toMinorUnits(wallet.balance));
+        const wallet = await getWalletForUpdate(payout.vendorId, session);
+        const payoutMinor = toMinorUnits(payout.netAmount);
+        releaseEscrow(wallet, payoutMinor, Boolean(holdTransaction));
         await wallet.save({ session });
       }
 
@@ -230,25 +237,60 @@ const releaseEscrowToWallets = async (
 };
 
 const finalizeRefundReceipt = async (contractId) => {
-  const contract = await EscrowContract.findOne({
-    _id: contractId,
-    status: "IN_DISPUTE",
-  });
-  if (!contract) return null;
+  const session = await mongoose.startSession();
+  let refundedContract;
+  try {
+    await session.withTransaction(async () => {
+      const contract = await EscrowContract.findOne({
+        _id: contractId,
+        status: "IN_DISPUTE",
+      }).session(session);
+      if (!contract) return;
 
-  const finalizedAt = new Date();
-  return EscrowContract.findOneAndUpdate(
-    { _id: contractId, status: "IN_DISPUTE" },
-    {
-      $set: {
-        status: "REFUNDED",
-        completedAt: finalizedAt,
-        receiptFinalizedAt: finalizedAt,
-        receipt: createReceipt(contract, finalizedAt, "REFUNDED"),
-      },
-    },
-    { new: true, runValidators: true },
-  );
+      for (const payout of contract.vendorPayouts || []) {
+        const holdTransaction = await VendorWalletTransaction.findOne({
+          vendorId: payout.vendorId,
+          contractId: contract._id,
+          type: "ESCROW_HOLD",
+        })
+          .session(session)
+          .lean();
+        if (!holdTransaction) continue;
+
+        await VendorWalletTransaction.create(
+          [
+            {
+              vendorId: payout.vendorId,
+              contractId: contract._id,
+              paymentReference: contract.paymentReference,
+              type: "ESCROW_REFUND",
+              grossAmount: payout.grossAmount,
+              platformFee: payout.platformFee,
+              amount: payout.netAmount,
+              currency: contract.currency || CURRENCY,
+              tier: payout.tier,
+              commissionRate: payout.commissionRate,
+            },
+          ],
+          { session },
+        );
+        const wallet = await getWalletForUpdate(payout.vendorId, session);
+        refundEscrow(wallet, toMinorUnits(payout.netAmount));
+        await wallet.save({ session });
+      }
+
+      const finalizedAt = new Date();
+      contract.status = "REFUNDED";
+      contract.completedAt = finalizedAt;
+      contract.receiptFinalizedAt = finalizedAt;
+      contract.receipt = createReceipt(contract, finalizedAt, "REFUNDED");
+      await contract.save({ session });
+      refundedContract = contract;
+    });
+  } finally {
+    await session.endSession();
+  }
+  return refundedContract || null;
 };
 
 const verifyPaystackTransaction = (reference) =>
@@ -969,10 +1011,26 @@ router.get("/wallet", authenticateToken, async (req, res) => {
       .sort({ createdAt: -1 })
       .limit(50)
       .lean();
+    const withdrawals = await VendorWithdrawal.find({
+      vendorId: req.user._id || req.user.id,
+    })
+      .sort({ createdAt: -1 })
+      .limit(20)
+      .select("-vendorId")
+      .lean();
+    const availableBalance =
+      wallet?.availableBalance ?? wallet?.balance ?? 0;
     return res.json({
       success: true,
-      wallet: wallet || { balance: 0, currency: CURRENCY },
+      wallet: {
+        ...(wallet || {}),
+        balance: availableBalance,
+        availableBalance,
+        pendingBalance: wallet?.pendingBalance || 0,
+        currency: wallet?.currency || CURRENCY,
+      },
       transactions,
+      withdrawals,
     });
   } catch (error) {
     console.error("Vendor wallet could not be loaded:", error);

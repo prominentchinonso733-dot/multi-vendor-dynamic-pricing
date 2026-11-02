@@ -168,6 +168,14 @@ export default function VendorDashboard({ onPriceUpdated }) {
   const [accountSummary, setAccountSummary] = useState(null);
   const [selectedTier, setSelectedTier] = useState("TIER_1");
   const [walletBalance, setWalletBalance] = useState(0);
+  const [pendingBalance, setPendingBalance] = useState(0);
+  const [withdrawalOpen, setWithdrawalOpen] = useState(false);
+  const [withdrawalBanks, setWithdrawalBanks] = useState([]);
+  const [withdrawalBankCode, setWithdrawalBankCode] = useState("");
+  const [withdrawalAccountNumber, setWithdrawalAccountNumber] = useState("");
+  const [withdrawalPending, setWithdrawalPending] = useState(false);
+  const [withdrawalError, setWithdrawalError] = useState("");
+  const [withdrawalNotice, setWithdrawalNotice] = useState("");
   const [accountSummaryError, setAccountSummaryError] = useState("");
   const canListProducts =
     accountSummary?.subscriptionStatus === "ACTIVE" &&
@@ -190,7 +198,10 @@ export default function VendorDashboard({ onPriceUpdated }) {
     ])
       .then(([profile, wallet]) => {
         setAccountSummary(profile);
-        setWalletBalance(Number(wallet?.balance) || 0);
+        setWalletBalance(
+          Number(wallet?.availableBalance ?? wallet?.balance) || 0,
+        );
+        setPendingBalance(Number(wallet?.pendingBalance) || 0);
         setAccountSummaryError("");
       })
       .catch((error) => {
@@ -375,11 +386,60 @@ export default function VendorDashboard({ onPriceUpdated }) {
           order._id === updatedContract._id ? updatedContract : order,
         ),
       );
+      setOrdersRefreshVersion((version) => version + 1);
       setOrdersNotice("Order status updated.");
     } catch (error) {
       setOrdersError(getApiErrorMessage(error, "Unable to update order status."));
     } finally {
       setPendingOrderStatusId(null);
+    }
+  };
+
+  const openWithdrawal = async () => {
+    setWithdrawalError("");
+    setWithdrawalNotice("");
+    if (walletBalance <= 0) {
+      setWithdrawalError("There are no available funds to withdraw.");
+      return;
+    }
+    if (!accountSummary?.payoutDetails) {
+      try {
+        setWithdrawalBanks(await authService.getTier1Banks());
+      } catch (error) {
+        setWithdrawalError(
+          getApiErrorMessage(error, "Unable to load payout banks."),
+        );
+        return;
+      }
+    }
+    setWithdrawalOpen(true);
+  };
+
+  const submitWithdrawal = async (event) => {
+    event.preventDefault();
+    setWithdrawalPending(true);
+    setWithdrawalError("");
+    setWithdrawalNotice("");
+    try {
+      const result = await escrowService.withdrawVendorFunds(
+        accountSummary?.payoutDetails
+          ? {}
+          : {
+              bankCode: withdrawalBankCode,
+              accountNumber: withdrawalAccountNumber,
+            },
+      );
+      setWithdrawalNotice(result.message);
+      setWithdrawalOpen(false);
+      setWithdrawalAccountNumber("");
+      setWithdrawalBankCode("");
+      setOrdersRefreshVersion((version) => version + 1);
+    } catch (error) {
+      setWithdrawalError(
+        getApiErrorMessage(error, "Unable to withdraw available funds."),
+      );
+    } finally {
+      setWithdrawalPending(false);
     }
   };
 
@@ -811,10 +871,118 @@ export default function VendorDashboard({ onPriceUpdated }) {
             <strong>{currencyFormatter.format(accountSummary.financialPolicy?.dailyVolumeLimit || 0)}</strong>
           </div>
           <div>
+            <span>Pending in escrow</span>
+            <strong>{currencyFormatter.format(pendingBalance)}</strong>
+          </div>
+          <div>
             <span>Available wallet balance</span>
             <strong>{currencyFormatter.format(walletBalance)}</strong>
+            <button
+              className="vendor-pricing__withdraw"
+              disabled={withdrawalPending || walletBalance <= 0}
+              onClick={openWithdrawal}
+              type="button"
+            >
+              Withdraw Funds
+            </button>
           </div>
         </section>
+      )}
+      {withdrawalError && (
+        <p className="vendor-pricing__message vendor-pricing__message--error" role="alert">
+          {withdrawalError}
+        </p>
+      )}
+      {withdrawalNotice && (
+        <p className="vendor-pricing__message vendor-pricing__message--success" role="status">
+          {withdrawalNotice}
+        </p>
+      )}
+      {withdrawalOpen && (
+        <div className="vendor-pricing__modal-backdrop">
+          <section
+            aria-labelledby="vendor-withdraw-title"
+            aria-modal="true"
+            className="vendor-pricing__withdraw-modal"
+            role="dialog"
+          >
+            <h2 id="vendor-withdraw-title">Withdraw available funds</h2>
+            <form onSubmit={submitWithdrawal}>
+            <p>
+              Amount: <strong>{currencyFormatter.format(walletBalance)}</strong>
+            </p>
+            {accountSummary?.payoutDetails ? (
+              <p>
+                Payout to {accountSummary.payoutDetails.bankName}, account
+                ending {accountSummary.payoutDetails.accountLast4}.
+              </p>
+            ) : (
+              <>
+                <p>
+                  Enter and verify a bank account for this withdrawal. Paystack
+                  checks that the account name matches your legal name.
+                </p>
+                <label>
+                  Bank name
+                  <select
+                    onChange={(event) =>
+                      setWithdrawalBankCode(event.target.value)
+                    }
+                    required
+                    value={withdrawalBankCode}
+                  >
+                    <option value="">Select payout bank</option>
+                    {withdrawalBanks.map((bank) => (
+                      <option key={bank.code} value={bank.code}>
+                        {bank.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label>
+                  Account number
+                  <input
+                    autoComplete="off"
+                    inputMode="numeric"
+                    maxLength={10}
+                    minLength={10}
+                    onChange={(event) =>
+                      setWithdrawalAccountNumber(
+                        event.target.value.replace(/\D/g, "").slice(0, 10),
+                      )
+                    }
+                    pattern="\d{10}"
+                    required
+                    value={withdrawalAccountNumber}
+                  />
+                </label>
+              </>
+            )}
+            {withdrawalError && (
+              <p className="vendor-pricing__message vendor-pricing__message--error" role="alert">
+                {withdrawalError}
+              </p>
+            )}
+            <div className="vendor-pricing__withdraw-actions">
+              <button
+                className="vendor-pricing__refresh"
+                disabled={withdrawalPending}
+                onClick={() => setWithdrawalOpen(false)}
+                type="button"
+              >
+                Cancel
+              </button>
+              <button
+                className="vendor-pricing__calculate"
+                disabled={withdrawalPending}
+                type="submit"
+              >
+                {withdrawalPending ? "Processing..." : "Confirm withdrawal"}
+              </button>
+            </div>
+            </form>
+          </section>
+        </div>
       )}
       {accountSummaryError && (
         <p className="vendor-pricing__message vendor-pricing__message--error" role="alert">
@@ -1732,7 +1900,11 @@ export default function VendorDashboard({ onPriceUpdated }) {
             </div>
           )}
           {selectedTier === "TIER_2" ? (
-            <VerificationPanel compact key={location.key} />
+            <VerificationPanel
+              compact
+              key={location.key}
+              requirePayoutBank
+            />
           ) : (
             <Tier1VerificationPanel
               key={location.key}

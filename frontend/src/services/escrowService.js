@@ -18,4 +18,9 @@ export const escrowService = {
     const { data } = await api.get("/escrow/wallet", config);
     return data.wallet;
   },
+
+  async withdrawVendorFunds(details = {}) {
+    const { data } = await api.post("/vendor/wallet/withdraw", details);
+    return data;
+  },
 };

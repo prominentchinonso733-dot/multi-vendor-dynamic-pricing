@@ -1,6 +1,9 @@
 const mongoose = require("mongoose");
 const EscrowContract = require("../models/EscrowContract");
 const Product = require("../models/Product");
+const VendorWalletTransaction = require("../models/VendorWalletTransaction");
+const { CURRENCY, toMinorUnits } = require("./financialPolicy");
+const { creditPending, getWalletForUpdate } = require("./vendorWallet");
 
 const confirmEscrowPayment = async (contractId, paymentReference) => {
   const session = await mongoose.startSession();
@@ -40,6 +43,29 @@ const confirmEscrowPayment = async (contractId, paymentReference) => {
           error.code = "ORDER_STOCK_UNAVAILABLE";
           throw error;
         }
+      }
+
+      for (const payout of contract.vendorPayouts || []) {
+        await VendorWalletTransaction.create(
+          [
+            {
+              vendorId: payout.vendorId,
+              contractId: contract._id,
+              paymentReference: contract.paymentReference,
+              type: "ESCROW_HOLD",
+              grossAmount: payout.grossAmount,
+              platformFee: payout.platformFee,
+              amount: payout.netAmount,
+              currency: contract.currency || CURRENCY,
+              tier: payout.tier,
+              commissionRate: payout.commissionRate,
+            },
+          ],
+          { session },
+        );
+        const wallet = await getWalletForUpdate(payout.vendorId, session);
+        creditPending(wallet, toMinorUnits(payout.netAmount));
+        await wallet.save({ session });
       }
     });
   } catch (error) {

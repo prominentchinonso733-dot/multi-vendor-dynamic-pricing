@@ -28,7 +28,7 @@ const AccountAuth = ({ role }) => {
   const isRegistering = canRegister && mode === "register";
 
   useEffect(() => {
-    if (!isRegistering || role !== "SELLER" || vendorTier !== "TIER_1") {
+    if (!isRegistering || role !== "SELLER" || vendorTier !== "TIER_2") {
       return undefined;
     }
 
@@ -62,27 +62,26 @@ const AccountAuth = ({ role }) => {
         });
         if (role === "SELLER") {
           const paymentPath = "/vendor/dashboard?section=store-settings";
-          navigate(paymentPath, { replace: true });
 
           try {
             if (vendorTier === "TIER_1") {
               await authService.verifyTier1Vendor({
                 fullLegalName: name,
                 ninNumber,
-                bankCode,
-                bankAccountNumber,
               });
             } else {
+              await authService.saveVendorPayoutBank({
+                legalName: name,
+                bankCode,
+                accountNumber: bankAccountNumber,
+              });
               const verification = new FormData();
               verification.set("legalName", name);
               verification.set("documentType", documentType);
               verification.set("document", documentFile);
               await authService.submitVerificationRequest(verification);
             }
-            navigate(paymentPath, {
-              replace: true,
-              state: { onboardingVerificationComplete: true },
-            });
+            navigate(paymentPath, { replace: true });
           } catch (verificationError) {
             navigate(paymentPath, {
               replace: true,
@@ -165,7 +164,11 @@ const AccountAuth = ({ role }) => {
             <label style={{ display: "grid", gap: "0.35rem" }}>
               Vendor tier
               <select
-                onChange={(event) => setVendorTier(event.target.value)}
+                onChange={(event) => {
+                  setVendorTier(event.target.value);
+                  setDocumentFile(null);
+                  setError("");
+                }}
                 value={vendorTier}
               >
                 <option value="TIER_1">Tier 1 — $10 one-time entry fee</option>
@@ -189,8 +192,34 @@ const AccountAuth = ({ role }) => {
                     value={ninNumber}
                   />
                 </label>
+              </>
+            ) : (
+              <>
                 <label style={{ display: "grid", gap: "0.35rem" }}>
-                  Bank name
+                  Document type
+                  <select
+                    onChange={(event) => setDocumentType(event.target.value)}
+                    value={documentType}
+                  >
+                    <option value="NIN">NIN</option>
+                    <option value="BVN">BVN</option>
+                    <option value="PASSPORT">Passport</option>
+                    <option value="VOTER_CARD">Voter&apos;s Card</option>
+                  </select>
+                </label>
+                <label style={{ display: "grid", gap: "0.35rem" }}>
+                  Photo ID (PDF, JPEG, or PNG; up to 5 MB)
+                  <input
+                    accept="application/pdf,image/jpeg,image/png"
+                    onChange={(event) =>
+                      setDocumentFile(event.target.files?.[0] || null)
+                    }
+                    required
+                    type="file"
+                  />
+                </label>
+                <label style={{ display: "grid", gap: "0.35rem" }}>
+                  Payout bank name
                   <select
                     onChange={(event) => setBankCode(event.target.value)}
                     required
@@ -219,31 +248,6 @@ const AccountAuth = ({ role }) => {
                     pattern="\d{10}"
                     required
                     value={bankAccountNumber}
-                  />
-                </label>
-              </>
-            ) : (
-              <>
-                <label style={{ display: "grid", gap: "0.35rem" }}>
-                  Document type
-                  <select
-                    onChange={(event) => setDocumentType(event.target.value)}
-                    value={documentType}
-                  >
-                    <option value="NIN">NIN</option>
-                    <option value="BVN">BVN</option>
-                    <option value="PASSPORT">Passport</option>
-                  </select>
-                </label>
-                <label style={{ display: "grid", gap: "0.35rem" }}>
-                  Photo ID (PDF, JPEG, or PNG; up to 5 MB)
-                  <input
-                    accept="application/pdf,image/jpeg,image/png"
-                    onChange={(event) =>
-                      setDocumentFile(event.target.files?.[0] || null)
-                    }
-                    required
-                    type="file"
                   />
                 </label>
               </>

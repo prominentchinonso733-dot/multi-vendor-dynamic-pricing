@@ -26,7 +26,7 @@ const UserSchema = new mongoose.Schema(
       legalName: { type: String, trim: true, maxlength: 120 },
       documentType: {
         type: String,
-        enum: ["NIN", "BVN", "DRIVERS_LICENSE", "PASSPORT"],
+        enum: ["NIN", "BVN", "DRIVERS_LICENSE", "PASSPORT", "VOTER_CARD"],
       },
       submittedAt: Date,
       reviewedAt: Date,
@@ -48,11 +48,14 @@ const UserSchema = new mongoose.Schema(
         ninNumber: { type: String, select: false },
         ninLast4: { type: String, select: false },
         ninVerifiedAt: { type: Date },
+      },
+      payoutDetails: {
         bankName: { type: String, trim: true, maxlength: 100 },
-        bankAccountName: { type: String, trim: true, maxlength: 120 },
-        bankAccountNumber: { type: String, select: false },
-        bankAccountLast4: { type: String },
         bankCode: { type: String, trim: true, maxlength: 20 },
+        accountName: { type: String, trim: true, maxlength: 120 },
+        accountNumber: { type: String, select: false },
+        accountLast4: { type: String },
+        transferRecipientCode: { type: String, select: false },
       },
       subscriptionStatus: {
         type: String,

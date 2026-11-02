@@ -9,6 +9,8 @@ const walletSchema = new mongoose.Schema(
       unique: true,
     },
     balance: { type: Number, required: true, default: 0, min: 0 },
+    availableBalance: { type: Number, min: 0 },
+    pendingBalance: { type: Number, required: true, default: 0, min: 0 },
     currency: { type: String, required: true, default: "NGN", immutable: true },
   },
   { timestamps: true },

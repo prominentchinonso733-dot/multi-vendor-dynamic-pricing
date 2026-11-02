@@ -15,7 +15,7 @@ const walletTransactionSchema = new mongoose.Schema(
     paymentReference: { type: String, required: true },
     type: {
       type: String,
-      enum: ["ESCROW_RELEASE"],
+      enum: ["ESCROW_HOLD", "ESCROW_RELEASE", "ESCROW_REFUND"],
       required: true,
       default: "ESCROW_RELEASE",
     },
