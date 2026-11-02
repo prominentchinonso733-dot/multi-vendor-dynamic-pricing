@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
+import { useLocation } from "react-router-dom";
 import { AlertCircle, CheckCircle2, RefreshCw, ShieldCheck } from "lucide-react";
 import { getApiErrorMessage, getAssetUrl } from "../api";
 import { authService } from "../services/authService";
@@ -120,6 +121,7 @@ const getPricePreview = (draft, currentPrice) => {
 
 export default function VendorDashboard({ onPriceUpdated }) {
   const { user } = useAuth();
+  const location = useLocation();
   const [products, setProducts] = useState([]);
   const [drafts, setDrafts] = useState({});
   const [results, setResults] = useState({});
@@ -147,7 +149,11 @@ export default function VendorDashboard({ onPriceUpdated }) {
   const [createError, setCreateError] = useState("");
   const [createNotice, setCreateNotice] = useState("");
   const [createPending, setCreatePending] = useState(false);
-  const [activeSection, setActiveSection] = useState("dynamic-pricing");
+  const [activeSection, setActiveSection] = useState(() =>
+    new URLSearchParams(location.search).get("section") === "store-settings"
+      ? "store-settings"
+      : "dynamic-pricing",
+  );
   const [storeProfile, setStoreProfile] = useState(emptyStoreProfile);
   const [profileLoading, setProfileLoading] = useState(false);
   const [profileSaving, setProfileSaving] = useState(false);
@@ -169,6 +175,12 @@ export default function VendorDashboard({ onPriceUpdated }) {
       accountSummary?.tier1Verified === true) ||
       (accountSummary?.vendorTier === "TIER_2" &&
         accountSummary?.isVerified === true));
+
+  useEffect(() => {
+    if (new URLSearchParams(location.search).get("section") === "store-settings") {
+      setActiveSection("store-settings");
+    }
+  }, [location.search]);
 
   useEffect(() => {
     const controller = new AbortController();
@@ -1710,10 +1722,20 @@ export default function VendorDashboard({ onPriceUpdated }) {
             selectedTier={selectedTier}
             vendorTier={accountSummary?.vendorTier || "TIER_1"}
           />
+          {location.state?.onboardingVerificationError && (
+            <div
+              className="vendor-pricing__message vendor-pricing__message--error"
+              role="alert"
+            >
+              <AlertCircle aria-hidden="true" size={18} />
+              <span>{location.state.onboardingVerificationError}</span>
+            </div>
+          )}
           {selectedTier === "TIER_2" ? (
-            <VerificationPanel compact />
+            <VerificationPanel compact key={location.key} />
           ) : (
             <Tier1VerificationPanel
+              key={location.key}
               onVerified={(tier1Verification) =>
                 setAccountSummary((current) => ({
                   ...current,

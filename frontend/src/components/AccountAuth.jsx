@@ -1,8 +1,10 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PropTypes from "prop-types";
 import { useNavigate } from "react-router-dom";
+import { getApiErrorMessage } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { getRoleHomeRoute } from "../services/roleRoutes";
+import { authService } from "../services/authService";
 
 const AccountAuth = ({ role }) => {
   const { login, register } = useAuth();
@@ -13,11 +15,35 @@ const AccountAuth = ({ role }) => {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [vendorTier, setVendorTier] = useState("TIER_1");
+  const [banks, setBanks] = useState([]);
+  const [bankCode, setBankCode] = useState("");
+  const [ninNumber, setNinNumber] = useState("");
+  const [bankAccountNumber, setBankAccountNumber] = useState("");
+  const [documentType, setDocumentType] = useState("NIN");
+  const [documentFile, setDocumentFile] = useState(null);
   const [error, setError] = useState("");
   const [isPending, setIsPending] = useState(false);
   const isBuyer = role === "BUYER";
   const canRegister = isBuyer || role === "SELLER";
   const isRegistering = canRegister && mode === "register";
+
+  useEffect(() => {
+    if (!isRegistering || role !== "SELLER" || vendorTier !== "TIER_1") {
+      return undefined;
+    }
+
+    const controller = new AbortController();
+    authService
+      .getTier1Banks({ signal: controller.signal })
+      .then(setBanks)
+      .catch((loadError) => {
+        if (!controller.signal.aborted) {
+          setError(getApiErrorMessage(loadError, "Unable to load payout banks."));
+        }
+      });
+
+    return () => controller.abort();
+  }, [isRegistering, role, vendorTier]);
 
   const submit = async (event) => {
     event.preventDefault();
@@ -34,6 +60,42 @@ const AccountAuth = ({ role }) => {
           role,
           ...(role === "SELLER" && { businessName, vendorTier }),
         });
+        if (role === "SELLER") {
+          const paymentPath = "/vendor/dashboard?section=store-settings";
+          navigate(paymentPath, { replace: true });
+
+          try {
+            if (vendorTier === "TIER_1") {
+              await authService.verifyTier1Vendor({
+                fullLegalName: name,
+                ninNumber,
+                bankCode,
+                bankAccountNumber,
+              });
+            } else {
+              const verification = new FormData();
+              verification.set("legalName", name);
+              verification.set("documentType", documentType);
+              verification.set("document", documentFile);
+              await authService.submitVerificationRequest(verification);
+            }
+            navigate(paymentPath, {
+              replace: true,
+              state: { onboardingVerificationComplete: true },
+            });
+          } catch (verificationError) {
+            navigate(paymentPath, {
+              replace: true,
+              state: {
+                onboardingVerificationError: getApiErrorMessage(
+                  verificationError,
+                  "Your account was created, but verification details could not be saved. You can submit them from vendor onboarding.",
+                ),
+              },
+            });
+          }
+          return;
+        }
       } else {
         authenticatedUser = await login({ email, password }, { expectedRole: role });
       }
@@ -80,6 +142,8 @@ const AccountAuth = ({ role }) => {
             {isBuyer ? "Name" : "Full name"}
             <input
               autoComplete="name"
+              maxLength={120}
+              minLength={2}
               onChange={(event) => setName(event.target.value)}
               required
               value={name}
@@ -108,11 +172,83 @@ const AccountAuth = ({ role }) => {
                 <option value="TIER_2">Tier 2 — $20 one-time entry fee</option>
               </select>
             </label>
-            <p>
-              Tier 1 requires a basic identity soft-check. Tier 2 requires photo
-              ID review by an administrator. Entry fees are paid after account
-              creation.
-            </p>
+            {vendorTier === "TIER_1" ? (
+              <>
+                <label style={{ display: "grid", gap: "0.35rem" }}>
+                  11-digit NIN
+                  <input
+                    autoComplete="off"
+                    inputMode="numeric"
+                    maxLength={11}
+                    minLength={11}
+                    onChange={(event) =>
+                      setNinNumber(event.target.value.replace(/\D/g, "").slice(0, 11))
+                    }
+                    pattern="\d{11}"
+                    required
+                    value={ninNumber}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: "0.35rem" }}>
+                  Bank name
+                  <select
+                    onChange={(event) => setBankCode(event.target.value)}
+                    required
+                    value={bankCode}
+                  >
+                    <option value="">Select payout bank</option>
+                    {banks.map((bank) => (
+                      <option key={bank.code} value={bank.code}>
+                        {bank.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ display: "grid", gap: "0.35rem" }}>
+                  Payout account number
+                  <input
+                    autoComplete="off"
+                    inputMode="numeric"
+                    maxLength={10}
+                    minLength={10}
+                    onChange={(event) =>
+                      setBankAccountNumber(
+                        event.target.value.replace(/\D/g, "").slice(0, 10),
+                      )
+                    }
+                    pattern="\d{10}"
+                    required
+                    value={bankAccountNumber}
+                  />
+                </label>
+              </>
+            ) : (
+              <>
+                <label style={{ display: "grid", gap: "0.35rem" }}>
+                  Document type
+                  <select
+                    onChange={(event) => setDocumentType(event.target.value)}
+                    value={documentType}
+                  >
+                    <option value="NIN">NIN</option>
+                    <option value="BVN">BVN</option>
+                    <option value="PASSPORT">Passport</option>
+                  </select>
+                </label>
+                <label style={{ display: "grid", gap: "0.35rem" }}>
+                  Photo ID (PDF, JPEG, or PNG; up to 5 MB)
+                  <input
+                    accept="application/pdf,image/jpeg,image/png"
+                    onChange={(event) =>
+                      setDocumentFile(event.target.files?.[0] || null)
+                    }
+                    required
+                    type="file"
+                  />
+                </label>
+              </>
+            )}
+            <p>After registering, you’ll continue to the selected tier’s entry fee payment.</p>
           </>
         )}
         <label style={{ display: "grid", gap: "0.35rem" }}>
