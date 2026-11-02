@@ -36,6 +36,8 @@ export default function CartDrawer({
 }) {
   const { authFetch, user } = useAuth();
   const [buyerEmail, setBuyerEmail] = useState(user?.email || "");
+  const [deliveryAddress, setDeliveryAddress] = useState("");
+  const [customerPhone, setCustomerPhone] = useState(user?.phone || "");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [checkoutPending, setCheckoutPending] = useState(false);
 
@@ -91,6 +93,8 @@ export default function CartDrawer({
         body: JSON.stringify({
           buyerId,
           buyerEmail: buyerEmail.trim(),
+          deliveryAddress: deliveryAddress.trim(),
+          customerPhone: customerPhone.trim(),
           sellerIds,
           items: cart,
           subtotal,
@@ -344,6 +348,44 @@ export default function CartDrawer({
                 readOnly
                 value={buyerEmail}
                 placeholder="you@example.com"
+                style={{
+                  minHeight: "42px",
+                  padding: "0 10px",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "4px",
+                }}
+              />
+              <label htmlFor="delivery-address" className="text-sm font-semibold">
+                Delivery address
+              </label>
+              <textarea
+                id="delivery-address"
+                autoComplete="street-address"
+                maxLength={500}
+                minLength={5}
+                onChange={(event) => setDeliveryAddress(event.target.value)}
+                required
+                rows={3}
+                value={deliveryAddress}
+                style={{
+                  minHeight: "70px",
+                  padding: "10px",
+                  border: "1px solid #cbd5e1",
+                  borderRadius: "4px",
+                }}
+              />
+              <label htmlFor="delivery-phone" className="text-sm font-semibold">
+                Customer phone
+              </label>
+              <input
+                id="delivery-phone"
+                autoComplete="tel"
+                maxLength={30}
+                minLength={7}
+                onChange={(event) => setCustomerPhone(event.target.value)}
+                required
+                type="tel"
+                value={customerPhone}
                 style={{
                   minHeight: "42px",
                   padding: "0 10px",

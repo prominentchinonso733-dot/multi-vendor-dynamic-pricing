@@ -55,6 +55,9 @@ const escrowContractSchema = new mongoose.Schema(
       lowercase: true,
       required: true,
     },
+    customerName: { type: String, trim: true, maxlength: 120 },
+    deliveryAddress: { type: String, trim: true, maxlength: 500 },
+    customerPhone: { type: String, trim: true, maxlength: 30 },
     sellerIds: [
       {
         type: mongoose.Schema.Types.ObjectId,
@@ -68,7 +71,7 @@ const escrowContractSchema = new mongoose.Schema(
     },
     deliveryStatus: {
       type: String,
-      enum: ["PENDING", "PICKED_UP", "IN_TRANSIT", "DELIVERED"],
+      enum: ["PENDING", "ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"],
       default: "PENDING",
     },
     deliveryUpdatedAt: { type: Date },

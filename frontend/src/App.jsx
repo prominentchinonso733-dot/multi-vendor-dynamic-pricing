@@ -15,7 +15,7 @@ import RiderDashboard from "./components/RiderDashboard";
 import { useAuth } from "./context/AuthContext";
 import { getRoleHomeRoute } from "./services/roleRoutes";
 
-function RequireRole({ role, children }) {
+function RequireRole({ role, allowAdmin = false, children }) {
   const { isAuthenticated, role: activeRole } = useAuth();
 
   if (!isAuthenticated) {
@@ -27,7 +27,7 @@ function RequireRole({ role, children }) {
     }[role];
     return <Navigate to={loginPath} replace />;
   }
-  if (activeRole !== role) {
+  if (activeRole !== role && !(allowAdmin && activeRole === "ADMIN")) {
     return <Navigate to={getRoleHomeRoute(activeRole) || "/"} replace />;
   }
   return children;
@@ -35,6 +35,7 @@ function RequireRole({ role, children }) {
 
 RequireRole.propTypes = {
   role: PropTypes.oneOf(["SELLER", "ADMIN", "BUYER", "DELIVERY_PARTNER"]).isRequired,
+  allowAdmin: PropTypes.bool,
   children: PropTypes.node.isRequired,
 };
 
@@ -59,7 +60,7 @@ function AdminLoginRoute() {
 function RiderLoginRoute() {
   const { role } = useAuth();
   if (role === "DELIVERY_PARTNER") return <Navigate to="/rider/dashboard" replace />;
-  if (role === "ADMIN") return <Navigate to="/admin" replace />;
+  if (role === "ADMIN") return <Navigate to="/rider/dashboard" replace />;
   if (role === "SELLER") return <Navigate to="/vendor/dashboard" replace />;
   if (role === "BUYER") return <Navigate to="/" replace />;
   return <AccountAuth role="DELIVERY_PARTNER" />;
@@ -163,7 +164,7 @@ function App() {
           <Route
             path="/rider/dashboard"
             element={
-              <RequireRole role="DELIVERY_PARTNER">
+              <RequireRole allowAdmin role="DELIVERY_PARTNER">
                 <RiderDashboard />
               </RequireRole>
             }

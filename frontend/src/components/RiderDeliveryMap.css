@@ -1,0 +1,158 @@
+.rider-map {
+  overflow: hidden;
+  margin: 14px 0;
+  border: 1px solid #dce5e5;
+  border-radius: 6px;
+  background: #f9fbf8;
+}
+
+.rider-map__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 13px 15px;
+}
+
+.rider-map__eyebrow {
+  color: #177b73;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.rider-map__header h3 {
+  margin: 3px 0 0;
+  color: #203943;
+  font-size: 0.95rem;
+}
+
+.rider-map__region {
+  color: #65777a;
+  font-size: 0.72rem;
+  font-weight: 700;
+}
+
+.rider-map__canvas {
+  position: relative;
+  height: 210px;
+  overflow: hidden;
+  background:
+    radial-gradient(ellipse at 30% 20%, #edf1dc, transparent 35%),
+    radial-gradient(ellipse at 85% 50%, #e8efdf, transparent 36%),
+    #edf2e8;
+}
+
+.rider-map__roads {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+}
+
+.rider-map__roads path {
+  fill: none;
+  stroke: #d3ddca;
+  stroke-width: 7;
+}
+
+.rider-map__roads .rider-map__water {
+  fill: #cfe7e7;
+  stroke: none;
+}
+
+.rider-map__roads .rider-map__main-road {
+  stroke: #fff;
+  stroke-width: 10;
+}
+
+.rider-map__roads .rider-map__route {
+  stroke: #177b73;
+  stroke-dasharray: 6 6;
+  stroke-width: 3;
+}
+
+.rider-map__area {
+  position: absolute;
+  color: #8a9a8b;
+  font-size: 0.59rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+}
+
+.rider-map__area--west {
+  top: 45%;
+  left: 16%;
+}
+
+.rider-map__area--center {
+  top: 17%;
+  left: 51%;
+}
+
+.rider-map__area--east {
+  top: 67%;
+  right: 12%;
+}
+
+.rider-map__marker {
+  position: absolute;
+  display: grid;
+  justify-items: center;
+  gap: 1px;
+  padding: 4px 7px;
+  border: 0;
+  border-radius: 6px;
+  background: rgb(255 255 255 / 90%);
+  color: #176f5d;
+  font: inherit;
+  font-size: 0.65rem;
+  font-weight: 800;
+  cursor: pointer;
+  filter: drop-shadow(0 2px 3px rgb(23 43 54 / 20%));
+}
+
+.rider-map__marker[aria-pressed="true"] {
+  background: #176f5d;
+  color: #fff;
+}
+
+.rider-map__marker--pickup {
+  top: 57%;
+  left: 22%;
+}
+
+.rider-map__marker--destination {
+  top: 25%;
+  left: 70%;
+}
+
+.rider-map__selected {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+  padding: 10px 14px 4px;
+  color: #435b5f;
+  font-size: 0.78rem;
+}
+
+.rider-map__selected svg {
+  flex: 0 0 auto;
+  color: #177b73;
+}
+
+.rider-map__note {
+  margin: 0;
+  padding: 0 14px 11px;
+  color: #77868a;
+  font-size: 0.68rem;
+}
+
+@media (max-width: 500px) {
+  .rider-map__header {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}

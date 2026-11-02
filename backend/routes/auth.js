@@ -105,6 +105,7 @@ const toPublicUser = (user) => ({
   id: user._id,
   name: user.name,
   email: user.email,
+  ...(user.phone && { phone: user.phone }),
   role: normalizeRole(user.role),
   isVendor: hasVendorAccess(user),
   accountStatus: user.accountStatus || "ACTIVE",
@@ -120,16 +121,52 @@ const toPublicUser = (user) => ({
 
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, role, businessName, vendorTier } = req.body;
+    const {
+      name,
+      email,
+      password,
+      phone,
+      role,
+      businessName,
+      vendorTier,
+    } = req.body;
     const normalizedRole = normalizeRole(role || "BUYER");
 
-    if (!["BUYER", "SELLER"].includes(normalizedRole)) {
-      return res.status(400).json({ msg: "Role must be BUYER or SELLER." });
+    if (!["BUYER", "SELLER", "DELIVERY_PARTNER"].includes(normalizedRole)) {
+      return res
+        .status(400)
+        .json({ msg: "Role must be BUYER, SELLER, or DELIVERY_PARTNER." });
     }
     if (!name || !email || !password) {
       return res
         .status(400)
         .json({ msg: "Name, email, and password are required." });
+    }
+    if (
+      typeof name !== "string" ||
+      name.trim().length < 2 ||
+      name.trim().length > 120 ||
+      typeof email !== "string" ||
+      !/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim()) ||
+      typeof password !== "string" ||
+      (normalizedRole === "DELIVERY_PARTNER" && password.length < 8)
+    ) {
+      return res.status(400).json({
+        msg:
+          normalizedRole === "DELIVERY_PARTNER"
+            ? "Enter a valid name and email, and a password of at least 8 characters."
+            : "Enter a valid name, email, and password.",
+      });
+    }
+    if (
+      normalizedRole === "DELIVERY_PARTNER" &&
+      (typeof phone !== "string" ||
+        phone.trim().length < 7 ||
+        phone.trim().length > 30)
+    ) {
+      return res.status(400).json({
+        msg: "A valid phone number is required for delivery partner registration.",
+      });
     }
     if (
       normalizedRole === "SELLER" &&
@@ -154,6 +191,7 @@ router.post("/register", async (req, res) => {
       email: normalizedEmail,
       password: hashedPassword,
       role: normalizedRole,
+      ...(normalizedRole === "DELIVERY_PARTNER" && { phone: phone.trim() }),
       vendorDetails:
         normalizedRole === "SELLER"
           ? {

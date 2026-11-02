@@ -14,6 +14,7 @@ const AccountAuth = ({ role }) => {
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [phone, setPhone] = useState("");
   const [vendorTier, setVendorTier] = useState("TIER_1");
   const [banks, setBanks] = useState([]);
   const [bankCode, setBankCode] = useState("");
@@ -24,7 +25,8 @@ const AccountAuth = ({ role }) => {
   const [error, setError] = useState("");
   const [isPending, setIsPending] = useState(false);
   const isBuyer = role === "BUYER";
-  const canRegister = isBuyer || role === "SELLER";
+  const canRegister =
+    isBuyer || role === "SELLER" || role === "DELIVERY_PARTNER";
   const isRegistering = canRegister && mode === "register";
 
   useEffect(() => {
@@ -58,6 +60,7 @@ const AccountAuth = ({ role }) => {
           email,
           password,
           role,
+          ...(role === "DELIVERY_PARTNER" && { phone }),
           ...(role === "SELLER" && { businessName, vendorTier }),
         });
         if (role === "SELLER") {
@@ -98,9 +101,18 @@ const AccountAuth = ({ role }) => {
           return;
         }
       } else {
-        authenticatedUser = await login({ email, password }, { expectedRole: role });
+        authenticatedUser = await login(
+          { email, password },
+          {
+            ...(role !== "DELIVERY_PARTNER" && { expectedRole: role }),
+          },
+        );
       }
-      const destination = getRoleHomeRoute(authenticatedUser?.role);
+      const destination =
+        role === "DELIVERY_PARTNER" &&
+        ["DELIVERY_PARTNER", "ADMIN"].includes(authenticatedUser?.role)
+          ? "/rider/dashboard"
+          : getRoleHomeRoute(authenticatedUser?.role);
       if (!destination) {
         throw new Error("This account does not have a supported destination.");
       }
@@ -132,11 +144,65 @@ const AccountAuth = ({ role }) => {
           : role === "ADMIN"
             ? "Admin sign in"
             : role === "DELIVERY_PARTNER"
-              ? "Delivery partner sign in"
+              ? isRegistering
+                ? "Create your delivery partner account"
+                : "Delivery partner sign in"
               : isRegistering
                 ? "Create your vendor account"
                 : "Vendor sign in"}
       </h1>
+      {role === "DELIVERY_PARTNER" && (
+        <div
+          className="rider-auth__tabs"
+          role="tablist"
+          aria-label="Rider access"
+          style={{
+            display: "flex",
+            gap: "0.5rem",
+            margin: "1rem 0",
+            borderBottom: "1px solid #dce5e5",
+          }}
+        >
+          <button
+            aria-selected={mode === "login"}
+            onClick={() => {
+              setError("");
+              setMode("login");
+            }}
+            role="tab"
+            style={{
+              padding: "0.55rem 0.9rem",
+              border: 0,
+              borderBottom: mode === "login" ? "2px solid #176f5d" : "2px solid transparent",
+              background: "transparent",
+              color: mode === "login" ? "#176f5d" : "#5c6f76",
+              fontWeight: 700,
+            }}
+            type="button"
+          >
+            Sign In
+          </button>
+          <button
+            aria-selected={mode === "register"}
+            onClick={() => {
+              setError("");
+              setMode("register");
+            }}
+            role="tab"
+            style={{
+              padding: "0.55rem 0.9rem",
+              border: 0,
+              borderBottom: mode === "register" ? "2px solid #176f5d" : "2px solid transparent",
+              background: "transparent",
+              color: mode === "register" ? "#176f5d" : "#5c6f76",
+              fontWeight: 700,
+            }}
+            type="button"
+          >
+            Register
+          </button>
+        </div>
+      )}
       <form onSubmit={submit} style={{ display: "grid", gap: "1rem" }}>
         {isRegistering && (
           <label style={{ display: "grid", gap: "0.35rem" }}>
@@ -148,6 +214,20 @@ const AccountAuth = ({ role }) => {
               onChange={(event) => setName(event.target.value)}
               required
               value={name}
+            />
+          </label>
+        )}
+        {isRegistering && role === "DELIVERY_PARTNER" && (
+          <label style={{ display: "grid", gap: "0.35rem" }}>
+            Phone number
+            <input
+              autoComplete="tel"
+              maxLength={30}
+              minLength={7}
+              onChange={(event) => setPhone(event.target.value)}
+              required
+              type="tel"
+              value={phone}
             />
           </label>
         )}
@@ -304,6 +384,9 @@ const AccountAuth = ({ role }) => {
           <input
             autoComplete={isRegistering ? "new-password" : "current-password"}
             onChange={(event) => setPassword(event.target.value)}
+            minLength={
+              isRegistering && role === "DELIVERY_PARTNER" ? 8 : undefined
+            }
             required
             type="password"
             value={password}
@@ -319,7 +402,7 @@ const AccountAuth = ({ role }) => {
         </button>
       </form>
       {canRegister && (
-        <p>
+        role !== "DELIVERY_PARTNER" && <p>
           {isRegistering ? "Already have an account?" : "New to the marketplace?"}{" "}
           <button
             onClick={() => {

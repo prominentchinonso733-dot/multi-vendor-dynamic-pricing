@@ -86,6 +86,42 @@
   display: block;
 }
 
+.rider-dashboard__order > header small {
+  display: block;
+  margin-top: 4px;
+  color: #78878b;
+  font-size: 0.68rem;
+  overflow-wrap: anywhere;
+}
+
+.rider-dashboard__customer {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 12px;
+  margin: 16px 0;
+  padding: 14px;
+  background: #f7faf8;
+}
+
+.rider-dashboard__customer dt {
+  margin-bottom: 4px;
+  color: #6b7b7f;
+  font-size: 0.7rem;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.rider-dashboard__customer dd {
+  margin: 0;
+  color: #344d55;
+  font-size: 0.84rem;
+  overflow-wrap: anywhere;
+}
+
+.rider-dashboard__customer a {
+  color: #176f5d;
+}
+
 .rider-dashboard__label {
   margin-bottom: 4px;
   color: #6b7b7f;

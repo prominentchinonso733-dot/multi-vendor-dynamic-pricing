@@ -2,6 +2,7 @@ import { useCallback, useEffect, useState } from "react";
 import { AlertCircle, CheckCircle2, RefreshCw } from "lucide-react";
 import { API_BASE_URL } from "../api";
 import { useAuth } from "../context/AuthContext";
+import RiderDeliveryMap from "./RiderDeliveryMap";
 import "./RiderDashboard.css";
 
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
@@ -72,7 +73,13 @@ export default function RiderDashboard() {
               entry._id === order._id ? data.contract : entry,
             ),
       );
-      setNotice(`Order ${order.paymentReference} marked ${status.toLowerCase().replace("_", " ")}.`);
+      const noticeStatus = {
+        ACCEPTED: "accepted",
+        PICKED_UP: "picked up",
+        IN_TRANSIT: "in transit",
+        DELIVERED: "delivered and escrow released",
+      }[status];
+      setNotice(`Order ${order.paymentReference} ${noticeStatus}.`);
     } catch (updateError) {
       setError(updateError.message || "Unable to update delivery status.");
     } finally {
@@ -119,13 +126,39 @@ export default function RiderDashboard() {
             <article className="rider-dashboard__order" key={order._id}>
               <header>
                 <div>
-                  <span className="rider-dashboard__label">Order reference</span>
+                  <span className="rider-dashboard__label">Order ID</span>
                   <strong>{order.paymentReference}</strong>
+                  <small>{order._id}</small>
                 </div>
                 <span className="rider-dashboard__status">
                   {(order.deliveryStatus || "PENDING").replaceAll("_", " ")}
                 </span>
               </header>
+              <dl className="rider-dashboard__customer">
+                <div>
+                  <dt>Customer</dt>
+                  <dd>{order.customerName || "Customer"}</dd>
+                </div>
+                <div>
+                  <dt>Delivery address</dt>
+                  <dd>{order.deliveryAddress || "Address not provided"}</dd>
+                </div>
+                <div>
+                  <dt>Customer phone</dt>
+                  <dd>
+                    {order.customerPhone && order.customerPhone !== "Not provided" ? (
+                      <a href={`tel:${order.customerPhone}`}>{order.customerPhone}</a>
+                    ) : (
+                      "Not provided"
+                    )}
+                  </dd>
+                </div>
+              </dl>
+              <RiderDeliveryMap
+                destination={order.deliveryAddress || "Customer destination"}
+                pickup={order.items?.map((item) => item.vendor).filter(Boolean).join(", ") || "Lagos vendor pickup"}
+              />
+              <span className="rider-dashboard__label">Package details</span>
               <ul>
                 {(order.items || []).map((item, index) => (
                   <li key={`${item.productId || item.name}-${index}`}>
@@ -150,20 +183,41 @@ export default function RiderDashboard() {
               <footer>
                 <span>
                   {currencyFormatter.format(
-                    Number(order.items?.reduce(
-                      (sum, item) =>
-                        sum + Number(item.price || 0) * Number(item.quantity || 0),
-                      0,
-                    )) || 0,
+                    Number(
+                      order.vendorPayouts?.reduce(
+                        (sum, payout) => sum + Number(payout.netAmount || 0),
+                        0,
+                      ) ??
+                        order.items?.reduce(
+                          (sum, item) =>
+                            sum +
+                            Number(
+                              item.vendorNetAmount ??
+                                item.lineTotal ??
+                                Number(item.price || 0) *
+                                  Number(item.quantity || 0),
+                            ),
+                          0,
+                        ),
+                    ) || 0,
                   )}
                 </span>
                 {order.deliveryStatus === "PENDING" && (
                   <button
                     disabled={pendingId !== null}
+                    onClick={() => updateDelivery(order, "ACCEPTED")}
+                    type="button"
+                  >
+                    {pendingId === order._id ? "Updating..." : "Accept Order"}
+                  </button>
+                )}
+                {order.deliveryStatus === "ACCEPTED" && (
+                  <button
+                    disabled={pendingId !== null}
                     onClick={() => updateDelivery(order, "PICKED_UP")}
                     type="button"
                   >
-                    {pendingId === order._id ? "Updating..." : "Pick Up Package"}
+                    {pendingId === order._id ? "Updating..." : "Picked Up Package"}
                   </button>
                 )}
                 {order.deliveryStatus === "PICKED_UP" && (

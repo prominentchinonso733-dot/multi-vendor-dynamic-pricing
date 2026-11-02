@@ -416,12 +416,32 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
     }
 
     const buyer = await User.findById(authenticatedBuyerId)
-      .select("email accountStatus")
+      .select("name email phone accountStatus")
       .lean();
     if (!buyer || buyer.accountStatus === "SUSPENDED") {
       return res.status(403).json({
         success: false,
         message: "An active buyer account is required to place an order.",
+      });
+    }
+    const deliveryAddress =
+      typeof req.body?.deliveryAddress === "string"
+        ? req.body.deliveryAddress.trim()
+        : "";
+    const customerPhone =
+      typeof req.body?.customerPhone === "string"
+        ? req.body.customerPhone.trim()
+        : buyer.phone || "";
+    if (
+      deliveryAddress.length < 5 ||
+      deliveryAddress.length > 500 ||
+      customerPhone.length < 7 ||
+      customerPhone.length > 30
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "A delivery address and valid customer phone number are required.",
       });
     }
 
@@ -630,6 +650,9 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
           currency: CURRENCY,
           vendorPayouts,
           buyerEmail: buyer.email,
+          customerName: buyer.name,
+          deliveryAddress,
+          customerPhone,
           sellerIds,
           fulfillmentStatuses: sellerIds.map((sellerId) => ({
             sellerId,
@@ -893,25 +916,39 @@ router.patch(
 );
 
 router.get("/rider/orders", authenticateToken, async (req, res) => {
-  if (req.user.role !== "DELIVERY_PARTNER") {
+  const isAdmin = req.user.role === "ADMIN";
+  if (!isAdmin && req.user.role !== "DELIVERY_PARTNER") {
     return res.status(403).json({
       success: false,
-      message: "Delivery partner role required.",
+      message: "Delivery partner or admin role required.",
     });
   }
 
   try {
-    const contracts = await EscrowContract.find({
-      deliveryPartnerId: req.user._id || req.user.id,
+    const filter = {
       status: { $in: ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"] },
       deliveryStatus: { $ne: "DELIVERED" },
-    })
+      deliveryPartnerId: { $ne: null },
+    };
+    if (!isAdmin) filter.deliveryPartnerId = req.user._id || req.user.id;
+
+    const contracts = await EscrowContract.find(filter)
       .select(
-        "paymentReference items status deliveryStatus deliveryUpdatedAt fulfillmentStatuses createdAt",
+        "paymentReference items vendorPayouts subtotal status deliveryStatus deliveryUpdatedAt fulfillmentStatuses createdAt buyerId customerName deliveryAddress customerPhone",
       )
+      .populate("buyerId", "name phone")
       .sort({ createdAt: -1 })
       .lean();
-    return res.json({ success: true, contracts });
+    return res.json({
+      success: true,
+      contracts: contracts.map((contract) => ({
+        ...contract,
+        customerName: contract.customerName || contract.buyerId?.name || "Customer",
+        customerPhone:
+          contract.customerPhone || contract.buyerId?.phone || "Not provided",
+        deliveryAddress: contract.deliveryAddress || "Address not provided",
+      })),
+    });
   } catch (error) {
     console.error("Rider assignments could not be loaded:", error);
     return res.status(500).json({
@@ -922,10 +959,11 @@ router.get("/rider/orders", authenticateToken, async (req, res) => {
 });
 
 router.patch("/:contractId/rider-status", authenticateToken, async (req, res) => {
-  if (req.user.role !== "DELIVERY_PARTNER") {
+  const isAdmin = req.user.role === "ADMIN";
+  if (!isAdmin && req.user.role !== "DELIVERY_PARTNER") {
     return res.status(403).json({
       success: false,
-      message: "Delivery partner role required.",
+      message: "Delivery partner or admin role required.",
     });
   }
   const { contractId } = req.params;
@@ -936,19 +974,24 @@ router.patch("/:contractId/rider-status", authenticateToken, async (req, res) =>
       message: "A valid contractId is required.",
     });
   }
-  if (!["PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(status)) {
+  if (!["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(status)) {
     return res.status(400).json({
       success: false,
-      message: "Status must be PICKED_UP, IN_TRANSIT, or DELIVERED.",
+      message: "Status must be ACCEPTED, PICKED_UP, IN_TRANSIT, or DELIVERED.",
     });
   }
 
   try {
-    const contract = await EscrowContract.findOne({
+    const contractFilter = {
       _id: contractId,
-      deliveryPartnerId: req.user._id || req.user.id,
       status: { $in: ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"] },
-    });
+    };
+    if (isAdmin) {
+      contractFilter.deliveryPartnerId = { $ne: null };
+    } else {
+      contractFilter.deliveryPartnerId = req.user._id || req.user.id;
+    }
+    const contract = await EscrowContract.findOne(contractFilter);
     if (!contract) {
       return res.status(404).json({
         success: false,
@@ -957,7 +1000,8 @@ router.patch("/:contractId/rider-status", authenticateToken, async (req, res) =>
     }
 
     const nextStatus = {
-      PENDING: "PICKED_UP",
+      PENDING: "ACCEPTED",
+      ACCEPTED: "PICKED_UP",
       PICKED_UP: "IN_TRANSIT",
       IN_TRANSIT: "DELIVERED",
       DELIVERED: null,
@@ -992,7 +1036,9 @@ router.patch("/:contractId/rider-status", authenticateToken, async (req, res) =>
       const completedContract = await releaseEscrowToWallets(
         contract._id,
         {
-          deliveryPartnerId: req.user._id || req.user.id,
+          deliveryPartnerId: isAdmin
+            ? contract.deliveryPartnerId
+            : req.user._id || req.user.id,
           deliveryStatus: contract.deliveryStatus,
         },
         ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"],
