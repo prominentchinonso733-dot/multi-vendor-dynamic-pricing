@@ -530,6 +530,12 @@ router.post(
         : "";
     const ninNumber =
       typeof req.body?.ninNumber === "string" ? req.body.ninNumber.trim() : "";
+    const bankCode =
+      typeof req.body?.bankCode === "string" ? req.body.bankCode.trim() : "";
+    const accountNumber =
+      typeof req.body?.accountNumber === "string"
+        ? req.body.accountNumber.trim()
+        : "";
     if (legalName.length < 2 || legalName.length > 120) {
       return res.status(400).json({
         success: false,
@@ -543,11 +549,21 @@ router.post(
       });
     }
     try {
+      const { selectedBank, accountName } = await resolvePayoutDetails(
+        bankCode,
+        accountNumber,
+        legalName,
+      );
       const userId = req.user._id || req.user.id;
       const ninCiphertext = encryptSensitiveValue(
         ninNumber,
         userId,
         "vendor-nin",
+      );
+      const accountCiphertext = encryptSensitiveValue(
+        accountNumber,
+        userId,
+        "vendor-bank-account",
       );
       const verifiedAt = new Date();
       const user = await User.findOneAndUpdate(
@@ -564,6 +580,15 @@ router.post(
             "vendorDetails.verificationData.ninNumber": ninCiphertext,
             "vendorDetails.verificationData.ninLast4": ninNumber.slice(-4),
             "vendorDetails.verificationData.ninVerifiedAt": verifiedAt,
+            "vendorDetails.payoutDetails.bankName": selectedBank.name,
+            "vendorDetails.payoutDetails.bankCode": String(selectedBank.code),
+            "vendorDetails.payoutDetails.accountName": accountName,
+            "vendorDetails.payoutDetails.accountNumber": accountCiphertext,
+            "vendorDetails.payoutDetails.accountLast4":
+              accountNumber.slice(-4),
+          },
+          $unset: {
+            "vendorDetails.payoutDetails.transferRecipientCode": "",
           },
         },
         { new: true, runValidators: true },
@@ -585,9 +610,21 @@ router.post(
           legalName,
           ninLast4: ninNumber.slice(-4),
           ninVerifiedAt: verifiedAt,
+          payoutDetails: {
+            bankName: selectedBank.name,
+            bankCode: String(selectedBank.code),
+            accountName,
+            accountLast4: accountNumber.slice(-4),
+          },
         },
       });
     } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+        });
+      }
       if (error.code === "DOCUMENT_ENCRYPTION_KEY_INVALID") {
         return res.status(503).json({
           success: false,

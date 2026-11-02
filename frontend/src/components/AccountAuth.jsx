@@ -28,7 +28,7 @@ const AccountAuth = ({ role }) => {
   const isRegistering = canRegister && mode === "register";
 
   useEffect(() => {
-    if (!isRegistering || role !== "SELLER" || vendorTier !== "TIER_2") {
+    if (!isRegistering || role !== "SELLER") {
       return undefined;
     }
 
@@ -68,6 +68,8 @@ const AccountAuth = ({ role }) => {
               await authService.verifyTier1Vendor({
                 fullLegalName: name,
                 ninNumber,
+                bankCode,
+                accountNumber: bankAccountNumber,
               });
             } else {
               await authService.saveVendorPayoutBank({
@@ -190,6 +192,38 @@ const AccountAuth = ({ role }) => {
                     pattern="\d{11}"
                     required
                     value={ninNumber}
+                  />
+                </label>
+                <label style={{ display: "grid", gap: "0.35rem" }}>
+                  Bank Name
+                  <select
+                    onChange={(event) => setBankCode(event.target.value)}
+                    required
+                    value={bankCode}
+                  >
+                    <option value="">Select payout bank</option>
+                    {banks.map((bank) => (
+                      <option key={bank.code} value={bank.code}>
+                        {bank.name}
+                      </option>
+                    ))}
+                  </select>
+                </label>
+                <label style={{ display: "grid", gap: "0.35rem" }}>
+                  Payout Account Number
+                  <input
+                    autoComplete="off"
+                    inputMode="numeric"
+                    maxLength={10}
+                    minLength={10}
+                    onChange={(event) =>
+                      setBankAccountNumber(
+                        event.target.value.replace(/\D/g, "").slice(0, 10),
+                      )
+                    }
+                    pattern="\d{10}"
+                    required
+                    value={bankAccountNumber}
                   />
                 </label>
               </>

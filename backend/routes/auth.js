@@ -421,6 +421,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
         payoutDetails: user.vendorDetails?.payoutDetails?.bankCode
           ? {
               bankName: user.vendorDetails.payoutDetails.bankName || "",
+              bankCode: user.vendorDetails.payoutDetails.bankCode || "",
               accountName: user.vendorDetails.payoutDetails.accountName || "",
               accountLast4:
                 user.vendorDetails.payoutDetails.accountLast4 || "",
@@ -535,6 +536,7 @@ router.put("/profile", authenticateToken, async (req, res) => {
         payoutDetails: user.vendorDetails?.payoutDetails?.bankCode
           ? {
               bankName: user.vendorDetails.payoutDetails.bankName || "",
+              bankCode: user.vendorDetails.payoutDetails.bankCode || "",
               accountName: user.vendorDetails.payoutDetails.accountName || "",
               accountLast4:
                 user.vendorDetails.payoutDetails.accountLast4 || "",

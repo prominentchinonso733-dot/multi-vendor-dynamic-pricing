@@ -1913,6 +1913,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
                   ...current,
                   tier1Verified: true,
                   tier1Verification,
+                  payoutDetails: tier1Verification.payoutDetails,
                 }))
               }
             />
