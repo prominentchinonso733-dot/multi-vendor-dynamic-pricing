@@ -7,6 +7,12 @@ const Product = require("../models/Product");
 const User = require("../models/User");
 const authenticateToken = require("../middleware/authenticateToken");
 const mongoose = require("mongoose");
+const {
+  getEligibleVendorFilter,
+  getVendorTier,
+  isTier2VerifiedVendor,
+  isVendorEligibleToSell,
+} = require("../services/vendorTiers");
 
 const router = express.Router();
 cloudinary.config({
@@ -122,13 +128,7 @@ const requireTier1Verification = async (req, res, next) => {
       _id: req.user._id,
       role: "SELLER",
       accountStatus: { $ne: "SUSPENDED" },
-      $or: [
-        { "vendorDetails.tier1Verified": true },
-        {
-          "verification.tier": "TIER_2",
-          "verification.status": "VERIFIED",
-        },
-      ],
+      ...getEligibleVendorFilter(),
     })
       .select("_id")
       .lean();
@@ -414,17 +414,14 @@ router.get("/store/:vendorId", async (req, res) => {
   try {
     const vendor = await User.findById(vendorId)
       .select(
-        "name email role accountStatus storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.tier1Verified verification.tier verification.status createdAt",
+        "name email role accountStatus storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified verification.tier verification.status createdAt",
       )
       .lean();
-    const isTier2Verified =
-      vendor?.verification?.tier === "TIER_2" &&
-      vendor?.verification?.status === "VERIFIED";
     if (
       !vendor ||
       vendor.role !== "SELLER" ||
       vendor.accountStatus === "SUSPENDED" ||
-      (!vendor.vendorDetails?.tier1Verified && !isTier2Verified)
+      !isVendorEligibleToSell(vendor)
     ) {
       return res
         .status(404)
@@ -446,8 +443,8 @@ router.get("/store/:vendorId", async (req, res) => {
         storeLogo: vendor.storeLogo || "",
         storeBanner: vendor.storeBanner || "",
         storeDescription: vendor.storeDescription || "",
-        tier: vendor.verification?.tier || "TIER_1",
-        isVerified: isTier2Verified,
+        tier: getVendorTier(vendor),
+        isVerified: isTier2VerifiedVendor(vendor),
         isTier1Verified: vendor.vendorDetails?.tier1Verified === true,
         memberSince: vendor.createdAt,
       },
@@ -459,6 +456,8 @@ router.get("/store/:vendorId", async (req, res) => {
         vendorId: vendor._id.toString(),
         vendor:
           vendor.storeName || vendor.vendorDetails?.businessName || vendor.name,
+        vendorTier: getVendorTier(vendor),
+        isVerifiedVendor: isTier2VerifiedVendor(vendor),
       })),
     });
   } catch (error) {
@@ -476,14 +475,11 @@ router.get("/", async (_req, res) => {
       .populate({
         path: "vendor",
         select:
-          "name storeName role accountStatus vendorDetails.businessName vendorDetails.tier1Verified verification.tier verification.status",
+          "name storeName role accountStatus vendorDetails.businessName vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified verification.tier verification.status",
         match: {
           role: "SELLER",
           accountStatus: { $ne: "SUSPENDED" },
-          $or: [
-            { "vendorDetails.tier1Verified": true },
-            { "verification.tier": "TIER_2", "verification.status": "VERIFIED" },
-          ],
+          ...getEligibleVendorFilter(),
         },
       })
       .sort({ createdAt: -1 })
@@ -501,6 +497,8 @@ router.get("/", async (_req, res) => {
           product.vendor?.vendorDetails?.businessName ||
           product.vendor?.name ||
           "Marketplace seller",
+        vendorTier: getVendorTier(product.vendor),
+        isVerifiedVendor: isTier2VerifiedVendor(product.vendor),
       })),
     );
   } catch (error) {

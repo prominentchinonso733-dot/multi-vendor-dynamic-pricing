@@ -16,6 +16,9 @@ const CURRENCY = "NGN";
 
 const getVendorPolicy = (vendor) => {
   const tier =
+    (vendor?.vendorDetails?.tier === "TIER_2" ||
+      (!vendor?.vendorDetails?.tier &&
+        vendor?.verification?.tier === "TIER_2")) &&
     vendor?.verification?.tier === "TIER_2" &&
     vendor?.verification?.status === "VERIFIED"
       ? "TIER_2"

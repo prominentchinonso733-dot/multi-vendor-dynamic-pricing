@@ -59,6 +59,16 @@ const UserSchema = new mongoose.Schema(
         enum: ["ACTIVE", "INACTIVE", "PENDING"],
         default: "INACTIVE",
       },
+      tierEntryPendingTier: {
+        type: String,
+        enum: ["TIER_1", "TIER_2"],
+      },
+      tierEntryPaymentReference: { type: String, select: false },
+      tierEntryPaymentAmountMinor: { type: Number, select: false },
+      tierEntryPaymentCurrency: { type: String, select: false },
+      tierEntryPaidReference: { type: String, select: false },
+      tierEntryPaidAmountMinor: { type: Number, select: false },
+      tierEntryPaidAt: { type: Date },
       isVendor: { type: Boolean, default: false },
       paystackSubaccountCode: { type: String }, // For Paystack split payouts
       bankDetails: {

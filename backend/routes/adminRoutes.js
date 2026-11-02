@@ -325,14 +325,10 @@ router.patch("/verification/:userId", async (req, res) => {
               "verification.reviewedBy": req.user._id,
               "verification.reviewNote": reviewNote.trim(),
               ...(decision === "APPROVE" && {
-                "vendorDetails.tier": tier,
                 "vendorDetails.isVerified": true,
-                "vendorDetails.commissionRate": 0.05,
               }),
               ...(decision === "REJECT" && {
-                "vendorDetails.tier": "TIER_1",
                 "vendorDetails.isVerified": false,
-                "vendorDetails.commissionRate": 0.1,
               }),
             },
           },

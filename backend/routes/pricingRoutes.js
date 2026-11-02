@@ -3,6 +3,7 @@ const mongoose = require("mongoose");
 const Product = require("../models/Product");
 const User = require("../models/User");
 const authenticateToken = require("../middleware/authenticateToken");
+const { getEligibleVendorFilter } = require("../services/vendorTiers");
 
 const router = express.Router();
 
@@ -18,13 +19,7 @@ router.post("/calculate", authenticateToken, async (req, res) => {
         _id: req.user._id,
         role: "SELLER",
         accountStatus: { $ne: "SUSPENDED" },
-        $or: [
-          { "vendorDetails.tier1Verified": true },
-          {
-            "verification.tier": "TIER_2",
-            "verification.status": "VERIFIED",
-          },
-        ],
+        ...getEligibleVendorFilter(),
       });
       if (!eligibleSeller) {
         return res.status(403).json({

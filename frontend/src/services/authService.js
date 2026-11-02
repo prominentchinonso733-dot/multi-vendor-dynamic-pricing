@@ -42,4 +42,19 @@ export const authService = {
     const { data } = await api.post("/vendor/verify-tier1", details);
     return data.verification;
   },
+
+  async getVendorTierPlans(config = {}) {
+    const { data } = await api.get("/vendor/tier-entry/options", config);
+    return data;
+  },
+
+  async initializeVendorTierPayment(tier) {
+    const { data } = await api.post("/vendor/tier-entry/initialize", { tier });
+    return data.payment;
+  },
+
+  async verifyVendorTierPayment(reference) {
+    const { data } = await api.post("/vendor/tier-entry/verify", { reference });
+    return data;
+  },
 };

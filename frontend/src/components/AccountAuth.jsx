@@ -9,12 +9,15 @@ const AccountAuth = ({ role }) => {
   const navigate = useNavigate();
   const [mode, setMode] = useState("login");
   const [name, setName] = useState("");
+  const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [vendorTier, setVendorTier] = useState("TIER_1");
   const [error, setError] = useState("");
   const [isPending, setIsPending] = useState(false);
   const isBuyer = role === "BUYER";
-  const isRegistering = isBuyer && mode === "register";
+  const canRegister = isBuyer || role === "SELLER";
+  const isRegistering = canRegister && mode === "register";
 
   const submit = async (event) => {
     event.preventDefault();
@@ -24,7 +27,13 @@ const AccountAuth = ({ role }) => {
     try {
       let authenticatedUser;
       if (isRegistering) {
-        authenticatedUser = await register({ name, email, password, role: "BUYER" });
+        authenticatedUser = await register({
+          name,
+          email,
+          password,
+          role,
+          ...(role === "SELLER" && { businessName, vendorTier }),
+        });
       } else {
         authenticatedUser = await login({ email, password }, { expectedRole: role });
       }
@@ -61,12 +70,14 @@ const AccountAuth = ({ role }) => {
             ? "Admin sign in"
             : role === "DELIVERY_PARTNER"
               ? "Delivery partner sign in"
-              : "Vendor sign in"}
+              : isRegistering
+                ? "Create your vendor account"
+                : "Vendor sign in"}
       </h1>
       <form onSubmit={submit} style={{ display: "grid", gap: "1rem" }}>
         {isRegistering && (
           <label style={{ display: "grid", gap: "0.35rem" }}>
-            Name
+            {isBuyer ? "Name" : "Full name"}
             <input
               autoComplete="name"
               onChange={(event) => setName(event.target.value)}
@@ -74,6 +85,35 @@ const AccountAuth = ({ role }) => {
               value={name}
             />
           </label>
+        )}
+        {isRegistering && role === "SELLER" && (
+          <>
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              Store or business name
+              <input
+                autoComplete="organization"
+                maxLength={100}
+                onChange={(event) => setBusinessName(event.target.value)}
+                required
+                value={businessName}
+              />
+            </label>
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              Vendor tier
+              <select
+                onChange={(event) => setVendorTier(event.target.value)}
+                value={vendorTier}
+              >
+                <option value="TIER_1">Tier 1 — $10 one-time entry fee</option>
+                <option value="TIER_2">Tier 2 — $20 one-time entry fee</option>
+              </select>
+            </label>
+            <p>
+              Tier 1 requires a basic identity soft-check. Tier 2 requires photo
+              ID review by an administrator. Entry fees are paid after account
+              creation.
+            </p>
+          </>
         )}
         <label style={{ display: "grid", gap: "0.35rem" }}>
           Email
@@ -104,7 +144,7 @@ const AccountAuth = ({ role }) => {
               : "Sign In"}
         </button>
       </form>
-      {isBuyer && (
+      {canRegister && (
         <p>
           {isRegistering ? "Already have an account?" : "New to the marketplace?"}{" "}
           <button

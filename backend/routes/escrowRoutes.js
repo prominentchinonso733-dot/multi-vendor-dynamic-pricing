@@ -10,6 +10,7 @@ const VendorWallet = require("../models/VendorWallet");
 const VendorWalletTransaction = require("../models/VendorWalletTransaction");
 const authenticateToken = require("../middleware/authenticateToken");
 const confirmEscrowPayment = require("../services/confirmEscrowPayment");
+const { getEligibleVendorFilter } = require("../services/vendorTiers");
 const {
   BUYER_ESCROW_FEE_RATE,
   CURRENCY,
@@ -116,7 +117,7 @@ const createLegacyVendorPayouts = async (contract, session) => {
     ),
   ];
   const sellers = await User.find({ _id: { $in: sellerIds }, role: "SELLER" })
-    .select("verification.tier verification.status")
+    .select("verification.tier verification.status vendorDetails.tier")
     .session(session)
     .lean();
   const sellersById = new Map(
@@ -416,16 +417,10 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
       _id: { $in: [...new Set(products.map((product) => product.vendor.toString()))] },
       role: "SELLER",
       accountStatus: { $ne: "SUSPENDED" },
-      $or: [
-        { "vendorDetails.tier1Verified": true },
-        {
-          "verification.tier": "TIER_2",
-          "verification.status": "VERIFIED",
-        },
-      ],
+      ...getEligibleVendorFilter(),
     })
       .select(
-        "name email role accountStatus verification storeName vendorDetails.businessName vendorDetails.tier1Verified",
+        "name email role accountStatus verification storeName vendorDetails.businessName vendorDetails.tier",
       )
       .lean();
     const sellersById = new Map(sellers.map((seller) => [seller._id.toString(), seller]));
@@ -510,11 +505,12 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
               _id: sellerId,
               role: "SELLER",
               accountStatus: "ACTIVE",
+              ...getEligibleVendorFilter(),
             },
             { $inc: { vendorLimitRevision: 1 } },
             { new: true, session, runValidators: true },
           )
-            .select("_id verification.tier verification.status")
+            .select("_id verification.tier verification.status vendorDetails.tier")
             .lean();
           if (!seller) {
             const error = new Error(

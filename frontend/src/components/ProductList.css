@@ -211,6 +211,23 @@
   font-size: 0.8rem;
 }
 
+.marketplace-card__tier-badge {
+  display: inline-flex;
+  width: fit-content;
+  margin-top: 8px;
+  padding: 5px 8px;
+  border-radius: 99px;
+  background: #edf2ef;
+  color: #496258;
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.marketplace-card__tier-badge--verified {
+  background: #e6f4eb;
+  color: #176f45;
+}
+
 .marketplace-card__price {
   margin: 15px 0;
   color: #176f5d;

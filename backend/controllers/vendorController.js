@@ -1,8 +1,13 @@
 const express = require("express");
 const https = require("https");
+const { randomUUID } = require("crypto");
 const User = require("../models/User");
 const authenticateToken = require("../middleware/authenticateToken");
 const { encryptSensitiveValue } = require("../services/verificationDocuments");
+const {
+  VENDOR_TIER_PRICES_USD,
+  getVendorTierAmountMinor,
+} = require("../services/vendorTiers");
 
 const router = express.Router();
 
@@ -16,7 +21,7 @@ const requireSeller = (req, res, next) => {
   return next();
 };
 
-const paystackRequest = (path) =>
+const paystackRequest = (path, { method = "GET", body } = {}) =>
   new Promise((resolve, reject) => {
     if (!process.env.PAYSTACK_SECRET_KEY) {
       const error = new Error("Paystack verification is not configured.");
@@ -25,14 +30,19 @@ const paystackRequest = (path) =>
       return;
     }
 
+    const requestBody = body ? Buffer.from(JSON.stringify(body)) : null;
     const request = https.request(
       {
         hostname: "api.paystack.co",
         path,
-        method: "GET",
+        method,
         headers: {
           Authorization: `Bearer ${process.env.PAYSTACK_SECRET_KEY}`,
           Accept: "application/json",
+          ...(requestBody && {
+            "Content-Type": "application/json",
+            "Content-Length": requestBody.length,
+          }),
         },
         timeout: 10000,
       },
@@ -84,7 +94,7 @@ const paystackRequest = (path) =>
       if (!error.code) error.code = "PAYSTACK_TRANSPORT_ERROR";
       reject(error);
     });
-    request.end();
+    request.end(requestBody || undefined);
   });
 
 const normalizeName = (value) =>
@@ -130,6 +140,304 @@ const sendProviderError = (error, res) => {
     message: "Bank verification is temporarily unavailable. Try again later.",
   });
 };
+
+const sendTierPaymentProviderError = (error, res) => {
+  if (error.code === "PAYSTACK_NOT_CONFIGURED") {
+    return res.status(503).json({
+      success: false,
+      message: "Vendor tier payments are not configured. Contact support.",
+    });
+  }
+  if (
+    !["PAYSTACK_LOOKUP_FAILED", "PAYSTACK_TRANSPORT_ERROR"].includes(
+      error.code,
+    )
+  ) {
+    console.error("Vendor tier payment could not be processed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to process the vendor tier payment.",
+    });
+  }
+  console.error("Vendor tier payment provider request failed:", error);
+  return res.status(502).json({
+    success: false,
+    message: "Vendor tier payment is temporarily unavailable. Try again later.",
+  });
+};
+
+router.get(
+  "/tier-entry/options",
+  authenticateToken,
+  requireSeller,
+  (_req, res) => {
+    const plans = Object.entries(VENDOR_TIER_PRICES_USD).map(
+      ([tier, priceUSD]) => {
+        let amountMinor = null;
+        try {
+          amountMinor = getVendorTierAmountMinor(tier);
+        } catch (error) {
+          if (error.code !== "VENDOR_TIER_PRICING_NOT_CONFIGURED") throw error;
+        }
+        return {
+          tier,
+          priceUSD,
+          currency: "NGN",
+          amountMinor,
+          amountNgn: amountMinor === null ? null : amountMinor / 100,
+        };
+      },
+    );
+    return res.json({
+      success: true,
+      configured: plans.every((plan) => plan.amountMinor !== null),
+      plans,
+    });
+  },
+);
+
+router.post(
+  "/tier-entry/initialize",
+  authenticateToken,
+  requireSeller,
+  async (req, res) => {
+    const tier = req.body?.tier;
+    if (!Object.hasOwn(VENDOR_TIER_PRICES_USD, tier)) {
+      return res.status(400).json({
+        success: false,
+        message: "Choose a valid vendor tier.",
+      });
+    }
+
+    try {
+      const amountMinor = getVendorTierAmountMinor(tier);
+      const userId = req.user._id || req.user.id;
+      const seller = await User.findOne({
+        _id: userId,
+        role: "SELLER",
+        accountStatus: { $ne: "SUSPENDED" },
+      })
+        .select(
+          "email vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tierEntryPendingTier vendorDetails.tierEntryPaymentReference vendorDetails.tierEntryPaymentAmountMinor",
+        )
+        .lean();
+      if (!seller) {
+        return res.status(404).json({
+          success: false,
+          message: "Seller account not found.",
+        });
+      }
+      if (
+        seller.vendorDetails?.subscriptionStatus === "ACTIVE" &&
+        seller.vendorDetails?.tier === tier
+      ) {
+        return res.status(409).json({
+          success: false,
+          message: "This vendor tier is already active.",
+        });
+      }
+      if (seller.vendorDetails?.tierEntryPaymentReference) {
+        if (seller.vendorDetails.tierEntryPendingTier !== tier) {
+          return res.status(409).json({
+            success: false,
+            message:
+              "Finish or cancel the pending tier payment before selecting another tier.",
+          });
+        }
+        return res.json({
+          success: true,
+          payment: {
+            reference: seller.vendorDetails.tierEntryPaymentReference,
+            amountMinor:
+              seller.vendorDetails.tierEntryPaymentAmountMinor ?? amountMinor,
+            amountNgn:
+              (seller.vendorDetails.tierEntryPaymentAmountMinor ?? amountMinor) /
+              100,
+            currency: "NGN",
+            email: seller.email,
+          },
+        });
+      }
+
+      const reference = `vendor_${randomUUID()}`;
+      const payment = await paystackRequest("/transaction/initialize", {
+        method: "POST",
+        body: {
+          email: seller.email,
+          amount: amountMinor,
+          currency: "NGN",
+          reference,
+          metadata: {
+            purpose: "vendor_tier_entry_fee",
+            vendor_id: String(userId),
+            tier,
+            price_usd: VENDOR_TIER_PRICES_USD[tier],
+          },
+        },
+      });
+      if (payment.reference !== reference) {
+        return res.status(502).json({
+          success: false,
+          message: "Payment provider returned invalid vendor tier details.",
+        });
+      }
+
+      const paymentIntentOwner = await User.updateOne(
+        {
+          _id: seller._id,
+          role: "SELLER",
+          accountStatus: { $ne: "SUSPENDED" },
+          "vendorDetails.tierEntryPaymentReference": { $exists: false },
+        },
+        {
+          $set: {
+            "vendorDetails.tierEntryPendingTier": tier,
+            "vendorDetails.tierEntryPaymentReference": reference,
+            "vendorDetails.tierEntryPaymentAmountMinor": amountMinor,
+            "vendorDetails.tierEntryPaymentCurrency": "NGN",
+          },
+        },
+      );
+      if (paymentIntentOwner.matchedCount !== 1) {
+        return res.status(409).json({
+          success: false,
+          message: "Seller account changed before payment could be started.",
+        });
+      }
+      return res.json({
+        success: true,
+        payment: {
+          reference,
+          amountMinor,
+          amountNgn: amountMinor / 100,
+          currency: "NGN",
+          email: seller.email,
+        },
+      });
+    } catch (error) {
+      if (error.code === "VENDOR_TIER_PRICING_NOT_CONFIGURED") {
+        return res.status(503).json({
+          success: false,
+          message:
+            "Vendor tier pricing is not configured. Contact marketplace support.",
+        });
+      }
+      return sendTierPaymentProviderError(error, res);
+    }
+  },
+);
+
+router.post(
+  "/tier-entry/verify",
+  authenticateToken,
+  requireSeller,
+  async (req, res) => {
+    const reference =
+      typeof req.body?.reference === "string" ? req.body.reference.trim() : "";
+    if (!/^vendor_[a-f\d-]{36}$/i.test(reference)) {
+      return res.status(400).json({
+        success: false,
+        message: "A valid vendor tier payment reference is required.",
+      });
+    }
+
+    try {
+      const userId = req.user._id || req.user.id;
+      const existingPayment = await User.findOne({
+        _id: userId,
+        role: "SELLER",
+        "vendorDetails.tierEntryPaidReference": reference,
+      })
+        .select("vendorDetails.tier vendorDetails.subscriptionStatus")
+        .lean();
+      if (existingPayment) {
+        return res.json({
+          success: true,
+          tier: existingPayment.vendorDetails.tier,
+          subscriptionStatus: existingPayment.vendorDetails.subscriptionStatus,
+          alreadyVerified: true,
+        });
+      }
+
+      const seller = await User.findOne({
+        _id: userId,
+        role: "SELLER",
+        accountStatus: { $ne: "SUSPENDED" },
+        "vendorDetails.tierEntryPaymentReference": reference,
+      })
+        .select(
+          "email vendorDetails.tierEntryPendingTier vendorDetails.tierEntryPaymentAmountMinor vendorDetails.tierEntryPaymentCurrency",
+        )
+        .lean();
+      if (!seller?.vendorDetails?.tierEntryPendingTier) {
+        return res.status(404).json({
+          success: false,
+          message: "Pending vendor tier payment was not found.",
+        });
+      }
+
+      const payment = await paystackRequest(
+        `/transaction/verify/${encodeURIComponent(reference)}`,
+      );
+      if (
+        payment.status !== "success" ||
+        payment.amount !== seller.vendorDetails.tierEntryPaymentAmountMinor ||
+        payment.currency !== seller.vendorDetails.tierEntryPaymentCurrency ||
+        String(payment.customer?.email || "").toLowerCase() !==
+          seller.email.toLowerCase()
+      ) {
+        return res.status(422).json({
+          success: false,
+          message:
+            "The vendor tier payment could not be verified. Confirm payment and try again.",
+        });
+      }
+
+      const verifiedAt = new Date();
+      const updatedSeller = await User.findOneAndUpdate(
+        {
+          _id: userId,
+          role: "SELLER",
+          accountStatus: { $ne: "SUSPENDED" },
+          "vendorDetails.tierEntryPaymentReference": reference,
+          "vendorDetails.tierEntryPendingTier":
+            seller.vendorDetails.tierEntryPendingTier,
+        },
+        {
+          $set: {
+            "vendorDetails.tier": seller.vendorDetails.tierEntryPendingTier,
+            "vendorDetails.subscriptionStatus": "ACTIVE",
+            "vendorDetails.tierEntryPaidReference": reference,
+            "vendorDetails.tierEntryPaidAmountMinor": payment.amount,
+            "vendorDetails.tierEntryPaidAt": verifiedAt,
+          },
+          $unset: {
+            "vendorDetails.tierEntryPendingTier": "",
+            "vendorDetails.tierEntryPaymentReference": "",
+            "vendorDetails.tierEntryPaymentAmountMinor": "",
+            "vendorDetails.tierEntryPaymentCurrency": "",
+          },
+        },
+        { new: true, runValidators: true },
+      ).select("vendorDetails.tier vendorDetails.subscriptionStatus");
+
+      if (!updatedSeller) {
+        return res.status(409).json({
+          success: false,
+          message: "Vendor tier payment has already been processed.",
+        });
+      }
+      return res.json({
+        success: true,
+        tier: updatedSeller.vendorDetails.tier,
+        subscriptionStatus: updatedSeller.vendorDetails.subscriptionStatus,
+        paidAt: verifiedAt,
+      });
+    } catch (error) {
+      return sendTierPaymentProviderError(error, res);
+    }
+  },
+);
 
 router.get("/banks", authenticateToken, requireSeller, async (_req, res) => {
   try {

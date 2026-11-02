@@ -194,6 +194,13 @@ export default function ProductList({ onAddToCart }) {
                     {product.vendor || "Marketplace seller"}
                   </span>
                 )}
+                <span
+                  className={`marketplace-card__tier-badge${product.vendorTier === "TIER_2" && product.isVerifiedVendor ? " marketplace-card__tier-badge--verified" : ""}`}
+                >
+                  {product.vendorTier === "TIER_2" && product.isVerifiedVendor
+                    ? "Tier 2 Verified Vendor"
+                    : "Tier 1 Vendor"}
+                </span>
                 <p className="marketplace-card__price">
                   ₦{(Number(product.price ?? product.currentPrice) || 0).toLocaleString()}
                 </p>

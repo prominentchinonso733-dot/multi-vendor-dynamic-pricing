@@ -9,6 +9,7 @@ import { escrowService } from "../services/escrowService";
 import { useAuth } from "../context/AuthContext";
 import VerificationPanel from "./VerificationPanel";
 import Tier1VerificationPanel from "./Tier1VerificationPanel";
+import VendorTierPlanPanel from "./VendorTierPlanPanel";
 import "./VendorDashboard.css";
 
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
@@ -162,7 +163,11 @@ export default function VendorDashboard({ onPriceUpdated }) {
   const [walletBalance, setWalletBalance] = useState(0);
   const [accountSummaryError, setAccountSummaryError] = useState("");
   const canListProducts =
-    accountSummary?.tier1Verified === true || accountSummary?.isVerified === true;
+    accountSummary?.subscriptionStatus === "ACTIVE" &&
+    ((accountSummary?.vendorTier === "TIER_1" &&
+      accountSummary?.tier1Verified === true) ||
+      (accountSummary?.vendorTier === "TIER_2" &&
+        accountSummary?.isVerified === true));
 
   useEffect(() => {
     const controller = new AbortController();
@@ -764,11 +769,15 @@ export default function VendorDashboard({ onPriceUpdated }) {
         >
           <div>
             <strong>
-              {accountSummary.isVerified
-                ? "Tier 2 · Verified Store"
-                : accountSummary.tier1Verified
-                  ? "Tier 1 · Soft-check verified"
-                  : "Tier 1 · Verification required"}
+              {accountSummary.subscriptionStatus !== "ACTIVE"
+                ? "Vendor tier entry fee required"
+                : accountSummary.vendorTier === "TIER_2"
+                  ? accountSummary.isVerified
+                    ? "Tier 2 · Verified Store"
+                    : "Tier 2 · Admin ID review required"
+                  : accountSummary.tier1Verified
+                    ? "Tier 1 · Soft-check verified"
+                    : "Tier 1 · Verification required"}
             </strong>
             <span>
               {((accountSummary.financialPolicy?.commissionRate || 0) * 100).toFixed(0)}% platform commission
@@ -988,14 +997,14 @@ export default function VendorDashboard({ onPriceUpdated }) {
             >
               <ShieldCheck aria-hidden="true" size={18} />
               <span>
-                Complete Tier 1 verification in Store Settings before listing
-                products or changing listing prices.
+                Complete your tier entry fee and the required identity review in
+                Store Settings before listing products or changing prices.
               </span>
               <button
                 onClick={() => setActiveSection("store-settings")}
                 type="button"
               >
-                Verify now
+                Finish onboarding
               </button>
             </div>
           )}
@@ -1681,16 +1690,30 @@ export default function VendorDashboard({ onPriceUpdated }) {
             </div>
           </div>
 
-          <Tier1VerificationPanel
-            onVerified={(tier1Verification) =>
+          <VendorTierPlanPanel
+            onUpdated={(payment) =>
               setAccountSummary((current) => ({
                 ...current,
-                tier1Verified: true,
-                tier1Verification,
+                vendorTier: payment.tier,
+                subscriptionStatus: payment.subscriptionStatus,
               }))
             }
+            subscriptionStatus={accountSummary?.subscriptionStatus}
+            vendorTier={accountSummary?.vendorTier || "TIER_1"}
           />
-          <VerificationPanel compact />
+          {accountSummary?.vendorTier === "TIER_2" ? (
+            <VerificationPanel compact />
+          ) : (
+            <Tier1VerificationPanel
+              onVerified={(tier1Verification) =>
+                setAccountSummary((current) => ({
+                  ...current,
+                  tier1Verified: true,
+                  tier1Verification,
+                }))
+              }
+            />
+          )}
 
           {profileError && (
             <div

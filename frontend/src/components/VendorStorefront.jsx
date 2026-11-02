@@ -193,6 +193,13 @@ export default function VendorStorefront({ onAddToCart }) {
                   {product.category || "Marketplace"}
                 </p>
                 <h3>{product.name}</h3>
+                <span
+                  className={`vendor-store__tier-badge${product.vendorTier === "TIER_2" && product.isVerifiedVendor ? " vendor-store__tier-badge--verified" : ""}`}
+                >
+                  {product.vendorTier === "TIER_2" && product.isVerifiedVendor
+                    ? "Tier 2 Verified Vendor"
+                    : "Tier 1 Vendor"}
+                </span>
                 {product.description && <p>{product.description}</p>}
                 <strong>{currencyFormatter.format(product.price)}</strong>
                 <button

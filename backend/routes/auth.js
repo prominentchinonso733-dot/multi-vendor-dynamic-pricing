@@ -13,6 +13,7 @@ const {
   detectContentType,
   encryptDocument,
 } = require("../services/verificationDocuments");
+const { VENDOR_TIER_PRICES_USD } = require("../services/vendorTiers");
 
 const uploadVerificationDocument = multer({
   storage: multer.memoryStorage(),
@@ -111,11 +112,15 @@ const toPublicUser = (user) => ({
     tier: user.verification?.tier || "TIER_1",
     status: user.verification?.status || "NOT_STARTED",
   },
+  ...(hasVendorAccess(user) && {
+    vendorTier: user.vendorDetails?.tier || "TIER_1",
+    subscriptionStatus: user.vendorDetails?.subscriptionStatus || "INACTIVE",
+  }),
 });
 
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, role, businessName } = req.body;
+    const { name, email, password, role, businessName, vendorTier } = req.body;
     const normalizedRole = normalizeRole(role || "BUYER");
 
     if (!["BUYER", "SELLER"].includes(normalizedRole)) {
@@ -125,6 +130,14 @@ router.post("/register", async (req, res) => {
       return res
         .status(400)
         .json({ msg: "Name, email, and password are required." });
+    }
+    if (
+      normalizedRole === "SELLER" &&
+      !Object.hasOwn(VENDOR_TIER_PRICES_USD, vendorTier)
+    ) {
+      return res.status(400).json({
+        msg: "Choose Tier 1 or Tier 2 for your vendor account.",
+      });
     }
 
     const normalizedEmail = String(email).trim().toLowerCase();
@@ -145,7 +158,7 @@ router.post("/register", async (req, res) => {
         normalizedRole === "SELLER"
           ? {
               businessName,
-              tier: "TIER_1",
+              tier: vendorTier,
               subscriptionStatus: "INACTIVE",
             }
           : {},
@@ -358,7 +371,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
       .select(
-        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.isVendor vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.verificationData.bankName vendorDetails.verificationData.bankAccountName vendorDetails.verificationData.bankAccountLast4 vendorDetails.verificationData.bankCode verification",
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.isVendor vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.verificationData.bankName vendorDetails.verificationData.bankAccountName vendorDetails.verificationData.bankAccountLast4 vendorDetails.verificationData.bankCode verification",
       )
       .lean();
     if (!user || !hasVendorAccess(user)) {
@@ -377,7 +390,11 @@ router.get("/profile", authenticateToken, async (req, res) => {
           tier: user.verification?.tier || "TIER_1",
           status: user.verification?.status || "NOT_STARTED",
         },
+        vendorTier: user.vendorDetails?.tier || "TIER_1",
+        subscriptionStatus:
+          user.vendorDetails?.subscriptionStatus || "INACTIVE",
         isVerified:
+          user.vendorDetails?.tier === "TIER_2" &&
           user.verification?.tier === "TIER_2" &&
           user.verification?.status === "VERIFIED",
         tier1Verified: user.vendorDetails?.tier1Verified === true,
@@ -466,7 +483,7 @@ router.put("/profile", authenticateToken, async (req, res) => {
       { new: true, runValidators: true },
     )
       .select(
-        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.verificationData.bankName vendorDetails.verificationData.bankAccountName vendorDetails.verificationData.bankAccountLast4 vendorDetails.verificationData.bankCode verification",
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.verificationData.bankName vendorDetails.verificationData.bankAccountName vendorDetails.verificationData.bankAccountLast4 vendorDetails.verificationData.bankCode verification",
       )
       .lean();
     if (!user) {
@@ -485,7 +502,11 @@ router.put("/profile", authenticateToken, async (req, res) => {
           tier: user.verification?.tier || "TIER_1",
           status: user.verification?.status || "NOT_STARTED",
         },
+        vendorTier: user.vendorDetails?.tier || "TIER_1",
+        subscriptionStatus:
+          user.vendorDetails?.subscriptionStatus || "INACTIVE",
         isVerified:
+          user.vendorDetails?.tier === "TIER_2" &&
           user.verification?.tier === "TIER_2" &&
           user.verification?.status === "VERIFIED",
         tier1Verified: user.vendorDetails?.tier1Verified === true,

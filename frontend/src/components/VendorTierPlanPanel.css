@@ -1,0 +1,143 @@
+.vendor-tier-plan {
+  margin: 24px 0;
+  padding: 22px;
+  border: 1px solid #dfe8e3;
+  border-radius: 10px;
+  background: #fff;
+  color: #233a32;
+}
+
+.vendor-tier-plan__header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+}
+
+.vendor-tier-plan__eyebrow {
+  margin: 0 0 7px;
+  color: #588275;
+  font-size: 0.7rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.vendor-tier-plan__header h2 {
+  margin: 0;
+  font-size: 1.25rem;
+}
+
+.vendor-tier-plan__header p:last-child {
+  margin: 7px 0 0;
+  color: #62736c;
+  font-size: 0.9rem;
+}
+
+.vendor-tier-plan__active {
+  display: inline-flex;
+  flex-shrink: 0;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 9px;
+  border-radius: 99px;
+  background: #e7f5ed;
+  color: #176f45;
+  font-size: 0.75rem;
+  font-weight: 750;
+}
+
+.vendor-tier-plan__options {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 12px;
+  margin-top: 20px;
+}
+
+.vendor-tier-plan__option {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  align-items: start;
+  gap: 7px 10px;
+  padding: 15px;
+  border: 1px solid #dfe8e3;
+  border-radius: 8px;
+  cursor: pointer;
+}
+
+.vendor-tier-plan__option--selected {
+  border-color: #1b6553;
+  box-shadow: 0 0 0 1px #1b6553;
+}
+
+.vendor-tier-plan__option input {
+  grid-row: span 4;
+  margin-top: 3px;
+  accent-color: #1b6553;
+}
+
+.vendor-tier-plan__option-title {
+  font-weight: 800;
+}
+
+.vendor-tier-plan__option strong {
+  color: #176f5d;
+}
+
+.vendor-tier-plan__option > span:not(.vendor-tier-plan__option-title),
+.vendor-tier-plan__option small {
+  color: #62736c;
+  font-size: 0.82rem;
+  line-height: 1.45;
+}
+
+.vendor-tier-plan__conversion {
+  color: #52675e;
+  font-size: 0.82rem;
+}
+
+.vendor-tier-plan__pay {
+  min-height: 42px;
+  padding: 0 16px;
+  border: 0;
+  border-radius: 5px;
+  background: #1b6553;
+  color: #fff;
+  font: inherit;
+  font-weight: 750;
+  cursor: pointer;
+}
+
+.vendor-tier-plan__pay:disabled {
+  background: #9aaba3;
+  cursor: not-allowed;
+}
+
+.vendor-tier-plan__message {
+  margin: 14px 0;
+  color: #176f45;
+}
+
+.vendor-tier-plan__message--error {
+  display: flex;
+  align-items: flex-start;
+  gap: 7px;
+  color: #a63333;
+}
+
+@media (max-width: 600px) {
+  .vendor-tier-plan {
+    padding: 16px;
+  }
+
+  .vendor-tier-plan__header {
+    display: block;
+  }
+
+  .vendor-tier-plan__active {
+    margin-top: 12px;
+  }
+
+  .vendor-tier-plan__options {
+    grid-template-columns: 1fr;
+  }
+}

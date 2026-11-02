@@ -201,6 +201,21 @@
   font-size: 1rem;
 }
 
+.vendor-store__tier-badge {
+  width: fit-content;
+  padding: 5px 8px;
+  border-radius: 99px;
+  background: #edf2ef;
+  color: #496258;
+  font-size: 0.68rem;
+  font-weight: 750;
+}
+
+.vendor-store__tier-badge--verified {
+  background: #e6f4eb;
+  color: #176f45;
+}
+
 .vendor-store__product-content > p:not(.vendor-store__category) {
   margin: 0;
   color: #5c6f76;
