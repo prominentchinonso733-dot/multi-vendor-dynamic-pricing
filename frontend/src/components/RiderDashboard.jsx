@@ -155,7 +155,7 @@ export default function RiderDashboard() {
         </button>
       </header>
 
-      {!loading && selectedOrder && (
+      {!loading && (
         <Suspense
           fallback={
             <p className="rider-dashboard__map-loading" role="status">
@@ -164,9 +164,13 @@ export default function RiderDashboard() {
           }
         >
           <RiderDeliveryMap
-            assignmentId={selectedOrder._id}
-            destination={selectedOrder.deliveryAddress || "Customer destination"}
-            pickup={selectedOrder.pickupAddress || "Vendor pickup, Lagos"}
+            assignmentId={selectedOrder?._id || "lagos-overview"}
+            destination={
+              selectedOrder?.deliveryAddress || "Lekki, Lagos (select an order)"
+            }
+            pickup={
+              selectedOrder?.pickupAddress || "Ikeja, Lagos (select an order)"
+            }
           />
         </Suspense>
       )}

@@ -1,6 +1,7 @@
 import PropTypes from "prop-types";
+import { useEffect } from "react";
 import { divIcon } from "leaflet";
-import { MapContainer, Marker, Popup, TileLayer } from "react-leaflet";
+import { MapContainer, Marker, Popup, TileLayer, useMap } from "react-leaflet";
 import "leaflet/dist/leaflet.css";
 import "./RiderDeliveryMap.css";
 
@@ -19,6 +20,16 @@ const destinationIcon = divIcon({
   popupAnchor: [0, -32],
 });
 
+function LagosView() {
+  const map = useMap();
+
+  useEffect(() => {
+    map.setView([6.5244, 3.3792], 11);
+  }, [map]);
+
+  return null;
+}
+
 export default function RiderDeliveryMap({ assignmentId, pickup, destination }) {
   return (
     <section className="rider-map" aria-label="Delivery map">
@@ -36,6 +47,7 @@ export default function RiderDeliveryMap({ assignmentId, pickup, destination }) 
         scrollWheelZoom
         zoom={11}
       >
+        <LagosView />
         <TileLayer
           attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
           url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"

@@ -924,16 +924,6 @@ router.post("/rider/seed", authenticateToken, async (req, res) => {
       message: "Delivery partner or admin role required.",
     });
   }
-  if (
-    process.env.NODE_ENV === "production" &&
-    process.env.ENABLE_MOCK_DELIVERIES !== "true"
-  ) {
-    return res.status(403).json({
-      success: false,
-      message: "Mock deliveries are disabled in production.",
-    });
-  }
-
   const riderId = req.user._id || req.user.id;
   const session = await mongoose.startSession();
   let contract;
