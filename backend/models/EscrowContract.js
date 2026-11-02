@@ -83,6 +83,8 @@ const escrowContractSchema = new mongoose.Schema(
     },
     pickupAddress: { type: String, trim: true, maxlength: 500 },
     isMockDelivery: { type: Boolean, default: false },
+    deliveryProof: { type: String, select: false },
+    riderEarning: { type: Number, min: 0, default: 0 },
     deliveryUpdatedAt: { type: Date },
     receiptFinalizedAt: { type: Date },
     receipt: {

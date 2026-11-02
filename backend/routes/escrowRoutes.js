@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const crypto = require("crypto");
 const bcrypt = require("bcryptjs");
+const multer = require("multer");
 const https = require("https");
 const mongoose = require("mongoose");
 const EscrowContract = require("../models/EscrowContract");
@@ -13,6 +14,7 @@ const VendorWithdrawal = require("../models/VendorWithdrawal");
 const authenticateToken = require("../middleware/authenticateToken");
 const confirmEscrowPayment = require("../services/confirmEscrowPayment");
 const calculateCurrentPrice = require("../services/dynamicPricing");
+const isValidDeliveryProof = require("../services/deliveryProof");
 const { getEligibleVendorFilter } = require("../services/vendorTiers");
 const {
   creditPending,
@@ -27,6 +29,44 @@ const {
   getVendorPolicy,
   toMinorUnits,
 } = require("../services/financialPolicy");
+
+const RIDER_DELIVERY_FEE = 1500;
+const MAX_DELIVERY_PROOF_SIZE = 1024 * 1024;
+const deliveryProofUpload = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: MAX_DELIVERY_PROOF_SIZE, files: 1 },
+  fileFilter: (_req, file, callback) => {
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.mimetype)) {
+      const error = new Error("Upload a JPEG, PNG, or WebP delivery photo.");
+      error.code = "INVALID_DELIVERY_PROOF_TYPE";
+      return callback(error);
+    }
+    return callback(null, true);
+  },
+}).single("proof");
+
+const parseDeliveryProof = (req, res, next) => {
+  deliveryProofUpload(req, res, (error) => {
+    if (!error) return next();
+    if (error.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        success: false,
+        message: "Delivery photos must be 1 MB or smaller.",
+      });
+    }
+    if (
+      error.code === "INVALID_DELIVERY_PROOF_TYPE" ||
+      error instanceof multer.MulterError
+    ) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    console.error("Delivery proof upload could not be processed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to process the delivery proof upload.",
+    });
+  });
+};
 
 const committedStatuses = [
   "FUNDS_LOCKED",
@@ -1077,13 +1117,48 @@ router.get("/rider/orders", authenticateToken, async (req, res) => {
     };
     if (!isAdmin) filter.deliveryPartnerId = req.user._id || req.user.id;
 
-    const contracts = await EscrowContract.find(filter)
+    const riderFilter = isAdmin
+      ? {}
+      : { deliveryPartnerId: req.user._id || req.user.id };
+    const completedFilter = {
+      ...riderFilter,
+      status: { $in: ["RELEASED", "COMPLETED"] },
+      deliveryStatus: "DELIVERED",
+    };
+    const todayInLagos = new Intl.DateTimeFormat("en-CA", {
+      timeZone: "Africa/Lagos",
+      year: "numeric",
+      month: "2-digit",
+      day: "2-digit",
+    }).format(new Date());
+    const today = new Date(`${todayInLagos}T00:00:00+01:00`);
+    const [contracts, completedCount, todayEarnings, completedContracts] =
+      await Promise.all([
+        EscrowContract.find(filter)
       .select(
         "paymentReference items vendorPayouts subtotal status deliveryStatus deliveryUpdatedAt fulfillmentStatuses createdAt buyerId customerName deliveryAddress customerPhone pickupAddress isMockDelivery",
       )
       .populate("buyerId", "name phone")
       .sort({ createdAt: -1 })
-      .lean();
+      .lean(),
+        EscrowContract.countDocuments(completedFilter),
+        EscrowContract.aggregate([
+          {
+            $match: {
+              ...completedFilter,
+              completedAt: { $gte: today },
+            },
+          },
+          { $group: { _id: null, total: { $sum: "$riderEarning" } } },
+        ]),
+        EscrowContract.find(completedFilter)
+          .select(
+            "+deliveryProof paymentReference deliveryStatus deliveryUpdatedAt completedAt customerName customerPhone deliveryAddress pickupAddress riderEarning isMockDelivery",
+          )
+          .sort({ completedAt: -1 })
+          .limit(5)
+          .lean(),
+      ]);
     return res.json({
       success: true,
       contracts: contracts.map((contract) => ({
@@ -1094,6 +1169,12 @@ router.get("/rider/orders", authenticateToken, async (req, res) => {
         deliveryAddress: contract.deliveryAddress || "Address not provided",
         pickupAddress: contract.pickupAddress || "Vendor pickup, Lagos",
       })),
+      stats: {
+        totalDeliveriesCompleted: completedCount,
+        totalEarningsToday: todayEarnings[0]?.total || 0,
+        activeDeliveriesCount: contracts.length,
+      },
+      completedContracts,
     });
   } catch (error) {
     console.error("Rider assignments could not be loaded:", error);
@@ -1104,7 +1185,11 @@ router.get("/rider/orders", authenticateToken, async (req, res) => {
   }
 });
 
-router.patch("/:contractId/rider-status", authenticateToken, async (req, res) => {
+router.patch(
+  "/:contractId/rider-status",
+  authenticateToken,
+  parseDeliveryProof,
+  async (req, res) => {
   const isAdmin = req.user.role === "ADMIN";
   if (!isAdmin && req.user.role !== "DELIVERY_PARTNER") {
     return res.status(403).json({
@@ -1172,6 +1257,18 @@ router.patch("/:contractId/rider-status", authenticateToken, async (req, res) =>
     }
 
     if (status === "DELIVERED") {
+      if (!req.file) {
+        return res.status(400).json({
+          success: false,
+          message: "Upload a delivery photo before marking this order delivered.",
+        });
+      }
+      if (!isValidDeliveryProof(req.file.buffer, req.file.mimetype)) {
+        return res.status(400).json({
+          success: false,
+          message: "The uploaded file is not a valid JPEG, PNG, or WebP image.",
+        });
+      }
       const completedAt = new Date();
       const fulfillmentStatuses = contract.fulfillmentStatuses.map(
         (fulfillment) => ({
@@ -1193,6 +1290,8 @@ router.patch("/:contractId/rider-status", authenticateToken, async (req, res) =>
           deliveryStatus: "DELIVERED",
           deliveryUpdatedAt: completedAt,
           fulfillmentStatuses,
+          deliveryProof: `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
+          riderEarning: RIDER_DELIVERY_FEE,
         },
       );
       if (!completedContract) {
@@ -1223,7 +1322,8 @@ router.patch("/:contractId/rider-status", authenticateToken, async (req, res) =>
       message: "Unable to update delivery status.",
     });
   }
-});
+  },
+);
 
 router.get("/wallet", authenticateToken, async (req, res) => {
   if (req.user.role !== "SELLER") {
