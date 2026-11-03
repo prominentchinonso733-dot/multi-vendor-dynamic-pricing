@@ -13,11 +13,19 @@ const { encryptSensitiveValue } = require("../services/verificationDocuments");
 const { marketplaceVendors } = require("../data/marketplaceSeedData");
 
 const DEMO_PASSWORD = "DemoVendor123!";
+const FALLBACK_DEMO_ENCRYPTION_KEY = "0000000000000000000000000000000000000000000000000000000000000000";
 const INITIAL_AVAILABLE_BALANCE = 75000;
 const INITIAL_PENDING_BALANCE = 25000;
 
 const getNinNumber = (index) => String(10000000001 + index).padStart(11, "0");
 const getAccountNumber = (index) => `000000000${index + 1}`;
+
+const configureDemoEncryptionKey = () => {
+  if (!process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY) {
+    process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY =
+      FALLBACK_DEMO_ENCRYPTION_KEY;
+  }
+};
 
 async function seedMarketplace() {
   const mongoUri = process.env.MONGO_URI || process.env.MONGODB_URI;
@@ -27,9 +35,10 @@ async function seedMarketplace() {
   if (process.env.NODE_ENV === "production") {
     throw new Error("Marketplace demo data cannot be seeded in production.");
   }
+  configureDemoEncryptionKey();
   if (!/^[a-f\d]{64}$/i.test(process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY || "")) {
     throw new Error(
-      "Set VERIFICATION_DOCUMENT_ENCRYPTION_KEY to a 64-character hexadecimal test key before seeding.",
+      "VERIFICATION_DOCUMENT_ENCRYPTION_KEY must be a 64-character hexadecimal key.",
     );
   }
 
@@ -189,3 +198,4 @@ if (require.main === module) {
 }
 
 module.exports = seedMarketplace;
+module.exports.configureDemoEncryptionKey = configureDemoEncryptionKey;

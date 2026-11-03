@@ -118,8 +118,7 @@ Demo product seed data is not run on server startup.
 ### Seeding local marketplace demo data
 
 To populate the marketplace with seven demo vendors and 35 products, configure
-`MONGO_URI` (or `MONGODB_URI`) and a 64-character hexadecimal
-`VERIFICATION_DOCUMENT_ENCRYPTION_KEY`, then run:
+`MONGO_URI` (or `MONGODB_URI`) and run:
 
 ```sh
 npm --prefix backend run seed:marketplace
@@ -134,3 +133,9 @@ synthetic, encrypted test placeholders. Their bank codes are deliberately
 non-production `TEST-*` values: these accounts are not real, have not passed
 identity or bank verification, and cannot be used for Paystack payouts. Do not
 use these accounts or credentials in a production environment.
+
+If `VERIFICATION_DOCUMENT_ENCRYPTION_KEY` is not set, the development seeder
+uses a fixed dummy test key for these synthetic records. Set a private
+64-character hexadecimal key if you need to decrypt seeded values locally.
+This fallback is limited to this seeder; it does not configure encryption for
+the application or other flows.

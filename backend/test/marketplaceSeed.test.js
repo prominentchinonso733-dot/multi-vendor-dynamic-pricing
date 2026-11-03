@@ -1,6 +1,7 @@
 const assert = require("node:assert/strict");
 const { test } = require("node:test");
 const { marketplaceVendors } = require("../data/marketplaceSeedData");
+const { configureDemoEncryptionKey } = require("../scripts/seedMarketplace");
 
 test("marketplace demo data has seven vendors with five stocked products each", () => {
   assert.equal(marketplaceVendors.length, 7);
@@ -29,4 +30,23 @@ test("each demo tier has its required synthetic onboarding and bank fields", () 
   }
   assert.ok(marketplaceVendors.some(({ tier }) => tier === "TIER_1"));
   assert.ok(marketplaceVendors.some(({ tier }) => tier === "TIER_2"));
+});
+
+test("seeder uses a dummy test encryption key only when none is configured", () => {
+  const originalKey = process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY;
+  try {
+    delete process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY;
+    configureDemoEncryptionKey();
+    assert.match(process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY, /^[a-f\d]{64}$/);
+
+    process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY = "a".repeat(64);
+    configureDemoEncryptionKey();
+    assert.equal(process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY, "a".repeat(64));
+  } finally {
+    if (originalKey === undefined) {
+      delete process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY;
+    } else {
+      process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY = originalKey;
+    }
+  }
 });
