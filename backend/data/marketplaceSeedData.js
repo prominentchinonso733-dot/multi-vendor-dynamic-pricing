@@ -1,0 +1,128 @@
+const imageUrl = (photoId) =>
+  `https://images.unsplash.com/${photoId}?auto=format&fit=crop&w=1200&q=85`;
+
+const product = (title, description, basePrice, demandScore, stock, photoId) => ({
+  title,
+  description,
+  basePrice,
+  demandScore,
+  stock,
+  imageUrl: imageUrl(photoId),
+});
+
+const marketplaceVendors = [
+  {
+    name: "Lagos Fresh Foods",
+    category: "Grocery & Produce",
+    email: "demo.vendor1@example.test",
+    legalName: "Lagos Fresh Foods Demo",
+    bankName: "GTBank (test data)",
+    bankCode: "TEST-058",
+    tier: "TIER_1",
+    products: [
+      product("Fresh Market Tomatoes", "Ripe, locally sourced tomatoes selected for everyday cooking and sauces.", 4500, 68, 42, "photo-1546094096-0df4bcaaa337"),
+      product("Premium White Yam", "A firm, carefully handled yam tuber ideal for pounding, boiling, or roasting.", 7800, 57, 28, "photo-1540420773420-3366772f4999"),
+      product("Sweet Ripe Plantains", "Golden, naturally sweet plantains ready for frying, grilling, or baking.", 3200, 72, 36, "photo-1571771894821-ce9b6c11b08e"),
+      product("Fresh Red Bell Peppers", "Bright, crisp peppers that add colour and flavour to stews and stir-fries.", 2800, 51, 54, "photo-1563565375-f3fdfdbefa83"),
+      product("Farm Basket Produce Box", "A convenient seasonal mix of fresh vegetables packed for your weekly meals.", 12500, 63, 18, "photo-1542838132-92c53300491e"),
+    ],
+  },
+  {
+    name: "Urban Vogue Fashion",
+    category: "Clothing & Apparel",
+    email: "demo.vendor2@example.test",
+    legalName: "Urban Vogue Fashion Demo",
+    bankName: "Access Bank (test data)",
+    bankCode: "TEST-044",
+    tier: "TIER_1",
+    products: [
+      product("Ankara Sunday Best Gown", "A flowing Ankara-print dress with a comfortable lining and a versatile midi silhouette.", 38500, 73, 14, "photo-1483985988355-763728e1935b"),
+      product("Everyday Designer Hoodie", "A soft cotton-blend hoodie with a relaxed fit, neat stitching, and a clean finish.", 29500, 62, 22, "photo-1551488831-00ddcb6c6bd3"),
+      product("Hand-Finished Leather Sandals", "Lightweight leather sandals with cushioned soles for comfortable all-day wear.", 24000, 55, 19, "photo-1543163521-1bf539c55dd2"),
+      product("Modern Ankara Co-ord Set", "A coordinated top and trouser set featuring a bold print and easy-to-style cut.", 42000, 66, 11, "photo-1539109136881-3be0616acf4b"),
+      product("Classic Weekend Shirt", "A breathable, smart-casual shirt made for relaxed weekends and easy layering.", 18500, 48, 31, "photo-1521572163474-6864f9cf17ab"),
+    ],
+  },
+  {
+    name: "Gadget Hub NG",
+    category: "Electronics & Tech",
+    email: "demo.vendor3@example.test",
+    legalName: "Gadget Hub Nigeria Demo",
+    bankName: "Zenith Bank (test data)",
+    bankCode: "TEST-057",
+    tier: "TIER_1",
+    products: [
+      product("ClearSound Wireless Earbuds", "Compact Bluetooth earbuds with a pocket charging case and clear everyday audio.", 28500, 79, 24, "photo-1505740420928-5e560c06d30e"),
+      product("20,000mAh Power Bank", "A high-capacity portable charger with dual outputs for commuting and travel.", 32500, 71, 20, "photo-1609091839311-d5365f9ff1c5"),
+      product("Braided USB-C Fast Charger", "A durable USB-C cable and compact fast-charge adapter for compatible devices.", 12500, 59, 38, "photo-1583394838336-acd977736f90"),
+      product("Foldable Bluetooth Headphones", "Comfortable over-ear headphones with wireless listening and a foldable travel design.", 41500, 64, 15, "photo-1505740420928-5e560c06d30e"),
+      product("Adjustable Desktop Phone Stand", "A sturdy, adjustable stand that keeps your phone visible during calls and desk work.", 9500, 45, 33, "photo-1512499617640-c74ae3a79d37"),
+    ],
+  },
+  {
+    name: "Glow & Skincare Store",
+    category: "Beauty & Health",
+    email: "demo.vendor4@example.test",
+    legalName: "Glow Skincare Store Demo",
+    bankName: "UBA (test data)",
+    bankCode: "TEST-033",
+    tier: "TIER_1",
+    products: [
+      product("Whipped Organic Shea Butter", "A rich, fragrance-free moisturising butter for dry skin and everyday body care.", 8500, 70, 27, "photo-1608248543803-ba4f8c70ae0b"),
+      product("Brightening Vitamin C Serum", "A lightweight facial serum designed to layer easily into a simple morning routine.", 16500, 76, 21, "photo-1601049541289-9b1b7bbbfe19"),
+      product("Gentle Glow Face Scrub", "A gentle exfoliating scrub with a creamy texture for occasional use in a skincare routine.", 9200, 58, 25, "photo-1556229010-6c3f2c9ca5f8"),
+      product("Daily Hydration Face Cream", "A comfortable daily moisturiser that leaves skin feeling soft without a heavy finish.", 14200, 61, 18, "photo-1556228720-195a672e8a03"),
+      product("Calm & Cleanse Skin Set", "A thoughtful cleanser and moisturiser pairing for a fresh, uncomplicated routine.", 21800, 66, 12, "photo-1571781926291-c477ebfd024b"),
+    ],
+  },
+  {
+    name: "HomeCraft Living",
+    category: "Home & Decor",
+    email: "demo.vendor5@example.test",
+    legalName: "HomeCraft Living Demo",
+    bankName: "FirstBank (test data)",
+    bankCode: "TEST-011",
+    tier: "TIER_1",
+    products: [
+      product("Amber Evening Scented Candle", "A hand-poured soy-blend candle in a reusable glass jar for a warm evening ambience.", 11500, 60, 26, "photo-1603006905003-be475563bc59"),
+      product("Handwoven Market Basket", "A versatile woven basket with sturdy handles for storage, shopping, or display.", 18500, 53, 16, "photo-1590736969955-71cc94901144"),
+      product("Textured Ankara Throw Pillow", "A soft decorative cushion featuring a distinctive African-inspired fabric pattern.", 14500, 68, 19, "photo-1584100936595-c0654b55a2e2"),
+      product("Minimal Ceramic Table Vase", "A simple ceramic accent piece that pairs beautifully with fresh or dried stems.", 12800, 47, 23, "photo-1578500494198-246f612d3b3d"),
+      product("Cozy Woven Lounge Throw", "A lightweight textured throw for adding a soft, welcoming layer to your living space.", 26500, 58, 13, "photo-1600210492486-724fe5c67fb0"),
+    ],
+  },
+  {
+    name: "Lekki Fitness Gear",
+    category: "Sports & Fitness",
+    email: "demo.vendor6@example.test",
+    legalName: "Lekki Fitness Gear Demo",
+    bankName: "GTBank (test data)",
+    bankCode: "TEST-058",
+    tier: "TIER_2",
+    products: [
+      product("Three-Level Resistance Band Set", "Three resistance levels for warm-ups, home workouts, mobility, and strength training.", 14500, 74, 30, "photo-1598289431512-b97b0917affc"),
+      product("Grip-Fit Non-Slip Yoga Mat", "A supportive, easy-to-roll exercise mat with a textured surface for home practice.", 29500, 67, 17, "photo-1544367567-0f2fcb009e0b"),
+      product("Insulated Steel Water Bottle", "A reusable stainless steel bottle designed to keep drinks at a comfortable temperature.", 18500, 62, 25, "photo-1602143407151-7111542de6e8"),
+      product("Adjustable Jump Rope", "A lightweight adjustable skipping rope for cardio sessions at home or outdoors.", 9800, 55, 34, "photo-1518611012118-696072aa579a"),
+      product("Everyday Training Duffel", "A roomy, durable gym bag with separate pockets for daily training essentials.", 32500, 50, 12, "photo-1553062407-98eeb64c6a62"),
+    ],
+  },
+  {
+    name: "Aroma Kitchen & Spices",
+    category: "Food & Spices",
+    email: "demo.vendor7@example.test",
+    legalName: "Aroma Kitchen and Spices Demo",
+    bankName: "Access Bank (test data)",
+    bankCode: "TEST-044",
+    tier: "TIER_2",
+    products: [
+      product("Smoky Suya Spice Rub", "A fragrant dry spice blend for suya-style grilling, roasted vegetables, and marinades.", 6200, 78, 40, "photo-1596040033229-a9821ebd058d"),
+      product("Cold-Pressed Red Palm Oil", "A richly coloured cooking oil packed in a sealed bottle for traditional recipes.", 7800, 56, 32, "photo-1474979266404-7eaacbcd87c5"),
+      product("Wildflower Honey Jar", "A small-batch, golden honey with a smooth texture for tea, breakfast, and baking.", 9500, 64, 28, "photo-1587049352851-8d4e89133924"),
+      product("Ginger & Garlic Seasoning", "A convenient aromatic seasoning mix that brings a savoury lift to everyday dishes.", 4800, 59, 37, "photo-1615485290382-441e4d049cb5"),
+      product("Jollof Party Spice Blend", "A balanced, warming seasoning blend created for rich one-pot rice and stews.", 5500, 72, 35, "photo-1512621776951-a57141f2eefd"),
+    ],
+  },
+];
+
+module.exports = { marketplaceVendors };

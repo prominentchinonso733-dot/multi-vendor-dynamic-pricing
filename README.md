@@ -114,3 +114,23 @@ assigned to other sellers.
 
 The public `GET /api/products` endpoint reads product documents from MongoDB.
 Demo product seed data is not run on server startup.
+
+### Seeding local marketplace demo data
+
+To populate the marketplace with seven demo vendors and 35 products, configure
+`MONGO_URI` (or `MONGODB_URI`) and a 64-character hexadecimal
+`VERIFICATION_DOCUMENT_ENCRYPTION_KEY`, then run:
+
+```sh
+npm --prefix backend run seed:marketplace
+```
+
+The script is idempotent and refuses to run when `NODE_ENV=production`. It
+creates eligible Tier 1/Tier 2 seller accounts, demo wallet balances, and
+product images hosted by Unsplash. All seller accounts use the password
+`DemoVendor123!`; their emails are `demo.vendor1@example.test` through
+`demo.vendor7@example.test`. The NINs and 10-digit account numbers are
+synthetic, encrypted test placeholders. Their bank codes are deliberately
+non-production `TEST-*` values: these accounts are not real, have not passed
+identity or bank verification, and cannot be used for Paystack payouts. Do not
+use these accounts or credentials in a production environment.

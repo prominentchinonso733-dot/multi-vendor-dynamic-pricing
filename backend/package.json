@@ -6,6 +6,7 @@
     "start": "node server.js",
     "test": "node --test",
     "seed:admin": "node scripts/provisionAdmin.js",
+    "seed:marketplace": "node scripts/seedMarketplace.js",
     "promote:vendor": "node scripts/promoteVendor.js",
     "reassign:products": "node scripts/reassignProductsToSeller.js"
   },
