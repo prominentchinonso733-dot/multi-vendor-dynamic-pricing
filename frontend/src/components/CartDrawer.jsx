@@ -45,14 +45,27 @@ export default function CartDrawer({
     if (user?.email) setBuyerEmail(user.email);
   }, [user?.email]);
 
+  useEffect(() => {
+    if (!isOpen) return undefined;
+
+    const previousBodyOverflow = document.body.style.overflow;
+    const previousRootOverflow = document.documentElement.style.overflow;
+    document.body.style.overflow = "hidden";
+    document.documentElement.style.overflow = "hidden";
+
+    return () => {
+      document.body.style.overflow = previousBodyOverflow;
+      document.documentElement.style.overflow = previousRootOverflow;
+    };
+  }, [isOpen]);
+
   if (!isOpen) return null;
 
   const subtotal = cart.reduce(
     (sum, item) => sum + item.price * item.quantity,
     0,
   );
-  const escrowFee =
-    subtotal > 0 ? Math.round(subtotal * 0.025 * 100) / 100 : 0;
+  const escrowFee = subtotal > 0 ? Math.round(subtotal * 0.025 * 100) / 100 : 0;
   const grandTotal = subtotal + escrowFee;
 
   const handleInitiateEscrow = async () => {
@@ -195,12 +208,13 @@ export default function CartDrawer({
       <div
         style={{
           width: "400px",
-          height: "100vh",
-          maxHeight: "100%",
+          maxWidth: "100vw",
+          height: "90vh",
+          maxHeight: "90vh",
           boxSizing: "border-box",
           backgroundColor: "#fff",
           padding: "24px",
-          overflow: "hidden",
+          overflowY: "auto",
           display: "flex",
           flexDirection: "column",
           justifyContent: "space-between",
@@ -217,8 +231,10 @@ export default function CartDrawer({
           <div className="flex justify-between items-center pb-4 border-b">
             <h2 className="text-xl font-bold">Escrow Shopping Cart</h2>
             <button
+              aria-label="Close cart"
               onClick={onClose}
               className="text-gray-500 hover:text-black font-bold text-xl"
+              type="button"
             >
               ✕
             </button>
@@ -264,8 +280,10 @@ export default function CartDrawer({
                       +
                     </button>
                     <button
+                      aria-label={`Remove ${item.name} from cart`}
                       onClick={() => onRemoveItem(item.id)}
                       className="text-red-500 text-xs ml-2 hover:underline"
+                      type="button"
                     >
                       Remove
                     </button>
@@ -328,9 +346,9 @@ export default function CartDrawer({
             )}
             {user?.role === "BUYER" && (
               <p style={{ fontSize: "0.85rem", lineHeight: 1.5 }}>
-                Vendor platform commission depends on the seller&apos;s
-                approved tier. Checkout validates product prices, stock, and
-                transaction limits on the server.
+                Vendor platform commission depends on the seller&apos;s approved
+                tier. Checkout validates product prices, stock, and transaction
+                limits on the server.
               </p>
             )}
             <div style={{ display: "grid", gap: "8px", marginTop: "16px" }}>
@@ -355,7 +373,10 @@ export default function CartDrawer({
                   borderRadius: "4px",
                 }}
               />
-              <label htmlFor="delivery-address" className="text-sm font-semibold">
+              <label
+                htmlFor="delivery-address"
+                className="text-sm font-semibold"
+              >
                 Delivery address
               </label>
               <textarea
@@ -407,7 +428,9 @@ export default function CartDrawer({
                   className="flex-1 w-full py-3 rounded-lg font-bold text-white transition bg-blue-600 hover:bg-blue-700"
                   style={{ flex: 1 }}
                 >
-                  {checkoutPending ? "Preparing Paystack..." : "Lock funds in escrow"}
+                  {checkoutPending
+                    ? "Preparing Paystack..."
+                    : "Lock funds in escrow"}
                 </button>
               </div>
             </div>

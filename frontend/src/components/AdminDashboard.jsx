@@ -1,5 +1,6 @@
 import PropTypes from "prop-types";
 import { useEffect, useState } from "react";
+import { useLocation } from "react-router-dom";
 import {
   AlertCircle,
   CheckCircle2,
@@ -32,7 +33,8 @@ const sections = [
 ];
 const formatDate = (date) =>
   date ? dateFormatter.format(new Date(date)) : "—";
-const displayStatus = (value) => String(value || "UNKNOWN").replaceAll("_", " ");
+const displayStatus = (value) =>
+  String(value || "UNKNOWN").replaceAll("_", " ");
 
 function PageControls({ page, total, pageSize, onChange }) {
   const pages = Math.max(1, Math.ceil(total / pageSize));
@@ -42,10 +44,18 @@ function PageControls({ page, total, pageSize, onChange }) {
         Page {page} of {pages} · {total.toLocaleString()} records
       </span>
       <div>
-        <button disabled={page <= 1} onClick={() => onChange(page - 1)} type="button">
+        <button
+          disabled={page <= 1}
+          onClick={() => onChange(page - 1)}
+          type="button"
+        >
           Previous
         </button>
-        <button disabled={page >= pages} onClick={() => onChange(page + 1)} type="button">
+        <button
+          disabled={page >= pages}
+          onClick={() => onChange(page + 1)}
+          type="button"
+        >
           Next
         </button>
       </div>
@@ -61,10 +71,18 @@ PageControls.propTypes = {
 };
 
 export default function AdminDashboard() {
-  const [section, setSection] = useState("overview");
+  const location = useLocation();
+  const [section, setSection] = useState(() =>
+    new URLSearchParams(location.search).get("section") === "verification"
+      ? "verification"
+      : "overview",
+  );
   const [overview, setOverview] = useState(null);
   const [pendingVerifications, setPendingVerifications] = useState([]);
-  const [featuredItems, setFeaturedItems] = useState({ vendors: [], products: [] });
+  const [featuredItems, setFeaturedItems] = useState({
+    vendors: [],
+    products: [],
+  });
   const [commissionLedger, setCommissionLedger] = useState(null);
   const [usersPage, setUsersPage] = useState(1);
   const [ordersPage, setOrdersPage] = useState(1);
@@ -73,7 +91,8 @@ export default function AdminDashboard() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [pendingAction, setPendingAction] = useState("");
-  const [downloadingDocumentUserId, setDownloadingDocumentUserId] = useState("");
+  const [downloadingDocumentUserId, setDownloadingDocumentUserId] =
+    useState("");
   const [reviewNotes, setReviewNotes] = useState({});
   const [identityChecks, setIdentityChecks] = useState({});
   const [riderDraft, setRiderDraft] = useState({
@@ -81,6 +100,15 @@ export default function AdminDashboard() {
     email: "",
     password: "",
   });
+
+  useEffect(() => {
+    if (
+      new URLSearchParams(location.search).get("section") === "verification"
+    ) {
+      setSection("verification");
+    }
+  }, [location.search]);
+
   const usersRole =
     section === "vendors"
       ? "vendors"
@@ -106,7 +134,11 @@ export default function AdminDashboard() {
         : Promise.resolve(null),
     ])
       .then(([data, verificationQueue, featured, ledger]) => {
-        if (!data?.success || !Array.isArray(data.users) || !Array.isArray(data.orders)) {
+        if (
+          !data?.success ||
+          !Array.isArray(data.users) ||
+          !Array.isArray(data.orders)
+        ) {
           throw new Error("The admin API returned invalid oversight data.");
         }
         setOverview(data);
@@ -134,7 +166,9 @@ export default function AdminDashboard() {
   const orders = overview?.orders || [];
   const riders = users.filter((user) => user.role === "DELIVERY_PARTNER");
   const displayedVendors = users.filter((user) => user.role === "SELLER");
-  const displayedAccounts = users.filter((user) => user.role !== "DELIVERY_PARTNER");
+  const displayedAccounts = users.filter(
+    (user) => user.role !== "DELIVERY_PARTNER",
+  );
   const pageSize = overview?.pagination?.pageSize || 100;
 
   const runAction = async (action, successMessage) => {
@@ -245,39 +279,88 @@ export default function AdminDashboard() {
   const renderFeatured = () => (
     <div className="admin-dashboard__featured">
       <p className="admin-dashboard__hint">
-        Featured vendors and products appear in the marketplace homepage carousel.
+        Featured vendors and products appear in the marketplace homepage
+        carousel.
       </p>
       <h2>Vendors</h2>
       <div className="admin-dashboard__table-wrap">
         <table className="admin-dashboard__table">
-          <thead><tr><th>Vendor</th><th>Email</th><th>Account</th><th>Promotion</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Vendor</th>
+              <th>Email</th>
+              <th>Account</th>
+              <th>Promotion</th>
+            </tr>
+          </thead>
           <tbody>
             {featuredItems.vendors.map((vendor) => (
               <tr key={vendor._id}>
                 <td>{vendor.storeName || vendor.name}</td>
                 <td>{vendor.email}</td>
                 <td>{displayStatus(vendor.accountStatus)}</td>
-                <td><button className="admin-dashboard__text-button" disabled={pendingAction === `featured-vendor-${vendor._id}`} onClick={() => setFeatured("vendor", vendor, !vendor.isFeatured)} type="button">{vendor.isFeatured ? "Remove featured" : "Feature vendor"}</button></td>
+                <td>
+                  <button
+                    className="admin-dashboard__text-button"
+                    disabled={pendingAction === `featured-vendor-${vendor._id}`}
+                    onClick={() =>
+                      setFeatured("vendor", vendor, !vendor.isFeatured)
+                    }
+                    type="button"
+                  >
+                    {vendor.isFeatured ? "Remove featured" : "Feature vendor"}
+                  </button>
+                </td>
               </tr>
             ))}
-            {!featuredItems.vendors.length && <tr><td colSpan="4">No vendors available.</td></tr>}
+            {!featuredItems.vendors.length && (
+              <tr>
+                <td colSpan="4">No vendors available.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
       <h2>Products</h2>
       <div className="admin-dashboard__table-wrap">
         <table className="admin-dashboard__table">
-          <thead><tr><th>Product</th><th>Category</th><th>Vendor</th><th>Promotion</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Product</th>
+              <th>Category</th>
+              <th>Vendor</th>
+              <th>Promotion</th>
+            </tr>
+          </thead>
           <tbody>
             {featuredItems.products.map((product) => (
               <tr key={product._id}>
                 <td>{product.title}</td>
                 <td>{product.category || "—"}</td>
-                <td>{product.vendor?.storeName || product.vendor?.name || "—"}</td>
-                <td><button className="admin-dashboard__text-button" disabled={pendingAction === `featured-product-${product._id}`} onClick={() => setFeatured("product", product, !product.isFeatured)} type="button">{product.isFeatured ? "Remove featured" : "Feature product"}</button></td>
+                <td>
+                  {product.vendor?.storeName || product.vendor?.name || "—"}
+                </td>
+                <td>
+                  <button
+                    className="admin-dashboard__text-button"
+                    disabled={
+                      pendingAction === `featured-product-${product._id}`
+                    }
+                    onClick={() =>
+                      setFeatured("product", product, !product.isFeatured)
+                    }
+                    type="button"
+                  >
+                    {product.isFeatured ? "Remove featured" : "Feature product"}
+                  </button>
+                </td>
               </tr>
             ))}
-            {!featuredItems.products.length && <tr><td colSpan="4">No products available.</td></tr>}
+            {!featuredItems.products.length && (
+              <tr>
+                <td colSpan="4">No products available.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
@@ -290,13 +373,26 @@ export default function AdminDashboard() {
         {["PENDING", "AVAILABLE", "REVERSED"].map((status) => (
           <article key={status}>
             <span>{displayStatus(status)} demand-surge share</span>
-            <strong>{currencyFormatter.format(commissionLedger?.totals?.[status]?.amount || 0)}</strong>
+            <strong>
+              {currencyFormatter.format(
+                commissionLedger?.totals?.[status]?.amount || 0,
+              )}
+            </strong>
           </article>
         ))}
       </div>
       <div className="admin-dashboard__table-wrap">
         <table className="admin-dashboard__table">
-          <thead><tr><th>Payment reference</th><th>Source</th><th>Amount</th><th>Settlement</th><th>Order</th><th>Created</th></tr></thead>
+          <thead>
+            <tr>
+              <th>Payment reference</th>
+              <th>Source</th>
+              <th>Amount</th>
+              <th>Settlement</th>
+              <th>Order</th>
+              <th>Created</th>
+            </tr>
+          </thead>
           <tbody>
             {(commissionLedger?.entries || []).map((entry) => (
               <tr key={entry._id}>
@@ -308,11 +404,18 @@ export default function AdminDashboard() {
                 <td>{formatDate(entry.createdAt)}</td>
               </tr>
             ))}
-            {!commissionLedger?.entries?.length && <tr><td colSpan="6">No demand-surge commission entries yet.</td></tr>}
+            {!commissionLedger?.entries?.length && (
+              <tr>
+                <td colSpan="6">No demand-surge commission entries yet.</td>
+              </tr>
+            )}
           </tbody>
         </table>
       </div>
-      <p className="admin-dashboard__hint">Surge shares remain pending in escrow until the buyer confirms delivery; refunded orders reverse their pending entry.</p>
+      <p className="admin-dashboard__hint">
+        Surge shares remain pending in escrow until the buyer confirms delivery;
+        refunded orders reverse their pending entry.
+      </p>
     </>
   );
 
@@ -332,27 +435,36 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            {records.length ? records.map((user) => (
-              <tr key={user._id}>
-                <td>{user.name}</td>
-                <td>{user.email}</td>
-                <td>{displayStatus(user.role)}</td>
-                <td>{user.verification?.tier || "TIER 1"} · {displayStatus(user.verification?.status || "NOT_STARTED")}</td>
-                <td>{displayStatus(user.accountStatus || "ACTIVE")}</td>
-                <td>{formatDate(user.createdAt)}</td>
-                <td>
-                  <button
-                    className="admin-dashboard__text-button"
-                    disabled={pendingAction === `account-${user._id}`}
-                    onClick={() => changeAccountStatus(user)}
-                    type="button"
-                  >
-                    {user.accountStatus === "SUSPENDED" ? "Reactivate" : "Suspend"}
-                  </button>
-                </td>
+            {records.length ? (
+              records.map((user) => (
+                <tr key={user._id}>
+                  <td>{user.name}</td>
+                  <td>{user.email}</td>
+                  <td>{displayStatus(user.role)}</td>
+                  <td>
+                    {user.verification?.tier || "TIER 1"} ·{" "}
+                    {displayStatus(user.verification?.status || "NOT_STARTED")}
+                  </td>
+                  <td>{displayStatus(user.accountStatus || "ACTIVE")}</td>
+                  <td>{formatDate(user.createdAt)}</td>
+                  <td>
+                    <button
+                      className="admin-dashboard__text-button"
+                      disabled={pendingAction === `account-${user._id}`}
+                      onClick={() => changeAccountStatus(user)}
+                      type="button"
+                    >
+                      {user.accountStatus === "SUSPENDED"
+                        ? "Reactivate"
+                        : "Suspend"}
+                    </button>
+                  </td>
+                </tr>
+              ))
+            ) : (
+              <tr>
+                <td colSpan="7">No accounts on this page.</td>
               </tr>
-            )) : (
-              <tr><td colSpan="7">No accounts on this page.</td></tr>
             )}
           </tbody>
         </table>
@@ -383,60 +495,81 @@ export default function AdminDashboard() {
             </tr>
           </thead>
           <tbody>
-            {orders.length ? orders.map((order) => {
-              const riderId =
-                typeof order.deliveryPartnerId === "object"
-                  ? order.deliveryPartnerId?._id
-                  : order.deliveryPartnerId;
-              const riderName =
-                typeof order.deliveryPartnerId === "object"
-                  ? order.deliveryPartnerId?.name
-                  : "";
-              return (
-                <tr key={order._id}>
-                  <td>{order.paymentReference}</td>
-                  <td>{order.buyerEmail || order.buyerId}</td>
-                  <td>{(order.items || []).map((item) => `${item.name} ×${item.quantity}`).join(", ") || "—"}</td>
-                  <td>{currencyFormatter.format(Number(order.totalHoldAmount) || 0)}</td>
-                  <td>{displayStatus(order.status)}</td>
-                  <td>{(order.fulfillmentStatuses || []).map((entry) => displayStatus(entry.status)).join(", ") || "Pending"}</td>
-                  <td>
-                    <select
-                      aria-label={`Assign delivery partner for ${order.paymentReference}`}
-                      disabled={
-                        pendingAction === `assign-${order._id}` ||
-                        !["FUNDS_LOCKED", "LOCKED"].includes(order.status) ||
-                        (order.deliveryStatus || "PENDING") !== "PENDING"
-                      }
-                      onChange={(event) => assignRider(order._id, event.target.value)}
-                      value={riderId || ""}
-                    >
-                      <option value="">Unassigned</option>
-                      {riders
-                        .filter(
-                          (rider) =>
-                            rider.accountStatus !== "SUSPENDED" ||
-                            rider._id === String(riderId || ""),
-                        )
-                        .map((rider) => (
-                          <option key={rider._id} value={rider._id}>
-                            {rider.name}
-                            {rider.accountStatus === "SUSPENDED"
-                              ? " (suspended)"
-                              : ""}
-                          </option>
-                        ))}
-                      {riderName && !riders.some((rider) => rider._id === riderId) && (
-                        <option value={riderId}>{riderName}</option>
+            {orders.length ? (
+              orders.map((order) => {
+                const riderId =
+                  typeof order.deliveryPartnerId === "object"
+                    ? order.deliveryPartnerId?._id
+                    : order.deliveryPartnerId;
+                const riderName =
+                  typeof order.deliveryPartnerId === "object"
+                    ? order.deliveryPartnerId?.name
+                    : "";
+                return (
+                  <tr key={order._id}>
+                    <td>{order.paymentReference}</td>
+                    <td>{order.buyerEmail || order.buyerId}</td>
+                    <td>
+                      {(order.items || [])
+                        .map((item) => `${item.name} ×${item.quantity}`)
+                        .join(", ") || "—"}
+                    </td>
+                    <td>
+                      {currencyFormatter.format(
+                        Number(order.totalHoldAmount) || 0,
                       )}
-                    </select>
-                    <small>{displayStatus(order.deliveryStatus || "PENDING")}</small>
-                  </td>
-                  <td>{formatDate(order.createdAt)}</td>
-                </tr>
-              );
-            }) : (
-              <tr><td colSpan="8">No orders on this page.</td></tr>
+                    </td>
+                    <td>{displayStatus(order.status)}</td>
+                    <td>
+                      {(order.fulfillmentStatuses || [])
+                        .map((entry) => displayStatus(entry.status))
+                        .join(", ") || "Pending"}
+                    </td>
+                    <td>
+                      <select
+                        aria-label={`Assign delivery partner for ${order.paymentReference}`}
+                        disabled={
+                          pendingAction === `assign-${order._id}` ||
+                          !["FUNDS_LOCKED", "LOCKED"].includes(order.status) ||
+                          (order.deliveryStatus || "PENDING") !== "PENDING"
+                        }
+                        onChange={(event) =>
+                          assignRider(order._id, event.target.value)
+                        }
+                        value={riderId || ""}
+                      >
+                        <option value="">Unassigned</option>
+                        {riders
+                          .filter(
+                            (rider) =>
+                              rider.accountStatus !== "SUSPENDED" ||
+                              rider._id === String(riderId || ""),
+                          )
+                          .map((rider) => (
+                            <option key={rider._id} value={rider._id}>
+                              {rider.name}
+                              {rider.accountStatus === "SUSPENDED"
+                                ? " (suspended)"
+                                : ""}
+                            </option>
+                          ))}
+                        {riderName &&
+                          !riders.some((rider) => rider._id === riderId) && (
+                            <option value={riderId}>{riderName}</option>
+                          )}
+                      </select>
+                      <small>
+                        {displayStatus(order.deliveryStatus || "PENDING")}
+                      </small>
+                    </td>
+                    <td>{formatDate(order.createdAt)}</td>
+                  </tr>
+                );
+              })
+            ) : (
+              <tr>
+                <td colSpan="8">No orders on this page.</td>
+              </tr>
             )}
           </tbody>
         </table>
@@ -448,73 +581,130 @@ export default function AdminDashboard() {
         total={overview?.pagination?.ordersTotal ?? 0}
       />
       {overview?.pagination?.ordersTotal > 0 && (
-        <p className="admin-dashboard__hint">Order oversight includes escrow payment and per-vendor fulfillment status. Rider assignment is tracked separately.</p>
+        <p className="admin-dashboard__hint">
+          Order oversight includes escrow payment and per-vendor fulfillment
+          status. Rider assignment is tracked separately.
+        </p>
       )}
     </>
   );
 
   const renderVerificationQueue = () => (
     <div className="admin-dashboard__review-list">
-      {pendingVerifications.length ? pendingVerifications.map((user) => (
-        <article className="admin-dashboard__review-card" key={user._id}>
-          <div className="admin-dashboard__review-header">
-            <div>
-              <h3>{user.name}</h3>
-              <p>{user.email} · {displayStatus(user.role)} · submitted {formatDate(user.verification?.submittedAt)}</p>
+      {pendingVerifications.length ? (
+        pendingVerifications.map((user) => (
+          <article className="admin-dashboard__review-card" key={user._id}>
+            <div className="admin-dashboard__review-header">
+              <div>
+                <h3>{user.name}</h3>
+                <p>
+                  {user.email} · {displayStatus(user.role)} · submitted{" "}
+                  {formatDate(user.verification?.submittedAt)}
+                </p>
+              </div>
+              <span className="admin-dashboard__status admin-dashboard__status--pending">
+                Pending review
+              </span>
             </div>
-            <span className="admin-dashboard__status admin-dashboard__status--pending">Pending review</span>
-          </div>
-          <dl>
-            <div><dt>Legal name</dt><dd>{user.verification?.legalName || "—"}</dd></div>
-            <div><dt>Document type</dt><dd>{displayStatus(user.verification?.documentType)}</dd></div>
-          </dl>
-          <button
-            disabled={
-              !user.verification?.documentAvailable ||
-              downloadingDocumentUserId === user._id
-            }
-            onClick={() => downloadIdentityDocument(user)}
-            type="button"
-          >
-            {downloadingDocumentUserId === user._id
-              ? "Preparing secure download..."
-              : user.verification?.documentAvailable
-                ? "Download identity document"
-                : "Identity document unavailable"}
-          </button>
-          <label>
-            Review note (optional)
-            <input
-              maxLength={500}
-              onChange={(event) => setReviewNotes((current) => ({ ...current, [user._id]: event.target.value }))}
-              value={reviewNotes[user._id] || ""}
-            />
-          </label>
-          <p className="admin-dashboard__hint">Review the uploaded document before deciding. Identity document files are deleted after approval or rejection.</p>
-          <label className="admin-dashboard__identity-confirmation">
-            <input
-              checked={identityChecks[user._id] === true}
-              onChange={(event) => setIdentityChecks((current) => ({ ...current, [user._id]: event.target.checked }))}
-              type="checkbox"
-            />
-            I confirm the applicant&apos;s identity was checked through the approved process.
-          </label>
-          <div className="admin-dashboard__review-actions">
-            <button disabled={pendingAction === `verification-${user._id}` || identityChecks[user._id] !== true || !user.verification?.documentAvailable} onClick={() => reviewIdentity(user, "APPROVE")} type="button">Approve Tier 2</button>
-            <button className="admin-dashboard__reject" disabled={pendingAction === `verification-${user._id}`} onClick={() => reviewIdentity(user, "REJECT")} type="button">Reject</button>
-          </div>
-        </article>
-      )) : <p className="admin-dashboard__empty">No identity requests are waiting for review.</p>}
+            <dl>
+              <div>
+                <dt>Legal name</dt>
+                <dd>{user.verification?.legalName || "—"}</dd>
+              </div>
+              <div>
+                <dt>Document type</dt>
+                <dd>{displayStatus(user.verification?.documentType)}</dd>
+              </div>
+            </dl>
+            <button
+              disabled={
+                !user.verification?.documentAvailable ||
+                downloadingDocumentUserId === user._id
+              }
+              onClick={() => downloadIdentityDocument(user)}
+              type="button"
+            >
+              {downloadingDocumentUserId === user._id
+                ? "Preparing secure download..."
+                : user.verification?.documentAvailable
+                  ? "Download identity document"
+                  : "Identity document unavailable"}
+            </button>
+            <label>
+              Review note (optional)
+              <input
+                maxLength={500}
+                onChange={(event) =>
+                  setReviewNotes((current) => ({
+                    ...current,
+                    [user._id]: event.target.value,
+                  }))
+                }
+                value={reviewNotes[user._id] || ""}
+              />
+            </label>
+            <p className="admin-dashboard__hint">
+              Review the uploaded document before deciding. Identity document
+              files are deleted after approval or rejection.
+            </p>
+            <label className="admin-dashboard__identity-confirmation">
+              <input
+                checked={identityChecks[user._id] === true}
+                onChange={(event) =>
+                  setIdentityChecks((current) => ({
+                    ...current,
+                    [user._id]: event.target.checked,
+                  }))
+                }
+                type="checkbox"
+              />
+              I confirm the applicant&apos;s identity was checked through the
+              approved process.
+            </label>
+            <div className="admin-dashboard__review-actions">
+              <button
+                disabled={
+                  pendingAction === `verification-${user._id}` ||
+                  identityChecks[user._id] !== true ||
+                  !user.verification?.documentAvailable
+                }
+                onClick={() => reviewIdentity(user, "APPROVE")}
+                type="button"
+              >
+                Approve Tier 2
+              </button>
+              <button
+                className="admin-dashboard__reject"
+                disabled={pendingAction === `verification-${user._id}`}
+                onClick={() => reviewIdentity(user, "REJECT")}
+                type="button"
+              >
+                Reject
+              </button>
+            </div>
+          </article>
+        ))
+      ) : (
+        <p className="admin-dashboard__empty">
+          No identity requests are waiting for review.
+        </p>
+      )}
     </div>
   );
 
   return (
-    <section aria-labelledby="admin-dashboard-title" className="admin-dashboard">
+    <section
+      aria-labelledby="admin-dashboard-title"
+      className="admin-dashboard"
+    >
       <header className="admin-dashboard__header">
         <div>
           <p className="admin-dashboard__eyebrow">MARKETPLACE OPERATIONS</p>
           <h1 id="admin-dashboard-title">Master admin</h1>
-          <p>Platform-wide vendor, order, account, verification and delivery oversight.</p>
+          <p>
+            Platform-wide vendor, order, account, verification and delivery
+            oversight.
+          </p>
           <Link className="admin-dashboard__escrow-link" to="/admin/escrow">
             Open escrow dispute operations
           </Link>
@@ -529,8 +719,22 @@ export default function AdminDashboard() {
         </button>
       </header>
 
-      {error && <p className="admin-dashboard__message admin-dashboard__message--error" role="alert"><AlertCircle size={18} /> {error}</p>}
-      {notice && <p className="admin-dashboard__message admin-dashboard__message--success" role="status"><CheckCircle2 size={18} /> {notice}</p>}
+      {error && (
+        <p
+          className="admin-dashboard__message admin-dashboard__message--error"
+          role="alert"
+        >
+          <AlertCircle size={18} /> {error}
+        </p>
+      )}
+      {notice && (
+        <p
+          className="admin-dashboard__message admin-dashboard__message--success"
+          role="status"
+        >
+          <CheckCircle2 size={18} /> {notice}
+        </p>
+      )}
 
       {overview?.summary && (
         <div className="admin-dashboard__stats">
@@ -540,18 +744,31 @@ export default function AdminDashboard() {
             ["Delivery partners", overview.summary.riderCount],
             ["Products", overview.summary.productCount],
             ["Marketplace orders", overview.summary.orderCount],
-            ["Pending identity reviews", overview.summary.pendingVerificationCount],
+            [
+              "Pending identity reviews",
+              overview.summary.pendingVerificationCount,
+            ],
           ].map(([label, count]) => (
-            <article key={label}><span>{label}</span><strong>{Number(count).toLocaleString()}</strong></article>
+            <article key={label}>
+              <span>{label}</span>
+              <strong>{Number(count).toLocaleString()}</strong>
+            </article>
           ))}
         </div>
       )}
 
-      <nav aria-label="Admin dashboard sections" className="admin-dashboard__tabs">
+      <nav
+        aria-label="Admin dashboard sections"
+        className="admin-dashboard__tabs"
+      >
         {sections.map(([key, label]) => (
           <button
             aria-current={section === key ? "page" : undefined}
-            className={section === key ? "admin-dashboard__tab admin-dashboard__tab--active" : "admin-dashboard__tab"}
+            className={
+              section === key
+                ? "admin-dashboard__tab admin-dashboard__tab--active"
+                : "admin-dashboard__tab"
+            }
             key={key}
             onClick={() => {
               setSection(key);
@@ -565,13 +782,22 @@ export default function AdminDashboard() {
       </nav>
 
       {loading && !overview ? (
-        <p className="admin-dashboard__empty" role="status">Loading platform oversight data...</p>
+        <p className="admin-dashboard__empty" role="status">
+          Loading platform oversight data...
+        </p>
       ) : (
         <section className="admin-dashboard__content">
           {section === "overview" && (
             <div className="admin-dashboard__welcome">
               <ShieldCheck aria-hidden="true" size={32} />
-              <div><h2>Platform health and access</h2><p>Use the dedicated sections to review vendors, inspect all order pages, manage customer/vendor/rider accounts, assign delivery partners and review Tier 2 requests.</p></div>
+              <div>
+                <h2>Platform health and access</h2>
+                <p>
+                  Use the dedicated sections to review vendors, inspect all
+                  order pages, manage customer/vendor/rider accounts, assign
+                  delivery partners and review Tier 2 requests.
+                </p>
+              </div>
             </div>
           )}
           {section === "vendors" && renderUsers(displayedVendors)}
@@ -584,12 +810,64 @@ export default function AdminDashboard() {
             <>
               <h2>Delivery partner accounts</h2>
               {renderUsers(riders)}
-              <form className="admin-dashboard__rider-form" onSubmit={createRider}>
-                <div><Users aria-hidden="true" size={20} /><h2>Register delivery partner</h2></div>
-                <label>Name<input autoComplete="name" maxLength={120} minLength={2} onChange={(event) => setRiderDraft({ ...riderDraft, name: event.target.value })} required value={riderDraft.name} /></label>
-                <label>Email<input autoComplete="email" onChange={(event) => setRiderDraft({ ...riderDraft, email: event.target.value })} required type="email" value={riderDraft.email} /></label>
-                <label>Temporary password (12+ characters)<input autoComplete="new-password" minLength={12} onChange={(event) => setRiderDraft({ ...riderDraft, password: event.target.value })} required type="password" value={riderDraft.password} /></label>
-                <button disabled={pendingAction === "create-rider"} type="submit">Create delivery partner</button>
+              <form
+                className="admin-dashboard__rider-form"
+                onSubmit={createRider}
+              >
+                <div>
+                  <Users aria-hidden="true" size={20} />
+                  <h2>Register delivery partner</h2>
+                </div>
+                <label>
+                  Name
+                  <input
+                    autoComplete="name"
+                    maxLength={120}
+                    minLength={2}
+                    onChange={(event) =>
+                      setRiderDraft({ ...riderDraft, name: event.target.value })
+                    }
+                    required
+                    value={riderDraft.name}
+                  />
+                </label>
+                <label>
+                  Email
+                  <input
+                    autoComplete="email"
+                    onChange={(event) =>
+                      setRiderDraft({
+                        ...riderDraft,
+                        email: event.target.value,
+                      })
+                    }
+                    required
+                    type="email"
+                    value={riderDraft.email}
+                  />
+                </label>
+                <label>
+                  Temporary password (12+ characters)
+                  <input
+                    autoComplete="new-password"
+                    minLength={12}
+                    onChange={(event) =>
+                      setRiderDraft({
+                        ...riderDraft,
+                        password: event.target.value,
+                      })
+                    }
+                    required
+                    type="password"
+                    value={riderDraft.password}
+                  />
+                </label>
+                <button
+                  disabled={pendingAction === "create-rider"}
+                  type="submit"
+                >
+                  Create delivery partner
+                </button>
               </form>
               <h2>Order delivery assignments</h2>
               {renderOrders()}

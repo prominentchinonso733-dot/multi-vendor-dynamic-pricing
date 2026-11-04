@@ -121,15 +121,8 @@ const toPublicUser = (user) => ({
 
 router.post("/register", async (req, res) => {
   try {
-    const {
-      name,
-      email,
-      password,
-      phone,
-      role,
-      businessName,
-      vendorTier,
-    } = req.body;
+    const { name, email, password, phone, role, businessName, vendorTier } =
+      req.body;
     const normalizedRole = normalizeRole(role || "BUYER");
 
     if (!["BUYER", "SELLER", "DELIVERY_PARTNER"].includes(normalizedRole)) {
@@ -191,6 +184,7 @@ router.post("/register", async (req, res) => {
       email: normalizedEmail,
       password: hashedPassword,
       role: normalizedRole,
+      accountStatus: "ACTIVE",
       ...(normalizedRole === "DELIVERY_PARTNER" && { phone: phone.trim() }),
       vendorDetails:
         normalizedRole === "SELLER"
@@ -244,7 +238,9 @@ router.post("/login", async (req, res) => {
 
 router.get("/verification", authenticateToken, async (req, res) => {
   try {
-    const user = await User.findById(req.user._id).select("verification").lean();
+    const user = await User.findById(req.user._id)
+      .select("verification")
+      .lean();
     if (!user) {
       return res.status(404).json({
         success: false,
@@ -461,8 +457,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
               bankName: user.vendorDetails.payoutDetails.bankName || "",
               bankCode: user.vendorDetails.payoutDetails.bankCode || "",
               accountName: user.vendorDetails.payoutDetails.accountName || "",
-              accountLast4:
-                user.vendorDetails.payoutDetails.accountLast4 || "",
+              accountLast4: user.vendorDetails.payoutDetails.accountLast4 || "",
             }
           : null,
         financialPolicy: getVendorPolicy(user),
@@ -538,7 +533,7 @@ router.put("/profile", authenticateToken, async (req, res) => {
       { new: true, runValidators: true },
     )
       .select(
-      "name email role storeName storeLogo storeBanner storeDescription vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.payoutDetails.bankName vendorDetails.payoutDetails.bankCode vendorDetails.payoutDetails.accountName vendorDetails.payoutDetails.accountLast4 verification",
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.payoutDetails.bankName vendorDetails.payoutDetails.bankCode vendorDetails.payoutDetails.accountName vendorDetails.payoutDetails.accountLast4 verification",
       )
       .lean();
     if (!user) {
@@ -576,8 +571,7 @@ router.put("/profile", authenticateToken, async (req, res) => {
               bankName: user.vendorDetails.payoutDetails.bankName || "",
               bankCode: user.vendorDetails.payoutDetails.bankCode || "",
               accountName: user.vendorDetails.payoutDetails.accountName || "",
-              accountLast4:
-                user.vendorDetails.payoutDetails.accountLast4 || "",
+              accountLast4: user.vendorDetails.payoutDetails.accountLast4 || "",
             }
           : null,
         financialPolicy: getVendorPolicy(user),

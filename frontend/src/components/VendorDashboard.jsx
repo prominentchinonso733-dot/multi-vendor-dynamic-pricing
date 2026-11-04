@@ -1,7 +1,12 @@
 import { useEffect, useRef, useState } from "react";
 import PropTypes from "prop-types";
 import { useLocation } from "react-router-dom";
-import { AlertCircle, CheckCircle2, RefreshCw, ShieldCheck } from "lucide-react";
+import {
+  AlertCircle,
+  CheckCircle2,
+  RefreshCw,
+  ShieldCheck,
+} from "lucide-react";
 import { getApiErrorMessage, getAssetUrl } from "../api";
 import { authService } from "../services/authService";
 import { pricingService } from "../services/pricingService";
@@ -173,7 +178,9 @@ export default function VendorDashboard({ onPriceUpdated }) {
         accountSummary?.isVerified === true));
 
   useEffect(() => {
-    if (new URLSearchParams(location.search).get("section") === "store-settings") {
+    if (
+      new URLSearchParams(location.search).get("section") === "store-settings"
+    ) {
       setActiveSection("store-settings");
     }
   }, [location.search]);
@@ -195,7 +202,10 @@ export default function VendorDashboard({ onPriceUpdated }) {
       .catch((error) => {
         if (!controller.signal.aborted) {
           setAccountSummaryError(
-            getApiErrorMessage(error, "Unable to load tier and wallet details."),
+            getApiErrorMessage(
+              error,
+              "Unable to load tier and wallet details.",
+            ),
           );
         }
       });
@@ -377,7 +387,9 @@ export default function VendorDashboard({ onPriceUpdated }) {
       setOrdersRefreshVersion((version) => version + 1);
       setOrdersNotice("Order status updated.");
     } catch (error) {
-      setOrdersError(getApiErrorMessage(error, "Unable to update order status."));
+      setOrdersError(
+        getApiErrorMessage(error, "Unable to update order status."),
+      );
     } finally {
       setPendingOrderStatusId(null);
     }
@@ -638,9 +650,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
       );
       setProducts((currentProducts) =>
         currentProducts.map((currentProduct) =>
-          currentProduct._id === product._id
-            ? updatedProduct
-            : currentProduct,
+          currentProduct._id === product._id ? updatedProduct : currentProduct,
         ),
       );
       setEditingProductId(null);
@@ -847,16 +857,27 @@ export default function VendorDashboard({ onPriceUpdated }) {
                     : "Tier 1 · Verification required"}
             </strong>
             <span>
-              {((accountSummary.financialPolicy?.commissionRate || 0) * 100).toFixed(0)}% platform commission
+              {(
+                (accountSummary.financialPolicy?.commissionRate || 0) * 100
+              ).toFixed(0)}
+              % platform commission
             </span>
           </div>
           <div>
             <span>Per-order cap</span>
-            <strong>{currencyFormatter.format(accountSummary.financialPolicy?.orderValueLimit || 0)}</strong>
+            <strong>
+              {currencyFormatter.format(
+                accountSummary.financialPolicy?.orderValueLimit || 0,
+              )}
+            </strong>
           </div>
           <div>
             <span>Daily sales cap</span>
-            <strong>{currencyFormatter.format(accountSummary.financialPolicy?.dailyVolumeLimit || 0)}</strong>
+            <strong>
+              {currencyFormatter.format(
+                accountSummary.financialPolicy?.dailyVolumeLimit || 0,
+              )}
+            </strong>
           </div>
           <div>
             <span>Pending in escrow</span>
@@ -877,12 +898,18 @@ export default function VendorDashboard({ onPriceUpdated }) {
         </section>
       )}
       {withdrawalError && (
-        <p className="vendor-pricing__message vendor-pricing__message--error" role="alert">
+        <p
+          className="vendor-pricing__message vendor-pricing__message--error"
+          role="alert"
+        >
           {withdrawalError}
         </p>
       )}
       {withdrawalNotice && (
-        <p className="vendor-pricing__message vendor-pricing__message--success" role="status">
+        <p
+          className="vendor-pricing__message vendor-pricing__message--success"
+          role="status"
+        >
           {withdrawalNotice}
         </p>
       )}
@@ -896,84 +923,92 @@ export default function VendorDashboard({ onPriceUpdated }) {
           >
             <h2 id="vendor-withdraw-title">Withdraw available funds</h2>
             <form onSubmit={submitWithdrawal}>
-            <p>
-              Amount: <strong>{currencyFormatter.format(walletBalance)}</strong>
-            </p>
-            {accountSummary?.payoutDetails ? (
               <p>
-                Payout to {accountSummary.payoutDetails.bankName}, account
-                ending {accountSummary.payoutDetails.accountLast4}.
+                Amount:{" "}
+                <strong>{currencyFormatter.format(walletBalance)}</strong>
               </p>
-            ) : (
-              <>
+              {accountSummary?.payoutDetails ? (
                 <p>
-                  Enter and verify a bank account for this withdrawal. Paystack
-                  checks that the account name matches your legal name.
+                  Payout to {accountSummary.payoutDetails.bankName}, account
+                  ending {accountSummary.payoutDetails.accountLast4}.
                 </p>
-                <label>
-                  Bank name
-                  <select
-                    onChange={(event) =>
-                      setWithdrawalBankCode(event.target.value)
-                    }
-                    required
-                    value={withdrawalBankCode}
-                  >
-                    <option value="">Select payout bank</option>
-                    {withdrawalBanks.map((bank) => (
-                      <option key={bank.code} value={bank.code}>
-                        {bank.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label>
-                  Account number
-                  <input
-                    autoComplete="off"
-                    inputMode="numeric"
-                    maxLength={10}
-                    minLength={10}
-                    onChange={(event) =>
-                      setWithdrawalAccountNumber(
-                        event.target.value.replace(/\D/g, "").slice(0, 10),
-                      )
-                    }
-                    pattern="\d{10}"
-                    required
-                    value={withdrawalAccountNumber}
-                  />
-                </label>
-              </>
-            )}
-            {withdrawalError && (
-              <p className="vendor-pricing__message vendor-pricing__message--error" role="alert">
-                {withdrawalError}
-              </p>
-            )}
-            <div className="vendor-pricing__withdraw-actions">
-              <button
-                className="vendor-pricing__refresh"
-                disabled={withdrawalPending}
-                onClick={() => setWithdrawalOpen(false)}
-                type="button"
-              >
-                Cancel
-              </button>
-              <button
-                className="vendor-pricing__calculate"
-                disabled={withdrawalPending}
-                type="submit"
-              >
-                {withdrawalPending ? "Processing..." : "Confirm withdrawal"}
-              </button>
-            </div>
+              ) : (
+                <>
+                  <p>
+                    Enter and verify a bank account for this withdrawal.
+                    Paystack checks that the account name matches your legal
+                    name.
+                  </p>
+                  <label>
+                    Bank name
+                    <select
+                      onChange={(event) =>
+                        setWithdrawalBankCode(event.target.value)
+                      }
+                      required
+                      value={withdrawalBankCode}
+                    >
+                      <option value="">Select payout bank</option>
+                      {withdrawalBanks.map((bank) => (
+                        <option key={bank.code} value={bank.code}>
+                          {bank.name}
+                        </option>
+                      ))}
+                    </select>
+                  </label>
+                  <label>
+                    Account number
+                    <input
+                      autoComplete="off"
+                      inputMode="numeric"
+                      maxLength={10}
+                      minLength={10}
+                      onChange={(event) =>
+                        setWithdrawalAccountNumber(
+                          event.target.value.replace(/\D/g, "").slice(0, 10),
+                        )
+                      }
+                      pattern="\d{10}"
+                      required
+                      value={withdrawalAccountNumber}
+                    />
+                  </label>
+                </>
+              )}
+              {withdrawalError && (
+                <p
+                  className="vendor-pricing__message vendor-pricing__message--error"
+                  role="alert"
+                >
+                  {withdrawalError}
+                </p>
+              )}
+              <div className="vendor-pricing__withdraw-actions">
+                <button
+                  className="vendor-pricing__refresh"
+                  disabled={withdrawalPending}
+                  onClick={() => setWithdrawalOpen(false)}
+                  type="button"
+                >
+                  Cancel
+                </button>
+                <button
+                  className="vendor-pricing__calculate"
+                  disabled={withdrawalPending}
+                  type="submit"
+                >
+                  {withdrawalPending ? "Processing..." : "Confirm withdrawal"}
+                </button>
+              </div>
             </form>
           </section>
         </div>
       )}
       {accountSummaryError && (
-        <p className="vendor-pricing__message vendor-pricing__message--error" role="alert">
+        <p
+          className="vendor-pricing__message vendor-pricing__message--error"
+          role="alert"
+        >
           {accountSummaryError}
         </p>
       )}
@@ -1049,9 +1084,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
             <button
               className="vendor-pricing__refresh"
               disabled={ordersLoading}
-              onClick={() =>
-                setOrdersRefreshVersion((version) => version + 1)
-              }
+              onClick={() => setOrdersRefreshVersion((version) => version + 1)}
               type="button"
             >
               <RefreshCw
@@ -1146,14 +1179,20 @@ export default function VendorDashboard({ onPriceUpdated }) {
                         <option value="PROCESSING">Processing</option>
                         <option value="SHIPPED">Shipped</option>
                         {status === "DELIVERED" && (
-                          <option disabled value="DELIVERED">Delivered by rider</option>
+                          <option disabled value="DELIVERED">
+                            Delivered by rider
+                          </option>
                         )}
                       </select>
                     </label>
                     {order.vendorPayout && (
                       <p className="vendor-pricing__payout">
-                        Tier {order.vendorPayout.tier.replace("TIER_", "")} · platform fee{" "}
-                        {currencyFormatter.format(order.vendorPayout.platformFee)} · net payout{" "}
+                        Tier {order.vendorPayout.tier.replace("TIER_", "")} ·
+                        platform fee{" "}
+                        {currencyFormatter.format(
+                          order.vendorPayout.platformFee,
+                        )}{" "}
+                        · net payout{" "}
                         {currencyFormatter.format(order.vendorPayout.netAmount)}
                       </p>
                     )}
@@ -1172,8 +1211,9 @@ export default function VendorDashboard({ onPriceUpdated }) {
             >
               <ShieldCheck aria-hidden="true" size={18} />
               <span>
-                Activate your monthly plan and complete the required identity review in
-                Store Settings before listing products or changing prices.
+                Activate your monthly plan and complete the required identity
+                review in Store Settings before listing products or changing
+                prices.
               </span>
               <button
                 onClick={() => setActiveSection("store-settings")}
@@ -1241,7 +1281,9 @@ export default function VendorDashboard({ onPriceUpdated }) {
                 />
               </label>
               <div className="vendor-pricing__field vendor-pricing__field--wide">
-                <label htmlFor="new-product-image">Product photo (optional)</label>
+                <label htmlFor="new-product-image">
+                  Product photo (optional)
+                </label>
                 <input
                   accept="image/jpeg,image/png,image/webp"
                   id="new-product-image"
@@ -1777,7 +1819,9 @@ export default function VendorDashboard({ onPriceUpdated }) {
                         className={`vendor-pricing__live-preview vendor-pricing__live-preview--${preview.direction}`}
                       >
                         Live preview:{" "}
-                        <strong>{currencyFormatter.format(preview.price)}</strong>
+                        <strong>
+                          {currencyFormatter.format(preview.price)}
+                        </strong>
                         {" · "}
                         {preview.direction === "up"
                           ? "price increasing"
@@ -1888,11 +1932,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
             </div>
           )}
           {selectedTier === "TIER_2" ? (
-            <VerificationPanel
-              compact
-              key={location.key}
-              requirePayoutBank
-            />
+            <VerificationPanel compact key={location.key} requirePayoutBank />
           ) : (
             <Tier1VerificationPanel
               key={location.key}

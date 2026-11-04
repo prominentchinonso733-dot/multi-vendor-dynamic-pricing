@@ -1,0 +1,1997 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="theme-color" content="#071311" />
+    <title>Multi-Vendor Marketplace | Group Presentation</title>
+    <style>
+      :root {
+        color-scheme: dark;
+        --ink: #edf4ef;
+        --muted: #a4b8af;
+        --faint: #71877e;
+        --bg: #071311;
+        --panel: #0e201c;
+        --panel-2: #122923;
+        --line: #28443a;
+        --green: #64d5ad;
+        --mint: #b7f4d8;
+        --gold: #efc47b;
+        --red: #f08f78;
+        --serif: Georgia, "Times New Roman", serif;
+        --sans: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont,
+          "Segoe UI", sans-serif;
+      }
+
+      * {
+        box-sizing: border-box;
+      }
+
+      html,
+      body {
+        width: 100%;
+        height: 100%;
+        margin: 0;
+        overflow: hidden;
+        background: var(--bg);
+        color: var(--ink);
+        font-family: var(--sans);
+      }
+
+      body {
+        background:
+          radial-gradient(ellipse at 82% 4%, rgb(39 111 83 / 17%), transparent 31%),
+          radial-gradient(ellipse at 4% 92%, rgb(35 92 77 / 11%), transparent 36%),
+          var(--bg);
+      }
+
+      button {
+        color: inherit;
+        font: inherit;
+      }
+
+      .deck {
+        position: relative;
+        width: 100vw;
+        height: 100vh;
+        isolation: isolate;
+      }
+
+      .slide {
+        position: absolute;
+        inset: 0;
+        display: grid;
+        grid-template-rows: auto 1fr auto;
+        gap: clamp(18px, 3vh, 30px);
+        padding: clamp(28px, 5.6vh, 54px) clamp(30px, 7vw, 104px)
+          clamp(66px, 8vh, 86px);
+        overflow: hidden;
+        opacity: 0;
+        visibility: hidden;
+        transform: translateX(18px);
+        transition:
+          opacity 380ms ease,
+          transform 380ms ease,
+          visibility 380ms;
+        background-image:
+          linear-gradient(rgb(255 255 255 / 1.7%) 1px, transparent 1px),
+          linear-gradient(90deg, rgb(255 255 255 / 1.7%) 1px, transparent 1px);
+        background-size: 64px 64px;
+        background-position: center center;
+      }
+
+      .slide::before {
+        position: absolute;
+        z-index: -1;
+        width: min(45vw, 540px);
+        aspect-ratio: 1;
+        top: -34%;
+        right: -14%;
+        border: 1px solid rgb(100 213 173 / 10%);
+        border-radius: 50%;
+        box-shadow:
+          0 0 0 54px rgb(100 213 173 / 2%),
+          0 0 0 110px rgb(100 213 173 / 1.4%);
+        content: "";
+        pointer-events: none;
+      }
+
+      .slide.active {
+        z-index: 1;
+        opacity: 1;
+        visibility: visible;
+        transform: translateX(0);
+      }
+
+      .slide-head,
+      .slide-foot {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 20px;
+      }
+
+      .brand {
+        display: inline-flex;
+        align-items: center;
+        gap: 10px;
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 750;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .brand-mark {
+        display: grid;
+        width: 27px;
+        height: 27px;
+        place-items: center;
+        border: 1px solid rgb(100 213 173 / 46%);
+        border-radius: 8px;
+        background: rgb(100 213 173 / 12%);
+        color: var(--mint);
+        font-size: 13px;
+        letter-spacing: 0;
+      }
+
+      .eyebrow {
+        margin: 0 0 12px;
+        color: var(--green);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.18em;
+        text-transform: uppercase;
+      }
+
+      h1,
+      h2,
+      h3,
+      p {
+        margin-top: 0;
+      }
+
+      h1,
+      h2 {
+        font-family: var(--serif);
+        font-weight: 500;
+        letter-spacing: -0.035em;
+      }
+
+      h1 {
+        max-width: 880px;
+        margin-bottom: 22px;
+        font-size: clamp(46px, 7.3vw, 94px);
+        line-height: 0.99;
+      }
+
+      h2 {
+        max-width: 880px;
+        margin-bottom: 13px;
+        font-size: clamp(36px, 4.3vw, 58px);
+        line-height: 1.04;
+      }
+
+      h3 {
+        margin-bottom: 9px;
+        font-size: clamp(15px, 1.6vw, 20px);
+        line-height: 1.22;
+      }
+
+      .lede {
+        max-width: 710px;
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: clamp(16px, 1.7vw, 21px);
+        line-height: 1.55;
+      }
+
+      .slide-foot {
+        color: var(--faint);
+        font-size: 10px;
+        letter-spacing: 0.09em;
+        text-transform: uppercase;
+      }
+
+      .foot-rule {
+        width: 42px;
+        height: 1px;
+        margin-right: auto;
+        background: var(--line);
+      }
+
+      .speaker {
+        color: var(--muted);
+        letter-spacing: 0.06em;
+      }
+
+      .slide-number {
+        color: var(--mint);
+        font-variant-numeric: tabular-nums;
+      }
+
+      .content {
+        min-height: 0;
+        align-self: center;
+      }
+
+      .title-slide {
+        grid-template-rows: auto 1fr auto;
+      }
+
+      .title-main {
+        position: relative;
+        display: flex;
+        align-items: center;
+        min-height: 0;
+      }
+
+      .title-copy {
+        position: relative;
+        z-index: 1;
+        width: min(74%, 850px);
+        padding: 4vh 0;
+      }
+
+      .title-copy .lede {
+        max-width: 640px;
+      }
+
+      .title-orbit {
+        position: absolute;
+        top: 50%;
+        right: 3%;
+        width: min(36vw, 430px);
+        aspect-ratio: 1;
+        transform: translateY(-50%);
+      }
+
+      .title-orbit::before,
+      .title-orbit::after {
+        position: absolute;
+        inset: 4%;
+        border: 1px solid rgb(100 213 173 / 24%);
+        border-radius: 50%;
+        content: "";
+      }
+
+      .title-orbit::after {
+        inset: 19%;
+        border-color: rgb(100 213 173 / 36%);
+      }
+
+      .orbit-core {
+        position: absolute;
+        inset: 34%;
+        display: grid;
+        place-items: center;
+        border: 1px solid rgb(183 244 216 / 45%);
+        border-radius: 50%;
+        background:
+          radial-gradient(circle at 35% 30%, rgb(100 213 173 / 45%), transparent 62%),
+          #123129;
+        box-shadow: 0 0 80px rgb(72 214 159 / 20%);
+        color: var(--mint);
+        font-size: clamp(44px, 6vw, 78px);
+      }
+
+      .orbit-node {
+        position: absolute;
+        display: grid;
+        width: 48px;
+        height: 48px;
+        place-items: center;
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        background: #10221e;
+        color: var(--mint);
+        box-shadow: 0 10px 32px rgb(0 0 0 / 24%);
+        font-size: 19px;
+      }
+
+      .orbit-node.n1 { top: 4%; left: 44%; }
+      .orbit-node.n2 { top: 45%; right: 1%; }
+      .orbit-node.n3 { bottom: 3%; left: 42%; }
+      .orbit-node.n4 { top: 44%; left: 0; }
+
+      .title-meta {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 10px;
+        margin-top: 28px;
+      }
+
+      .pill,
+      .tag {
+        display: inline-flex;
+        align-items: center;
+        gap: 7px;
+        border: 1px solid var(--line);
+        border-radius: 999px;
+        background: rgb(14 32 28 / 72%);
+        color: var(--muted);
+        font-size: 11px;
+        font-weight: 650;
+      }
+
+      .pill {
+        padding: 8px 12px;
+      }
+
+      .pill strong {
+        color: var(--mint);
+        font-weight: 750;
+      }
+
+      .split {
+        display: grid;
+        grid-template-columns: minmax(0, 0.92fr) minmax(360px, 1.08fr);
+        align-items: center;
+        gap: clamp(28px, 5vw, 72px);
+      }
+
+      .split.reverse {
+        grid-template-columns: minmax(360px, 1.08fr) minmax(0, 0.92fr);
+      }
+
+      .copy-stack {
+        display: grid;
+        gap: 14px;
+      }
+
+      .copy-stack p {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: clamp(14px, 1.3vw, 17px);
+        line-height: 1.58;
+      }
+
+      .card-grid {
+        display: grid;
+        grid-template-columns: repeat(2, minmax(0, 1fr));
+        gap: 12px;
+      }
+
+      .card {
+        position: relative;
+        min-width: 0;
+        padding: clamp(16px, 2vw, 23px);
+        border: 1px solid var(--line);
+        border-radius: 16px;
+        background:
+          linear-gradient(145deg, rgb(255 255 255 / 2.8%), transparent 74%),
+          rgb(14 32 28 / 84%);
+      }
+
+      .card p,
+      .card li {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: clamp(12px, 1.15vw, 15px);
+        line-height: 1.48;
+      }
+
+      .card .icon {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        margin-bottom: 15px;
+        place-items: center;
+        border: 1px solid rgb(100 213 173 / 26%);
+        border-radius: 11px;
+        background: rgb(100 213 173 / 10%);
+        color: var(--mint);
+        font-size: 16px;
+      }
+
+      .card .metric {
+        display: block;
+        margin: 5px 0;
+        color: var(--mint);
+        font-size: clamp(26px, 3vw, 40px);
+        font-weight: 730;
+        letter-spacing: -0.05em;
+        line-height: 1;
+      }
+
+      .card .metric-label {
+        color: var(--faint);
+        font-size: 10px;
+        font-weight: 750;
+        letter-spacing: 0.12em;
+        text-transform: uppercase;
+      }
+
+      .card-grid.three {
+        grid-template-columns: repeat(3, minmax(0, 1fr));
+      }
+
+      .card-grid.three .card {
+        padding: 18px;
+      }
+
+      .key-feature-grid {
+        display: grid;
+        grid-template-columns: repeat(6, minmax(0, 1fr));
+        gap: 12px;
+        margin-top: 24px;
+      }
+
+      .key-feature {
+        grid-column: span 2;
+        min-height: 150px;
+        padding: 17px 18px;
+        border: 1px solid rgb(100 213 173 / 27%);
+        border-radius: 15px;
+        background:
+          linear-gradient(145deg, rgb(100 213 173 / 7%), transparent 75%),
+          rgb(14 32 28 / 91%);
+      }
+
+      .key-feature:nth-child(4) {
+        grid-column: 2 / span 2;
+      }
+
+      .key-feature:nth-child(5) {
+        grid-column: 4 / span 2;
+      }
+
+      .key-feature .feature-number {
+        display: inline-flex;
+        margin-bottom: 12px;
+        color: var(--green);
+        font-size: 10px;
+        font-weight: 850;
+        letter-spacing: 0.13em;
+      }
+
+      .key-feature h3 {
+        margin-bottom: 7px;
+        color: var(--mint);
+        font-size: clamp(14px, 1.35vw, 18px);
+      }
+
+      .key-feature p {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: clamp(11px, 1vw, 13px);
+        line-height: 1.45;
+      }
+
+      .screenshot-frame {
+        position: relative;
+        overflow: hidden;
+        border: 1px solid rgb(183 244 216 / 24%);
+        border-radius: 15px;
+        background: #f4f7f5;
+        box-shadow:
+          0 28px 80px rgb(0 0 0 / 42%),
+          0 0 0 7px rgb(255 255 255 / 2.5%);
+      }
+
+      .screenshot-frame img {
+        display: block;
+        width: 100%;
+        height: auto;
+        max-height: 54vh;
+        object-fit: contain;
+        object-position: top center;
+      }
+
+      .screenshot-frame.wide img {
+        max-height: 50vh;
+      }
+
+      .screenshot-caption {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 12px;
+        padding: 11px 15px;
+        border-top: 1px solid var(--line);
+        background: #10221e;
+        color: var(--muted);
+        font-size: 11px;
+      }
+
+      .screenshot-caption strong {
+        color: var(--mint);
+        font-weight: 700;
+      }
+
+      .image-pair {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 18px;
+        align-items: center;
+      }
+
+      .image-pair .screenshot-frame img {
+        max-height: 33vh;
+      }
+
+      .image-pair .screenshot-caption {
+        padding: 9px 11px;
+        font-size: 10px;
+      }
+
+      .section-label {
+        display: inline-flex;
+        align-items: center;
+        gap: 9px;
+        margin: 0 0 16px;
+        color: var(--gold);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.16em;
+        text-transform: uppercase;
+      }
+
+      .section-label::before {
+        width: 22px;
+        height: 1px;
+        background: var(--gold);
+        content: "";
+      }
+
+      .problem-list {
+        display: grid;
+        gap: 12px;
+        margin: 26px 0 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .problem-list li {
+        display: grid;
+        grid-template-columns: 30px 1fr;
+        gap: 12px;
+        align-items: start;
+        color: var(--muted);
+        font-size: 14px;
+        line-height: 1.45;
+      }
+
+      .problem-list .bullet {
+        display: grid;
+        width: 27px;
+        height: 27px;
+        place-items: center;
+        border-radius: 50%;
+        background: rgb(240 143 120 / 12%);
+        color: var(--red);
+        font-size: 12px;
+      }
+
+      .problem-list strong {
+        display: block;
+        margin-bottom: 2px;
+        color: var(--ink);
+        font-size: 14px;
+      }
+
+      .quote-panel {
+        padding: clamp(22px, 3vw, 34px);
+        border-left: 2px solid var(--green);
+        border-radius: 0 16px 16px 0;
+        background: linear-gradient(90deg, rgb(100 213 173 / 9%), transparent);
+      }
+
+      .quote-panel p {
+        margin: 0;
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: clamp(22px, 2.5vw, 34px);
+        line-height: 1.25;
+      }
+
+      .quote-panel small {
+        display: block;
+        margin-top: 14px;
+        color: var(--muted);
+        font-size: 11px;
+        letter-spacing: 0.08em;
+        text-transform: uppercase;
+      }
+
+      .flow {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 22px;
+        margin-top: 32px;
+      }
+
+      .flow-step {
+        position: relative;
+        min-height: 175px;
+        padding: 22px 18px;
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        background: linear-gradient(155deg, #11251f, #0b1916);
+      }
+
+      .flow-step:not(:last-child)::after {
+        position: absolute;
+        top: 34px;
+        right: -19px;
+        color: var(--green);
+        content: "→";
+        font-size: 20px;
+      }
+
+      .flow-step .step-no {
+        display: block;
+        margin-bottom: 21px;
+        color: var(--green);
+        font-size: 11px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+      }
+
+      .flow-step p {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 13px;
+        line-height: 1.48;
+      }
+
+      .role-row {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 13px;
+        margin-top: 27px;
+      }
+
+      .role-card {
+        padding: 17px;
+        border: 1px solid var(--line);
+        border-radius: 14px;
+        background: rgb(14 32 28 / 82%);
+      }
+
+      .role-card .role-icon {
+        margin-bottom: 10px;
+        color: var(--green);
+        font-size: 19px;
+      }
+
+      .role-card h3 {
+        margin-bottom: 6px;
+        font-size: 15px;
+      }
+
+      .role-card p {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 12px;
+        line-height: 1.45;
+      }
+
+      .metric-strip {
+        display: grid;
+        grid-template-columns: repeat(4, minmax(0, 1fr));
+        gap: 10px;
+        margin-top: 18px;
+      }
+
+      .metric-box {
+        padding: 15px 17px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgb(14 32 28 / 72%);
+      }
+
+      .metric-box strong {
+        display: block;
+        margin-bottom: 5px;
+        color: var(--mint);
+        font-size: clamp(22px, 2.7vw, 34px);
+        font-weight: 750;
+        letter-spacing: -0.05em;
+      }
+
+      .metric-box span {
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.35;
+      }
+
+      .tier-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 14px;
+        margin-top: 18px;
+      }
+
+      .tier-card {
+        padding: 19px;
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        background: linear-gradient(140deg, #132822, #0d1d19);
+      }
+
+      .tier-card.featured {
+        border-color: rgb(100 213 173 / 55%);
+        box-shadow: inset 0 0 30px rgb(100 213 173 / 4%);
+      }
+
+      .tier-card .tier-name {
+        color: var(--green);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .tier-card .tier-price {
+        margin: 8px 0 13px;
+        color: var(--ink);
+        font-family: var(--serif);
+        font-size: 31px;
+      }
+
+      .tier-card .tier-price small {
+        color: var(--muted);
+        font-family: var(--sans);
+        font-size: 12px;
+      }
+
+      .tier-card ul {
+        display: grid;
+        gap: 8px;
+        margin: 0;
+        padding: 0;
+        list-style: none;
+      }
+
+      .tier-card li {
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .tier-card li::before {
+        margin-right: 8px;
+        color: var(--green);
+        content: "✓";
+      }
+
+      .price-equation {
+        display: grid;
+        grid-template-columns: 1fr auto 1fr auto 1fr;
+        align-items: center;
+        gap: 12px;
+        margin: 22px 0 14px;
+      }
+
+      .equation-cell {
+        min-height: 86px;
+        display: grid;
+        align-content: center;
+        gap: 8px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 13px;
+        background: var(--panel);
+      }
+
+      .equation-cell strong {
+        color: var(--ink);
+        font-size: 13px;
+      }
+
+      .equation-cell span {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.35;
+      }
+
+      .equation-sign {
+        color: var(--green);
+        font-size: 22px;
+      }
+
+      .guardrail {
+        display: flex;
+        align-items: center;
+        justify-content: space-between;
+        gap: 16px;
+        padding: 12px 15px;
+        border: 1px solid rgb(100 213 173 / 28%);
+        border-radius: 11px;
+        background: rgb(100 213 173 / 7%);
+        color: var(--muted);
+        font-size: 12px;
+      }
+
+      .guardrail strong {
+        color: var(--mint);
+      }
+
+      .checkout-stats {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 12px;
+        margin-top: 20px;
+      }
+
+      .checkout-stats .card {
+        padding: 16px;
+      }
+
+      .checkout-stats .card .metric {
+        font-size: clamp(23px, 2.5vw, 32px);
+      }
+
+      .data-flow {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 11px;
+        margin-top: 18px;
+      }
+
+      .flow-node {
+        display: flex;
+        align-items: center;
+        gap: 13px;
+        padding: 14px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgb(14 32 28 / 84%);
+      }
+
+      .flow-node .node-dot {
+        flex: 0 0 auto;
+        width: 10px;
+        height: 10px;
+        border-radius: 50%;
+        background: var(--green);
+        box-shadow: 0 0 15px rgb(100 213 173 / 60%);
+      }
+
+      .flow-node strong {
+        display: block;
+        margin-bottom: 3px;
+        color: var(--ink);
+        font-size: 12px;
+      }
+
+      .flow-node span {
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.35;
+      }
+
+      .admin-callout {
+        margin-top: 14px;
+        padding: 13px 15px;
+        border: 1px solid rgb(239 196 123 / 32%);
+        border-radius: 11px;
+        background: rgb(239 196 123 / 7%);
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .admin-callout strong {
+        color: var(--gold);
+      }
+
+      .escrow-diagram {
+        display: grid;
+        gap: 12px;
+        padding: clamp(18px, 2.4vw, 30px);
+        border: 1px solid rgb(100 213 173 / 24%);
+        border-radius: 18px;
+        background:
+          radial-gradient(ellipse at 50% 40%, rgb(100 213 173 / 8%), transparent 57%),
+          linear-gradient(150deg, #10241e, #0a1714);
+      }
+
+      .escrow-party,
+      .escrow-vault,
+      .escrow-outcome {
+        display: grid;
+        gap: 5px;
+        padding: 14px 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgb(7 19 17 / 62%);
+      }
+
+      .escrow-party {
+        grid-template-columns: auto 1fr;
+        align-items: center;
+        gap: 12px;
+      }
+
+      .escrow-party .icon {
+        display: grid;
+        width: 35px;
+        height: 35px;
+        place-items: center;
+        border: 1px solid rgb(100 213 173 / 26%);
+        border-radius: 11px;
+        background: rgb(100 213 173 / 10%);
+        color: var(--mint);
+      }
+
+      .escrow-party strong,
+      .escrow-vault strong,
+      .escrow-outcome strong {
+        color: var(--ink);
+        font-size: 13px;
+      }
+
+      .escrow-party span,
+      .escrow-vault span,
+      .escrow-outcome span {
+        color: var(--muted);
+        font-size: 10px;
+        line-height: 1.4;
+      }
+
+      .escrow-arrow {
+        color: var(--green);
+        font-size: 19px;
+        line-height: 1;
+        text-align: center;
+      }
+
+      .escrow-vault {
+        padding: 21px 18px;
+        border-color: rgb(100 213 173 / 50%);
+        background:
+          radial-gradient(circle at 50% 0, rgb(100 213 173 / 13%), transparent 75%),
+          rgb(7 19 17 / 78%);
+        text-align: center;
+      }
+
+      .escrow-vault strong {
+        color: var(--mint);
+        font-size: 17px;
+      }
+
+      .escrow-outcomes {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 9px;
+      }
+
+      .escrow-outcome:first-child {
+        border-color: rgb(100 213 173 / 28%);
+      }
+
+      .escrow-outcome:last-child {
+        border-color: rgb(239 196 123 / 28%);
+      }
+
+      .escrow-outcome:last-child strong {
+        color: var(--gold);
+      }
+
+      .architecture {
+        display: grid;
+        grid-template-columns: 1fr 0.24fr 1fr 0.24fr 1fr;
+        align-items: stretch;
+        gap: 9px;
+        margin: 25px 0 19px;
+      }
+
+      .arch-box {
+        display: grid;
+        align-content: start;
+        gap: 11px;
+        padding: 18px 16px;
+        border: 1px solid var(--line);
+        border-radius: 15px;
+        background: linear-gradient(145deg, #132721, #0b1916);
+      }
+
+      .arch-box .arch-label {
+        color: var(--green);
+        font-size: 9px;
+        font-weight: 800;
+        letter-spacing: 0.13em;
+        text-transform: uppercase;
+      }
+
+      .arch-box strong {
+        font-size: 15px;
+      }
+
+      .arch-box p {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.45;
+      }
+
+      .arch-arrow {
+        display: grid;
+        place-items: center;
+        color: var(--green);
+        font-size: 20px;
+      }
+
+      .service-row {
+        display: flex;
+        flex-wrap: wrap;
+        gap: 8px;
+      }
+
+      .tag {
+        padding: 6px 9px;
+        font-size: 10px;
+      }
+
+      .service-note {
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.5;
+      }
+
+      .closing-layout {
+        display: grid;
+        grid-template-columns: 1.05fr 0.95fr;
+        align-items: center;
+        gap: 56px;
+      }
+
+      .roadmap {
+        display: grid;
+        gap: 10px;
+      }
+
+      .roadmap-row {
+        display: grid;
+        grid-template-columns: 82px 1fr;
+        gap: 14px;
+        padding: 15px 16px;
+        border: 1px solid var(--line);
+        border-radius: 12px;
+        background: rgb(14 32 28 / 82%);
+      }
+
+      .roadmap-row .when {
+        color: var(--green);
+        font-size: 10px;
+        font-weight: 800;
+        letter-spacing: 0.1em;
+        text-transform: uppercase;
+      }
+
+      .roadmap-row strong {
+        display: block;
+        margin-bottom: 4px;
+        font-size: 13px;
+      }
+
+      .roadmap-row p {
+        margin-bottom: 0;
+        color: var(--muted);
+        font-size: 11px;
+        line-height: 1.42;
+      }
+
+      .closing-mark {
+        display: grid;
+        width: 100%;
+        min-height: 270px;
+        place-items: center;
+        border: 1px solid rgb(100 213 173 / 22%);
+        border-radius: 22px;
+        background:
+          radial-gradient(circle at 50% 45%, rgb(100 213 173 / 18%), transparent 53%),
+          linear-gradient(150deg, rgb(19 47 39 / 85%), rgb(9 23 19 / 95%));
+      }
+
+      .closing-mark .orbit-core {
+        position: relative;
+        inset: auto;
+        width: 120px;
+        height: 120px;
+        font-size: 54px;
+      }
+
+      .closing-mark p {
+        align-self: start;
+        margin: -20px 0 0;
+        color: var(--muted);
+        font-family: var(--serif);
+        font-size: 25px;
+      }
+
+      .controls {
+        position: fixed;
+        z-index: 10;
+        right: clamp(18px, 3.2vw, 46px);
+        bottom: clamp(17px, 3vh, 28px);
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        padding: 7px;
+        border: 1px solid rgb(183 244 216 / 16%);
+        border-radius: 999px;
+        background: rgb(7 19 17 / 88%);
+        box-shadow: 0 10px 35px rgb(0 0 0 / 28%);
+        backdrop-filter: blur(14px);
+      }
+
+      .controls button {
+        display: grid;
+        width: 34px;
+        height: 34px;
+        place-items: center;
+        border: 1px solid transparent;
+        border-radius: 50%;
+        background: transparent;
+        color: var(--mint);
+        cursor: pointer;
+        transition: background 160ms ease;
+      }
+
+      .controls button:hover,
+      .controls button:focus-visible {
+        outline: none;
+        background: rgb(100 213 173 / 14%);
+      }
+
+      .controls .counter {
+        min-width: 49px;
+        color: var(--muted);
+        font-size: 11px;
+        font-variant-numeric: tabular-nums;
+        text-align: center;
+      }
+
+      .progress {
+        position: fixed;
+        z-index: 11;
+        right: 0;
+        bottom: 0;
+        left: 0;
+        height: 3px;
+        background: rgb(255 255 255 / 7%);
+      }
+
+      .progress span {
+        display: block;
+        width: 8.333%;
+        height: 100%;
+        background: linear-gradient(90deg, #43b98e, #b7f4d8);
+        box-shadow: 0 0 14px rgb(100 213 173 / 48%);
+        transition: width 350ms ease;
+      }
+
+      .sr-only {
+        position: absolute;
+        width: 1px;
+        height: 1px;
+        overflow: hidden;
+        clip: rect(0, 0, 0, 0);
+        white-space: nowrap;
+        clip-path: inset(50%);
+      }
+
+      @media (max-width: 850px) {
+        .slide {
+          padding-right: 5vw;
+          padding-left: 5vw;
+        }
+
+        .split,
+        .split.reverse,
+        .closing-layout {
+          grid-template-columns: 1fr;
+          gap: 20px;
+        }
+
+        .split .copy-stack,
+        .split.reverse .copy-stack {
+          order: 0;
+        }
+
+        .split .screenshot-frame,
+        .split.reverse .screenshot-frame {
+          order: 1;
+        }
+
+        .title-copy {
+          width: 82%;
+        }
+
+        .title-orbit {
+          right: -8%;
+          opacity: 0.72;
+        }
+
+        .flow {
+          gap: 12px;
+        }
+
+        .flow-step:not(:last-child)::after {
+          right: -13px;
+        }
+
+        .role-row {
+          grid-template-columns: repeat(2, 1fr);
+        }
+
+        .closing-mark {
+          display: none;
+        }
+      }
+
+      @media (max-width: 600px) {
+        .slide {
+          gap: 16px;
+          padding: 24px 23px 72px;
+        }
+
+        .slide-head .brand {
+          font-size: 9px;
+        }
+
+        h1 {
+          font-size: clamp(43px, 12vw, 62px);
+        }
+
+        h2 {
+          font-size: clamp(34px, 9vw, 46px);
+        }
+
+        .title-copy {
+          width: 100%;
+        }
+
+        .title-orbit {
+          right: -30%;
+          opacity: 0.22;
+        }
+
+        .card-grid,
+        .card-grid.three,
+        .tier-grid,
+        .data-flow {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .key-feature-grid {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .key-feature,
+        .key-feature:nth-child(4),
+        .key-feature:nth-child(5) {
+          grid-column: auto;
+        }
+
+        .key-feature:nth-child(5) {
+          grid-column: 1 / -1;
+        }
+
+        .key-feature-grid {
+          gap: 7px;
+          margin-top: 14px;
+        }
+
+        .key-feature {
+          min-height: 0;
+          padding: 11px 12px;
+        }
+
+        .key-feature .feature-number {
+          margin-bottom: 7px;
+          font-size: 9px;
+        }
+
+        .key-feature h3 {
+          margin-bottom: 5px;
+          font-size: 13px;
+        }
+
+        .key-feature p {
+          font-size: 11px;
+        }
+
+        .role-row,
+        .flow {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .flow-step {
+          min-height: 135px;
+          padding: 15px;
+        }
+
+        .flow-step:not(:last-child)::after {
+          display: none;
+        }
+
+        .price-equation {
+          grid-template-columns: 1fr;
+          gap: 7px;
+        }
+
+        .equation-sign {
+          line-height: 0.7;
+          text-align: center;
+          transform: rotate(90deg);
+        }
+
+        .metric-strip {
+          grid-template-columns: 1fr 1fr;
+        }
+
+        .image-pair {
+          gap: 8px;
+        }
+
+        .image-pair .screenshot-frame img {
+          max-height: 24vh;
+        }
+
+        .architecture {
+          grid-template-columns: 1fr;
+        }
+
+        .arch-arrow {
+          min-height: 12px;
+          transform: rotate(90deg);
+        }
+
+        .checkout-stats {
+          gap: 7px;
+        }
+
+        .checkout-stats .card {
+          padding: 11px;
+        }
+
+        .controls {
+          right: 16px;
+          bottom: 13px;
+        }
+      }
+
+      @media (max-height: 650px) and (min-width: 851px) {
+        .slide {
+          gap: 14px;
+          padding-top: 24px;
+          padding-bottom: 60px;
+        }
+
+        .screenshot-frame img {
+          max-height: 42vh;
+        }
+
+        .image-pair .screenshot-frame img {
+          max-height: 26vh;
+        }
+
+        .flow-step {
+          min-height: 145px;
+          padding: 16px;
+        }
+
+        .card {
+          padding: 15px;
+        }
+      }
+
+      @media (min-width: 851px) and (max-height: 800px) {
+        .slide {
+          gap: 12px;
+          padding-top: 24px;
+          padding-bottom: 58px;
+        }
+
+        h2 {
+          margin-bottom: 8px;
+          font-size: clamp(34px, 3.8vw, 48px);
+        }
+
+        .eyebrow {
+          margin-bottom: 8px;
+        }
+
+        .lede {
+          font-size: clamp(14px, 1.3vw, 17px);
+        }
+
+        .image-pair .screenshot-frame img {
+          max-height: 24vh;
+        }
+
+        .roadmap-row {
+          padding: 11px 13px;
+        }
+
+        .closing-layout {
+          gap: 36px;
+        }
+
+        .quote-panel {
+          padding: 19px 22px;
+        }
+
+        .slide[aria-label="Slide 5: Customer storefront"] .copy-stack {
+          gap: 8px;
+        }
+
+        .slide[aria-label="Slide 5: Customer storefront"] h2 {
+          font-size: clamp(32px, 3.2vw, 40px);
+        }
+
+        .slide[aria-label="Slide 5: Customer storefront"] .card {
+          padding: 11px 13px;
+        }
+
+        .slide[aria-label="Slide 5: Customer storefront"] .card .icon {
+          width: 29px;
+          height: 29px;
+          margin-bottom: 8px;
+        }
+
+        .slide[aria-label="Slide 12: Outcomes and next steps"] .closing-layout {
+          grid-template-columns: 1fr;
+        }
+
+        .slide[aria-label="Slide 12: Outcomes and next steps"] .closing-mark {
+          display: none;
+        }
+
+        .slide[aria-label="Slide 12: Outcomes and next steps"] .copy-stack {
+          gap: 9px;
+        }
+
+        .slide[aria-label="Slide 12: Outcomes and next steps"] .roadmap {
+          gap: 6px;
+        }
+
+        .slide[aria-label="Slide 12: Outcomes and next steps"] .roadmap-row {
+          padding: 9px 12px;
+        }
+
+        .slide[aria-label="Slide 12: Outcomes and next steps"] .quote-panel p {
+          font-size: 22px;
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        *,
+        *::before,
+        *::after {
+          scroll-behavior: auto !important;
+          transition-duration: 0.01ms !important;
+        }
+      }
+
+      @media print {
+        @page {
+          size: 13.333in 7.5in;
+          margin: 0;
+        }
+
+        html,
+        body {
+          width: auto;
+          height: auto;
+          overflow: visible;
+          print-color-adjust: exact;
+          -webkit-print-color-adjust: exact;
+        }
+
+        body {
+          background: var(--bg);
+        }
+
+        .deck {
+          width: auto;
+          height: auto;
+        }
+
+        .slide {
+          position: relative;
+          display: grid !important;
+          width: 13.333in;
+          height: 7.5in;
+          break-after: page;
+          page-break-after: always;
+          opacity: 1 !important;
+          visibility: visible !important;
+          transform: none !important;
+        }
+
+        .slide:last-of-type {
+          break-after: auto;
+          page-break-after: auto;
+        }
+
+        .controls,
+        .progress {
+          display: none !important;
+        }
+      }
+    </style>
+  </head>
+  <body>
+    <main class="deck" aria-label="Multi-vendor marketplace project presentation">
+      <section class="slide title-slide active" aria-label="Slide 1: Title">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> Marketplace systems</div>
+          <span class="eyebrow">Group project · Product & engineering</span>
+        </header>
+        <div class="title-main">
+          <div class="title-copy">
+            <p class="eyebrow">A fairer way to shop and sell</p>
+            <h1>One marketplace.<br />Many independent stores.</h1>
+            <p class="lede">
+              A multi-vendor commerce platform that brings product discovery,
+              explainable dynamic pricing, protected checkout, and delivery
+              operations into one connected experience.
+            </p>
+            <div class="title-meta">
+              <span class="pill"><strong>Project</strong> Multi-Vendor Marketplace</span>
+              <span class="pill"><strong>Focus</strong> Dynamic pricing & escrow</span>
+              <span class="pill"><strong>Team</strong> Group presentation</span>
+            </div>
+          </div>
+          <div class="title-orbit" aria-hidden="true">
+            <span class="orbit-node n1">⌕</span>
+            <span class="orbit-node n2">↗</span>
+            <span class="orbit-node n3">₦</span>
+            <span class="orbit-node n4">◈</span>
+            <span class="orbit-core">M</span>
+          </div>
+        </div>
+        <footer class="slide-foot">
+          <span>Marketplace platform · Nigeria</span><span class="foot-rule"></span>
+          <span class="speaker">Opening · Speaker 1</span><span class="slide-number">01 / 12</span>
+        </footer>
+      </section>
+
+      <section class="slide" aria-label="Slide 2: The challenge">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> The opportunity</div>
+          <span class="section-label">01 · Context</span>
+        </header>
+        <div class="content split">
+          <div class="copy-stack">
+            <div>
+              <p class="eyebrow">The problem we set out to solve</p>
+              <h2>Great local stores.<br />A fragmented journey.</h2>
+              <p class="lede">
+                Independent sellers need a reliable way to reach customers.
+                Buyers need confidence that a listing, payment, and delivery
+                belong to one coherent experience.
+              </p>
+            </div>
+            <ul class="problem-list">
+              <li><span class="bullet">01</span><span><strong>Discovery is scattered</strong>Product listings and storefronts are difficult to compare across sellers.</span></li>
+              <li><span class="bullet">02</span><span><strong>Pricing is hard to manage</strong>Stock and demand shift, while manual repricing is slow and inconsistent.</span></li>
+              <li><span class="bullet">03</span><span><strong>Trust breaks at checkout</strong>Payment, fulfillment, and dispute resolution often feel disconnected.</span></li>
+            </ul>
+          </div>
+          <div class="quote-panel">
+            <p>How might we make independent commerce feel as clear and dependable as one well-run store?</p>
+            <small>Design question · Project framing</small>
+          </div>
+        </div>
+        <footer class="slide-foot"><span>From fragmented touchpoints to a connected marketplace</span><span class="foot-rule"></span><span class="speaker">Speaker 1</span><span class="slide-number">02 / 12</span></footer>
+      </section>
+
+      <section class="slide" aria-label="Slide 3: Goals and principles">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> Project highlights</div>
+          <span class="section-label">02 · Five key features</span>
+        </header>
+        <div class="content">
+          <p class="eyebrow">The platform at a glance</p>
+          <h2>Five features. One connected marketplace.</h2>
+          <p class="lede">
+          From price decisions to the final delivery, these capabilities work
+          together to support buyers, vendors, and marketplace operators.
+          </p>
+          <div class="key-feature-grid">
+          <article class="key-feature">
+            <span class="feature-number">01 / PRICING ENGINE</span>
+            <h3>Dynamic Pricing</h3>
+            <p>Adjusts with demand, stock, and recent orders—within vendor-set price floors and ceilings.</p>
+            </article>
+          <article class="key-feature">
+            <span class="feature-number">02 / SELLER TOOLS</span>
+            <h3>Vendor Dashboard / Management</h3>
+            <p>Manage onboarding, products, inventory, orders, store settings, and wallet activity.</p>
+            </article>
+          <article class="key-feature">
+            <span class="feature-number">03 / BUYER EXPERIENCE</span>
+            <h3>Multi-Vendor Shopping / Storefront</h3>
+            <p>Discover independent stores, compare listings, and shop across vendors in one shared cart.</p>
+            </article>
+          <article class="key-feature">
+            <span class="feature-number">04 / LIVE OPERATIONS</span>
+            <h3>Real-Time Updates &amp; Operations</h3>
+            <p>Broadcast committed price and stock changes; track fulfillment and delivery status as work progresses.</p>
+          </article>
+          <article class="key-feature">
+            <span class="feature-number">05 / OVERSIGHT</span>
+            <h3>Admin Control &amp; Delivery</h3>
+            <p>Coordinate delivery partners and oversee vendors, accounts, verification, orders, and disputes.</p>
+          </article>
+          </div>
+        </div>
+        <footer class="slide-foot"><span>Five key measures · Pricing · Vendor tools · Shopping · Operations · Oversight</span><span class="foot-rule"></span><span class="speaker">Speaker 1</span><span class="slide-number">03 / 12</span></footer>
+      </section>
+
+      <section class="slide" aria-label="Slide 4: Marketplace lifecycle">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> How the marketplace works</div>
+          <span class="section-label">03 · User journey</span>
+        </header>
+        <div class="content">
+          <p class="eyebrow">A connected commerce lifecycle</p>
+          <h2>From listing to trusted handoff.</h2>
+          <p class="lede">Each role has a clear job; each transition leaves a visible state for the next person.</p>
+          <div class="flow">
+            <article class="flow-step"><span class="step-no">01 · DISCOVER</span><h3>Browse & compare</h3><p>Buyers explore active listings, vendor storefronts, categories, and search results.</p></article>
+            <article class="flow-step"><span class="step-no">02 · CHECK OUT</span><h3>Lock payment</h3><p>Server-confirmed prices and stock create an order; payment is held in escrow.</p></article>
+            <article class="flow-step"><span class="step-no">03 · FULFILL</span><h3>Ship & confirm</h3><p>Vendor fulfillment and assigned rider updates track pickup through delivery.</p></article>
+            <article class="flow-step"><span class="step-no">04 · SETTLE</span><h3>Release proceeds</h3><p>Buyer confirmation releases vendor proceeds; disputes go to admin review.</p></article>
+          </div>
+          <div class="role-row">
+            <article class="role-card"><div class="role-icon">◉</div><h3>Buyer</h3><p>Discovers products, checks out, tracks orders, and confirms receipt.</p></article>
+            <article class="role-card"><div class="role-icon">▣</div><h3>Vendor</h3><p>Onboards, publishes listings, adjusts inventory, and prepares orders.</p></article>
+            <article class="role-card"><div class="role-icon">↗</div><h3>Delivery partner</h3><p>Updates assigned pickup and delivery milestones.</p></article>
+            <article class="role-card"><div class="role-icon">◇</div><h3>Administrator</h3><p>Oversees accounts, verification, orders, and escrow disputes.</p></article>
+          </div>
+        </div>
+        <footer class="slide-foot"><span>One order lifecycle · Four coordinated roles</span><span class="foot-rule"></span><span class="speaker">Speaker 2</span><span class="slide-number">04 / 12</span></footer>
+      </section>
+
+      <section class="slide" aria-label="Slide 5: Customer storefront">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> Buyer experience</div>
+          <span class="section-label">04 · Discovery</span>
+        </header>
+        <div class="content split">
+          <div class="copy-stack">
+            <div>
+              <p class="eyebrow">A storefront built for discovery</p>
+              <h2>Find the right thing—and the store behind it.</h2>
+              <p class="lede">
+                The customer experience starts with a public catalog and
+                independent vendor storefronts, then carries product context
+                into a single shared cart.
+              </p>
+            </div>
+            <div class="card-grid">
+              <article class="card"><span class="icon">⌕</span><h3>Flexible search</h3><p>Keyword search plus semantic search for intent-based discovery.</p></article>
+              <article class="card"><span class="icon">▦</span><h3>Useful product cards</h3><p>Category, store, current price, and purchase actions stay together.</p></article>
+              <article class="card"><span class="icon">◉</span><h3>Vendor identity</h3><p>Store pages and tier badges make the seller visible, not anonymous.</p></article>
+              <article class="card"><span class="icon">↻</span><h3>Live updates</h3><p>Committed price and stock changes can be broadcast to the storefront.</p></article>
+            </div>
+          </div>
+          <div class="image-pair">
+            <figure class="screenshot-frame">
+              <img src="presentation-assets/storefront.png" alt="Marketplace homepage with search and storefront introduction" />
+              <figcaption class="screenshot-caption"><strong>Storefront</strong><span>Search-led entry</span></figcaption>
+            </figure>
+            <figure class="screenshot-frame">
+              <img src="presentation-assets/product-catalog.png" alt="Marketplace catalog showing categories and product cards" />
+              <figcaption class="screenshot-caption"><strong>Catalog</strong><span>Compare & shop</span></figcaption>
+            </figure>
+          </div>
+        </div>
+        <footer class="slide-foot"><span>Buyer interface · Public discovery to shared cart</span><span class="foot-rule"></span><span class="speaker">Speaker 2</span><span class="slide-number">05 / 12</span></footer>
+      </section>
+
+      <section class="slide" aria-label="Slide 6: Vendor onboarding">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> Vendor enablement</div>
+          <span class="section-label">05 · Trust & eligibility</span>
+        </header>
+        <div class="content split reverse">
+          <figure class="screenshot-frame wide">
+            <img src="presentation-assets/vendor-onboarding.png" alt="Vendor store settings showing tier selection and verification steps" />
+            <figcaption class="screenshot-caption"><strong>Store settings</strong><span>Tier selection · Verification · Payout setup</span></figcaption>
+          </figure>
+          <div class="copy-stack">
+            <div>
+              <p class="eyebrow">Structured onboarding</p>
+              <h2>Clear tiers.<br />Progressive trust.</h2>
+              <p class="lede">
+                Vendor participation is tied to an active plan and tier-specific
+                checks. Tier 2 verification is reviewed before its badge and
+                higher financial limits apply.
+              </p>
+            </div>
+            <div class="tier-grid">
+              <article class="tier-card">
+                <span class="tier-name">Tier 1 · Basic</span>
+                <p class="tier-price">$5<small> / month</small></p>
+                <ul><li>Monthly Paystack plan</li><li>Basic identity and bank soft-check</li><li>10% vendor commission</li></ul>
+              </article>
+              <article class="tier-card featured">
+                <span class="tier-name">Tier 2 · Verified</span>
+                <p class="tier-price">$10<small> / month</small></p>
+                <ul><li>Monthly Paystack plan</li><li>Identity document reviewed by admin</li><li>5% commission after approval</li></ul>
+              </article>
+            </div>
+            <p class="service-note">Subscriptions are charged in NGN at the operator-configured USD/NGN rate. Identity checks are not a substitute for government-record validation.</p>
+          </div>
+        </div>
+        <footer class="slide-foot"><span>Vendor tiers · Eligibility is enforced by the server</span><span class="foot-rule"></span><span class="speaker">Speaker 2</span><span class="slide-number">06 / 12</span></footer>
+      </section>
+
+      <section class="slide" aria-label="Slide 7: Dynamic pricing and vendor operations">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> Seller operations</div>
+          <span class="section-label">06 · Dynamic pricing</span>
+        </header>
+        <div class="content split">
+          <div class="copy-stack">
+            <div>
+              <p class="eyebrow">A price that responds—with limits</p>
+              <h2>Adapt to the market.<br />Keep the vendor in control.</h2>
+              <p class="lede">
+                Pricing is calculated from seller-defined inputs and marketplace
+                signals, then bounded by the floor and ceiling set for that
+                product.
+              </p>
+            </div>
+            <div class="price-equation">
+              <div class="equation-cell"><strong>Vendor inputs</strong><span>Base price · Floor · Ceiling</span></div>
+              <span class="equation-sign">+</span>
+              <div class="equation-cell"><strong>Marketplace signals</strong><span>Demand · Stock · Recent orders</span></div>
+              <span class="equation-sign">→</span>
+              <div class="equation-cell"><strong>Current price</strong><span>Rounded to cents · Within limits</span></div>
+            </div>
+            <div class="guardrail"><span><strong>Guardrail:</strong> automated adjustments never bypass a product's configured price range.</span><span>₦ →</span></div>
+            <p class="service-note">The vendor dashboard also groups inventory, order fulfillment, store settings, wallet balances, and pricing controls.</p>
+          </div>
+          <figure class="screenshot-frame">
+            <img src="presentation-assets/vendor-dashboard.png" alt="Vendor management dashboard showing wallet, tier limits, dynamic pricing controls, and product inventory" />
+            <figcaption class="screenshot-caption"><strong>Store management</strong><span>Pricing · Inventory · Orders</span></figcaption>
+          </figure>
+        </div>
+        <footer class="slide-foot"><span>Pricing engine · Demand & stock signals · Seller-defined bounds</span><span class="foot-rule"></span><span class="speaker">Speaker 3</span><span class="slide-number">07 / 12</span></footer>
+      </section>
+
+      <section class="slide" aria-label="Slide 8: Checkout and escrow">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> Protected checkout</div>
+          <span class="section-label">07 · Payment flow</span>
+        </header>
+        <div class="content split reverse">
+          <div>
+            <p class="eyebrow">Escrow makes the handoff explicit</p>
+            <h2>Payment is a journey—not a blind transfer.</h2>
+            <p class="lede">
+              Buyers can check out across eligible vendors in one order. The
+              backend confirms price, quantity, and stock before funds are
+              locked.
+            </p>
+            <div class="flow" style="grid-template-columns: repeat(3, 1fr); gap: 12px; margin-top: 22px">
+              <article class="flow-step" style="min-height: 143px"><span class="step-no">A · AUTHORIZE</span><h3>Confirm order</h3><p>Use current server prices and verified stock.</p></article>
+              <article class="flow-step" style="min-height: 143px"><span class="step-no">B · PROTECT</span><h3>Hold in escrow</h3><p>Payment stays held until the delivery outcome.</p></article>
+              <article class="flow-step" style="min-height: 143px"><span class="step-no">C · RELEASE</span><h3>Settle fairly</h3><p>Receipt confirmation releases vendor proceeds.</p></article>
+            </div>
+            <div class="checkout-stats">
+              <article class="card"><span class="metric">2.5%</span><span class="metric-label">Buyer escrow fee</span></article>
+              <article class="card"><span class="metric">10% / 5%</span><span class="metric-label">Tier 1 / approved Tier 2 commission</span></article>
+              <article class="card"><span class="metric">20%</span><span class="metric-label">Of positive price uplift recorded as surge share</span></article>
+            </div>
+            <p class="service-note" style="margin-top: 12px">A refund decision is recorded for reconciliation; gateway refunds still require completion in Paystack.</p>
+          </div>
+          <div class="copy-stack">
+            <div class="quote-panel"><p>Price and stock are confirmed by the server—not trusted from the browser.</p><small>Checkout integrity</small></div>
+            <div class="escrow-diagram" role="img" aria-label="Buyer payment is held in escrow until receipt is confirmed, or the order enters admin dispute review">
+              <div class="escrow-party"><span class="icon">₦</span><span><strong>Buyer pays</strong><br /><span>Paystack verifies the transaction</span></span></div>
+              <div class="escrow-arrow" aria-hidden="true">↓</div>
+              <div class="escrow-vault"><strong>Funds held in escrow</strong><span>Order and delivery states remain visible</span></div>
+              <div class="escrow-arrow" aria-hidden="true">↓</div>
+              <div class="escrow-outcomes">
+                <div class="escrow-outcome"><strong>Receipt confirmed</strong><span>Vendor proceeds released</span></div>
+                <div class="escrow-outcome"><strong>Issue raised</strong><span>Admin dispute review</span></div>
+              </div>
+            </div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span>Paystack · Escrow ledger · Receipt-confirmed settlement</span><span class="foot-rule"></span><span class="speaker">Speaker 3</span><span class="slide-number">08 / 12</span></footer>
+      </section>
+
+      <section class="slide" aria-label="Slide 9: Delivery and fulfillment">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> Fulfillment operations</div>
+          <span class="section-label">08 · Last mile</span>
+        </header>
+        <div class="content split">
+          <div class="copy-stack">
+            <div>
+              <p class="eyebrow">A clear chain of custody</p>
+              <h2>Every handoff has a status.</h2>
+              <p class="lede">
+                Vendors prepare and ship packages. An assigned delivery partner
+                confirms pickup and delivery, giving buyers and administrators
+                a shared view of order progress.
+              </p>
+            </div>
+            <div class="data-flow">
+              <div class="flow-node"><span class="node-dot"></span><span><strong>Vendor fulfillment</strong><span>Pending → Processing → Shipped</span></span></div>
+              <div class="flow-node"><span class="node-dot"></span><span><strong>Partner pickup</strong><span>Assigned rider records handoff</span></span></div>
+              <div class="flow-node"><span class="node-dot"></span><span><strong>Delivery update</strong><span>Partner confirms delivery status</span></span></div>
+              <div class="flow-node"><span class="node-dot"></span><span><strong>Buyer confirmation</strong><span>Receipt can release escrow</span></span></div>
+            </div>
+            <div class="card" style="margin-top: 6px"><span class="icon">⌖</span><h3>Operational visibility</h3><p>Delivery-partner tools include assigned orders, route overview, active delivery status, and completed-delivery history.</p></div>
+          </div>
+          <figure class="screenshot-frame">
+            <img src="presentation-assets/delivery-dashboard.png" alt="Delivery partner portal with delivery metrics, Lagos route overview, and assigned delivery statuses" />
+            <figcaption class="screenshot-caption"><strong>Delivery partner portal</strong><span>Assigned orders · Route overview</span></figcaption>
+          </figure>
+        </div>
+        <footer class="slide-foot"><span>Pickup · Transit · Delivery · Receipt</span><span class="foot-rule"></span><span class="speaker">Speaker 3</span><span class="slide-number">09 / 12</span></footer>
+      </section>
+
+      <section class="slide" aria-label="Slide 10: Admin oversight and support">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> Marketplace governance</div>
+          <span class="section-label">09 · Admin & support</span>
+        </header>
+        <div class="content split reverse">
+          <figure class="screenshot-frame wide">
+            <img src="presentation-assets/admin-overview.png" alt="Master admin overview showing marketplace counts and operations tabs" />
+            <figcaption class="screenshot-caption"><strong>Master admin</strong><span>Accounts · Orders · Verification · Commission</span></figcaption>
+          </figure>
+          <div class="copy-stack">
+            <div>
+              <p class="eyebrow">Oversight without taking over the workflow</p>
+              <h2>Give operators context to act.</h2>
+              <p class="lede">
+                The admin console centralizes platform health and access to
+                vendor, order, delivery, identity, featured-listing, and
+                commission operations.
+              </p>
+            </div>
+            <div class="card-grid">
+              <article class="card"><span class="icon">▤</span><h3>Dispute triage</h3><p>Support requests can be categorized and summarized into buyer or vendor ticket drafts.</p></article>
+              <article class="card"><span class="icon">◇</span><h3>Review & resolution</h3><p>Admins review identity requests and escrow disputes using dedicated operations.</p></article>
+            </div>
+            <div class="admin-callout"><strong>Important boundary:</strong> support drafts are suggestions only. They do not submit tickets, inspect private orders, trigger payouts, or issue refunds.</div>
+          </div>
+        </div>
+        <footer class="slide-foot"><span>Admin copilot · Triage support · Human review for consequential decisions</span><span class="foot-rule"></span><span class="speaker">Speaker 4</span><span class="slide-number">10 / 12</span></footer>
+      </section>
+
+      <section class="slide" aria-label="Slide 11: Technical architecture">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> System design</div>
+          <span class="section-label">10 · Architecture</span>
+        </header>
+        <div class="content">
+          <p class="eyebrow">A modular web platform</p>
+          <h2>One experience, backed by clear boundaries.</h2>
+          <p class="lede">Role-aware interfaces call a server-authoritative API; persistent state and external providers support commerce, operations, and discovery.</p>
+          <div class="architecture">
+            <article class="arch-box"><span class="arch-label">Experience layer</span><strong>React storefront & portals</strong><p>Buyer · Vendor · Delivery partner · Admin<br />Responsive screens and role-aware navigation.</p><div class="service-row"><span class="tag">React</span><span class="tag">Vite</span><span class="tag">Socket.io client</span></div></article>
+            <div class="arch-arrow">→</div>
+            <article class="arch-box"><span class="arch-label">Application layer</span><strong>Node.js + Express API</strong><p>Authentication, pricing, catalog, escrow workflows, tier eligibility, and admin controls.</p><div class="service-row"><span class="tag">REST</span><span class="tag">Validation</span><span class="tag">Realtime events</span></div></article>
+            <div class="arch-arrow">→</div>
+            <article class="arch-box"><span class="arch-label">Data & providers</span><strong>MongoDB + integrations</strong><p>Products, users, wallets, and orders, with explicit provider boundaries.</p><div class="service-row"><span class="tag">MongoDB</span><span class="tag">Paystack</span><span class="tag">Cloudinary</span><span class="tag">Gemini</span></div></article>
+          </div>
+          <div class="card-grid three">
+            <article class="card"><h3>Financial integrity</h3><p>Server-calculated totals, transactions, signed webhooks, and ledger-backed wallet changes.</p></article>
+            <article class="card"><h3>Resilient discovery</h3><p>Semantic search can fall back to keyword search when AI credentials are unavailable or invalid.</p></article>
+            <article class="card"><h3>Protected operations</h3><p>Role checks, encrypted sensitive verification data, and human review for identity and disputes.</p></article>
+          </div>
+        </div>
+        <footer class="slide-foot"><span>Frontend · API · Persistence · Provider integrations</span><span class="foot-rule"></span><span class="speaker">Speaker 4</span><span class="slide-number">11 / 12</span></footer>
+      </section>
+
+      <section class="slide" aria-label="Slide 12: Outcomes and next steps">
+        <header class="slide-head">
+          <div class="brand"><span class="brand-mark">M</span> What comes next</div>
+          <span class="section-label">11 · Conclusion</span>
+        </header>
+        <div class="content closing-layout">
+          <div class="copy-stack">
+            <div>
+              <p class="eyebrow">A foundation for trusted local commerce</p>
+              <h2>Commerce that connects the whole journey.</h2>
+              <p class="lede">
+                The platform combines independent stores, bounded pricing,
+                protected checkout, delivery visibility, and operational
+                oversight in one coherent system.
+              </p>
+            </div>
+            <div class="roadmap">
+              <div class="roadmap-row"><span class="when">Next</span><span><strong>Measure the experience</strong><p>Track search-to-cart conversion, order completion, delivery time, disputes, and vendor retention.</p></span></div>
+              <div class="roadmap-row"><span class="when">Improve</span><span><strong>Refine pricing & support</strong><p>Evaluate price outcomes and support categories with real, privacy-conscious feedback.</p></span></div>
+              <div class="roadmap-row"><span class="when">Scale</span><span><strong>Strengthen operations</strong><p>Expand provider monitoring, reconciliation, delivery coverage, and accessibility testing.</p></span></div>
+            </div>
+            <div class="quote-panel"><p>Many stores. One clearer promise: fair rules, protected payments, and visible progress.</p><small>Thank you · Questions?</small></div>
+          </div>
+          <div class="closing-mark" aria-hidden="true"><div class="orbit-core">M</div><p>Shop. Sell. Deliver.</p></div>
+        </div>
+        <footer class="slide-foot"><span>Multi-vendor marketplace · Dynamic pricing · Trust by design</span><span class="foot-rule"></span><span class="speaker">Closing · All speakers</span><span class="slide-number">12 / 12</span></footer>
+      </section>
+    </main>
+
+    <nav class="controls" aria-label="Presentation controls">
+      <button id="previous" type="button" aria-label="Previous slide" title="Previous slide (←)">←</button>
+      <span class="counter" id="counter" aria-live="polite">01 / 12</span>
+      <button id="next" type="button" aria-label="Next slide" title="Next slide (→)">→</button>
+      <button id="fullscreen" type="button" aria-label="Toggle fullscreen" title="Toggle fullscreen (F)">⛶</button>
+    </nav>
+    <div class="progress" aria-hidden="true"><span id="progress"></span></div>
+    <p class="sr-only" id="help">Use the left and right arrow keys to navigate slides. Press F for fullscreen and Home or End to jump.</p>
+
+    <script>
+      (() => {
+        const slides = [...document.querySelectorAll(".slide")];
+        const counter = document.getElementById("counter");
+        const progress = document.getElementById("progress");
+        const previous = document.getElementById("previous");
+        const next = document.getElementById("next");
+        const fullscreen = document.getElementById("fullscreen");
+        let current = 0;
+        let touchStartX = null;
+
+        const showSlide = (index) => {
+          current = Math.max(0, Math.min(slides.length - 1, index));
+          slides.forEach((slide, slideIndex) => {
+            const active = slideIndex === current;
+            slide.classList.toggle("active", active);
+            slide.setAttribute("aria-hidden", String(!active));
+          });
+          counter.textContent = `${String(current + 1).padStart(2, "0")} / ${String(slides.length).padStart(2, "0")}`;
+          progress.style.width = `${((current + 1) / slides.length) * 100}%`;
+          previous.disabled = current === 0;
+          next.disabled = current === slides.length - 1;
+          history.replaceState(null, "", `#slide-${current + 1}`);
+        };
+
+        previous.addEventListener("click", () => showSlide(current - 1));
+        next.addEventListener("click", () => showSlide(current + 1));
+        fullscreen.addEventListener("click", async () => {
+          if (document.fullscreenElement) {
+            await document.exitFullscreen();
+          } else {
+            await document.documentElement.requestFullscreen();
+          }
+        });
+
+        document.addEventListener("keydown", (event) => {
+          if (["ArrowRight", "PageDown", " "].includes(event.key)) {
+            event.preventDefault();
+            showSlide(current + 1);
+          } else if (["ArrowLeft", "PageUp"].includes(event.key)) {
+            event.preventDefault();
+            showSlide(current - 1);
+          } else if (event.key === "Home") {
+            showSlide(0);
+          } else if (event.key === "End") {
+            showSlide(slides.length - 1);
+          } else if (event.key.toLowerCase() === "f") {
+            fullscreen.click();
+          }
+        });
+
+        document.addEventListener("touchstart", (event) => {
+          touchStartX = event.changedTouches[0].screenX;
+        }, { passive: true });
+
+        document.addEventListener("touchend", (event) => {
+          if (touchStartX === null) return;
+          const delta = event.changedTouches[0].screenX - touchStartX;
+          if (Math.abs(delta) > 70) showSlide(current + (delta < 0 ? 1 : -1));
+          touchStartX = null;
+        }, { passive: true });
+
+        const initialSlide = Number(location.hash.match(/slide-(\d+)/)?.[1]);
+        showSlide(Number.isInteger(initialSlide) && initialSlide > 0 ? initialSlide - 1 : 0);
+      })();
+    </script>
+  </body>
+</html>

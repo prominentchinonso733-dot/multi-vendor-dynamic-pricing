@@ -13,7 +13,8 @@ const { encryptSensitiveValue } = require("../services/verificationDocuments");
 const { marketplaceVendors } = require("../data/marketplaceSeedData");
 
 const DEMO_PASSWORD = "DemoVendor123!";
-const FALLBACK_DEMO_ENCRYPTION_KEY = "0000000000000000000000000000000000000000000000000000000000000000";
+const FALLBACK_DEMO_ENCRYPTION_KEY =
+  "0000000000000000000000000000000000000000000000000000000000000000";
 const INITIAL_AVAILABLE_BALANCE = 75000;
 const INITIAL_PENDING_BALANCE = 25000;
 
@@ -36,7 +37,11 @@ async function seedMarketplace() {
     throw new Error("Marketplace demo data cannot be seeded in production.");
   }
   configureDemoEncryptionKey();
-  if (!/^[a-f\d]{64}$/i.test(process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY || "")) {
+  if (
+    !/^[a-f\d]{64}$/i.test(
+      process.env.VERIFICATION_DOCUMENT_ENCRYPTION_KEY || "",
+    )
+  ) {
     throw new Error(
       "VERIFICATION_DOCUMENT_ENCRYPTION_KEY must be a 64-character hexadecimal key.",
     );
@@ -103,7 +108,8 @@ async function seedMarketplace() {
           documentType: "NIN",
           submittedAt: verifiedAt,
           reviewedAt: now,
-          reviewNote: "Synthetic demo verification; not valid for real onboarding.",
+          reviewNote:
+            "Synthetic demo verification; not valid for real onboarding.",
         }
       : {
           tier: "TIER_1",
@@ -130,6 +136,15 @@ async function seedMarketplace() {
       { runValidators: true },
     );
 
+    await Product.updateMany(
+      { vendor: user._id },
+      {
+        $set: { isApproved: true, status: "active", isPublished: true },
+        $max: { stock: 1 },
+      },
+      { runValidators: true },
+    );
+
     await VendorWallet.updateOne(
       { vendorId: user._id },
       {
@@ -151,7 +166,7 @@ async function seedMarketplace() {
         description: productSeed.description,
         category: vendorSeed.category,
         imageUrl: productSeed.imageUrl,
-        stock: productSeed.stock,
+        stock: Math.max(1, Number(productSeed.stock) || 0),
         basePrice,
         currentPrice: calculateCurrentPrice({
           basePrice,
@@ -163,6 +178,9 @@ async function seedMarketplace() {
         priceCeiling: Math.round(basePrice * 1.25 * 100) / 100,
         competitorPrice: Math.round(basePrice * 0.95 * 100) / 100,
         demandScore: productSeed.demandScore,
+        isApproved: true,
+        status: "active",
+        isPublished: true,
       };
 
       await Product.updateOne(
@@ -173,7 +191,9 @@ async function seedMarketplace() {
       productCount += 1;
     }
 
-    console.log(`Seeded ${vendorSeed.name} (${vendorSeed.products.length} products).`);
+    console.log(
+      `Seeded ${vendorSeed.name} (${vendorSeed.products.length} products).`,
+    );
   }
 
   console.log(

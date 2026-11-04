@@ -26,7 +26,9 @@ export default function ProductList({ onAddToCart }) {
       .list({ signal: controller.signal })
       .then((data) => {
         if (!Array.isArray(data)) {
-          throw new Error("The marketplace API returned an invalid product list.");
+          throw new Error(
+            "The marketplace API returned an invalid product list.",
+          );
         }
         setProducts(data);
       })
@@ -43,7 +45,9 @@ export default function ProductList({ onAddToCart }) {
   }, []);
 
   useEffect(() => {
-    const socket = io(BACKEND_BASE_URL, { transports: ["websocket", "polling"] });
+    const socket = io(BACKEND_BASE_URL, {
+      transports: ["websocket", "polling"],
+    });
     const refreshFeatured = () => {
       productsService
         .featured()
@@ -52,7 +56,12 @@ export default function ProductList({ onAddToCart }) {
           setFeaturedError("");
         })
         .catch((loadError) => {
-          setFeaturedError(getApiErrorMessage(loadError, "Featured listings could not be refreshed."));
+          setFeaturedError(
+            getApiErrorMessage(
+              loadError,
+              "Featured listings could not be refreshed.",
+            ),
+          );
         });
     };
     socket.on("product:updated", (update) => {
@@ -86,7 +95,9 @@ export default function ProductList({ onAddToCart }) {
       const results = await productsService.semanticSearch(search.trim());
       setSemanticResults(results);
     } catch (searchError) {
-      setSemanticError(getApiErrorMessage(searchError, "Semantic search is unavailable."));
+      setSemanticError(
+        getApiErrorMessage(searchError, "Semantic search is unavailable."),
+      );
     } finally {
       setSemanticLoading(false);
     }
@@ -121,8 +132,10 @@ export default function ProductList({ onAddToCart }) {
         .filter(Boolean)
         .join(" ")
         .toLowerCase();
-      return matchesCategory &&
-        (semanticResults || searchableText.includes(normalizedSearch));
+      return (
+        matchesCategory &&
+        (semanticResults || searchableText.includes(normalizedSearch))
+      );
     });
   }, [products, semanticResults, search, selectedCategory]);
 
@@ -136,7 +149,10 @@ export default function ProductList({ onAddToCart }) {
 
   if (error) {
     return (
-      <section className="marketplace-state marketplace-state--error" role="alert">
+      <section
+        className="marketplace-state marketplace-state--error"
+        role="alert"
+      >
         <h1>Marketplace unavailable</h1>
         <p>{error}</p>
         <p>Check that the configured marketplace API is available.</p>
@@ -155,7 +171,9 @@ export default function ProductList({ onAddToCart }) {
         </p>
         <label className="marketplace__search">
           <Search aria-hidden="true" size={19} />
-          <span className="marketplace__sr-only">Search products and stores</span>
+          <span className="marketplace__sr-only">
+            Search products and stores
+          </span>
           <input
             onChange={(event) => {
               setSearch(event.target.value);
@@ -180,29 +198,53 @@ export default function ProductList({ onAddToCart }) {
         >
           {semanticLoading ? "Finding matches..." : "Search by meaning"}
         </button>
-        {semanticError && <p className="marketplace__search-error" role="status">{semanticError}</p>}
+        {semanticError && (
+          <p className="marketplace__search-error" role="status">
+            {semanticError}
+          </p>
+        )}
       </header>
 
       {featuredProducts.length > 0 && (
-        <section aria-labelledby="marketplace-featured-title" className="marketplace-featured">
+        <section
+          aria-labelledby="marketplace-featured-title"
+          className="marketplace-featured"
+        >
           <div className="marketplace__section-heading">
             <div>
               <p className="marketplace__eyebrow">HANDPICKED FOR YOU</p>
-              <h2 id="marketplace-featured-title">Featured Vendors &amp; Top Deals</h2>
+              <h2 id="marketplace-featured-title">
+                Featured Vendors &amp; Top Deals
+              </h2>
             </div>
           </div>
-          {featuredError && <p className="marketplace__search-error" role="status">{featuredError}</p>}
+          {featuredError && (
+            <p className="marketplace__search-error" role="status">
+              {featuredError}
+            </p>
+          )}
           <div className="marketplace-featured__items">
             {featuredProducts.map((product) => (
               <Link
                 className="marketplace-featured__item"
                 key={product.id || product._id}
-                to={`/store/${encodeURIComponent(product.vendorId)}`}
+                to={`/vendor/${encodeURIComponent(product.vendorId)}`}
               >
-                {product.imageUrl && <img alt="" loading="lazy" src={getAssetUrl(product.imageUrl)} />}
+                {product.imageUrl && (
+                  <img
+                    alt=""
+                    loading="lazy"
+                    src={getAssetUrl(product.imageUrl)}
+                  />
+                )}
                 <span>
                   <strong>{product.title || product.name}</strong>
-                  <small>{product.vendor} · ₦{Number(product.price ?? product.currentPrice).toLocaleString()}</small>
+                  <small>
+                    {product.vendor} · ₦
+                    {Number(
+                      product.price ?? product.currentPrice,
+                    ).toLocaleString()}
+                  </small>
                 </span>
               </Link>
             ))}
@@ -218,7 +260,10 @@ export default function ProductList({ onAddToCart }) {
         <span>{filteredProducts.length} products</span>
       </div>
 
-      <nav aria-label="Filter products by category" className="marketplace__categories">
+      <nav
+        aria-label="Filter products by category"
+        className="marketplace__categories"
+      >
         {categories.map((category) => (
           <button
             aria-pressed={selectedCategory === category}
@@ -238,7 +283,11 @@ export default function ProductList({ onAddToCart }) {
 
       {filteredProducts.length === 0 ? (
         <div className="marketplace__empty">
-          <h3>{products.length ? "No matching products" : "The shelves are being stocked"}</h3>
+          <h3>
+            {products.length
+              ? "No matching products"
+              : "The shelves are being stocked"}
+          </h3>
           <p>
             {products.length
               ? "Try another search or category."
@@ -260,7 +309,10 @@ export default function ProductList({ onAddToCart }) {
       ) : (
         <div className="marketplace__grid">
           {filteredProducts.map((product) => (
-            <article className="marketplace-card" key={product.id || product._id}>
+            <article
+              className="marketplace-card"
+              key={product.id || product._id}
+            >
               <div className="marketplace-card__image">
                 {product.imageUrl || product.image ? (
                   <img
@@ -287,7 +339,7 @@ export default function ProductList({ onAddToCart }) {
                 {product.vendorId ? (
                   <Link
                     className="marketplace-card__vendor"
-                    to={`/store/${encodeURIComponent(product.vendorId)}`}
+                    to={`/vendor/${encodeURIComponent(product.vendorId)}`}
                   >
                     {product.vendor || "Visit vendor store"}
                   </Link>
@@ -306,9 +358,7 @@ export default function ProductList({ onAddToCart }) {
                 <div className="marketplace-card__pricing">
                   <p className="marketplace-card__price-before">
                     Before Price{" "}
-                    <s>
-                      ₦{(Number(product.basePrice) || 0).toLocaleString()}
-                    </s>
+                    <s>₦{(Number(product.basePrice) || 0).toLocaleString()}</s>
                   </p>
                   <p className="marketplace-card__price">
                     After Price{" "}
@@ -324,7 +374,7 @@ export default function ProductList({ onAddToCart }) {
                   {product.vendorId ? (
                     <Link
                       className="marketplace-card__store"
-                      to={`/store/${encodeURIComponent(product.vendorId)}`}
+                      to={`/vendor/${encodeURIComponent(product.vendorId)}`}
                     >
                       Visit store
                     </Link>

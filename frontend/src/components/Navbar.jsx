@@ -2,7 +2,13 @@ import PropTypes from "prop-types";
 import { Link, useLocation, useNavigate } from "react-router-dom";
 import "./Navbar.css";
 
-export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) {
+export default function Navbar({
+  cartCount,
+  onOpenCart,
+  role,
+  user,
+  onLogout,
+}) {
   const location = useLocation();
   const navigate = useNavigate();
   const isVendor = role === "SELLER";
@@ -27,7 +33,9 @@ export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) 
         <span className="site-brand__mark" aria-hidden="true">
           M
         </span>
-        <span>Market<span className="site-brand__accent">place</span></span>
+        <span>
+          Market<span className="site-brand__accent">place</span>
+        </span>
       </Link>
       <nav aria-label="Main navigation" className="site-nav">
         {isPortalLogin && (
@@ -41,17 +49,9 @@ export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) 
               Explore products
             </Link>
             {role === "BUYER" && (
-              <>
-                <Link className={linkClassName("/orders")} to="/orders">
-                  My orders
-                </Link>
-                <Link
-                  className={linkClassName("/account/verification")}
-                  to="/account/verification"
-                >
-                  Verification
-                </Link>
-              </>
+              <Link className={linkClassName("/orders")} to="/orders">
+                My orders
+              </Link>
             )}
             <button
               aria-label={`Open cart with ${cartCount} items`}
@@ -67,9 +67,6 @@ export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) 
               </Link>
             ) : (
               <>
-                <span className="site-nav__identity">
-                  {user?.name || user?.email}
-                </span>
                 <button
                   className="site-nav__link site-nav__button"
                   onClick={handleLogout}
@@ -86,11 +83,14 @@ export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) 
             <Link className={linkClassName("/")} to="/">
               View marketplace
             </Link>
-            <Link
-              className="site-nav__primary"
-              to="/vendor/dashboard"
-            >
+            <Link className="site-nav__primary" to="/vendor/dashboard">
               Store management
+            </Link>
+            <Link
+              className={linkClassName("/vendor/dashboard")}
+              to="/vendor/dashboard?section=store-settings"
+            >
+              Verification
             </Link>
             <span className="site-nav__identity">
               {user?.name || user?.email}
@@ -112,6 +112,12 @@ export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) 
             <Link className="site-nav__primary" to="/admin">
               Admin panel
             </Link>
+            <Link
+              className={linkClassName("/admin")}
+              to="/admin?section=verification"
+            >
+              Verification
+            </Link>
             <Link className={linkClassName("/admin/escrow")} to="/admin/escrow">
               Escrow disputes
             </Link>
@@ -129,7 +135,10 @@ export default function Navbar({ cartCount, onOpenCart, role, user, onLogout }) 
         )}
         {isRider && (
           <>
-            <Link className={linkClassName("/rider/dashboard")} to="/rider/dashboard">
+            <Link
+              className={linkClassName("/rider/dashboard")}
+              to="/rider/dashboard"
+            >
               Delivery assignments
             </Link>
             <span className="site-nav__identity">
