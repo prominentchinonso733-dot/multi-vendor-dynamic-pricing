@@ -247,7 +247,12 @@ export default function CartDrawer({
           ) : (
             <div
               className="mt-4 space-y-4"
-              style={{ flex: 1, overflowY: "auto", minHeight: 0 }}
+              style={{
+                flex: 1,
+                minHeight: "200px",
+                maxHeight: "40vh",
+                overflowY: "auto",
+              }}
             >
               {cart.map((item) => (
                 <div
