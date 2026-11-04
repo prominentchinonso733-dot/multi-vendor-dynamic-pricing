@@ -6,12 +6,24 @@ const {
 } = require("../services/vendorTiers");
 
 const originalExchangeRate = process.env.VENDOR_TIER_USD_NGN_RATE;
+const originalNodeEnv = process.env.NODE_ENV;
+const originalDemoCheckout = process.env.DEMO_ALLOW_UNVERIFIED_VENDOR_CHECKOUT;
 
 afterEach(() => {
   if (originalExchangeRate === undefined) {
     delete process.env.VENDOR_TIER_USD_NGN_RATE;
   } else {
     process.env.VENDOR_TIER_USD_NGN_RATE = originalExchangeRate;
+  }
+  if (originalNodeEnv === undefined) {
+    delete process.env.NODE_ENV;
+  } else {
+    process.env.NODE_ENV = originalNodeEnv;
+  }
+  if (originalDemoCheckout === undefined) {
+    delete process.env.DEMO_ALLOW_UNVERIFIED_VENDOR_CHECKOUT;
+  } else {
+    process.env.DEMO_ALLOW_UNVERIFIED_VENDOR_CHECKOUT = originalDemoCheckout;
   }
 });
 
@@ -90,5 +102,25 @@ test("requires an unexpired subscription and tier-specific verification to sell"
       },
     }),
     false,
+  );
+});
+
+test("demo checkout can accept active legacy vendors only outside production", () => {
+  const {
+    getCheckoutEligibleVendorFilter,
+    getEligibleVendorFilter,
+  } = require("../services/vendorTiers");
+
+  process.env.NODE_ENV = "development";
+  process.env.DEMO_ALLOW_UNVERIFIED_VENDOR_CHECKOUT = "true";
+  const demoFilter = getCheckoutEligibleVendorFilter();
+  assert.ok(demoFilter.$or.some((filter) => filter.accountStatus === "ACTIVE"));
+  assert.ok(demoFilter.$or.some((filter) => filter.status === "approved"));
+  assert.ok(demoFilter.$or.some((filter) => filter.isActive === true));
+
+  process.env.NODE_ENV = "production";
+  assert.deepEqual(
+    getCheckoutEligibleVendorFilter(),
+    getEligibleVendorFilter(),
   );
 });

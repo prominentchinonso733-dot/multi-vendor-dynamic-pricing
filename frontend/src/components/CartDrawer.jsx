@@ -217,7 +217,7 @@ export default function CartDrawer({
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
-          justifyContent: "space-between",
+          justifyContent: "flex-start",
         }}
       >
         <div
@@ -248,10 +248,14 @@ export default function CartDrawer({
             <div
               className="mt-4 space-y-4"
               style={{
-                flex: 1,
+                flex: "0 1 auto",
                 minHeight: "200px",
                 maxHeight: "40vh",
                 overflowY: "auto",
+                backgroundColor: "#f8fafc",
+                border: "1px solid #e2e8f0",
+                borderRadius: "8px",
+                padding: "12px",
               }}
             >
               {cart.map((item) => (
@@ -302,7 +306,11 @@ export default function CartDrawer({
         {cart.length > 0 && (
           <div
             className="border-t pt-4 mt-6"
-            style={{ flexShrink: 0, paddingBottom: "24px" }}
+            style={{
+              flexShrink: 0,
+              paddingBottom: "24px",
+              backgroundColor: "#fff",
+            }}
           >
             <div
               className="text-sm py-1"

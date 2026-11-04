@@ -19,7 +19,10 @@ const isVendorEligibleToSell = (vendor) => {
   const subscriptionPeriodEnd = new Date(
     vendor.vendorDetails.subscriptionPeriodEnd,
   ).getTime();
-  if (!Number.isFinite(subscriptionPeriodEnd) || subscriptionPeriodEnd <= Date.now()) {
+  if (
+    !Number.isFinite(subscriptionPeriodEnd) ||
+    subscriptionPeriodEnd <= Date.now()
+  ) {
     return false;
   }
   if (getVendorTier(vendor) === "TIER_2") return isTier2VerifiedVendor(vendor);
@@ -44,7 +47,29 @@ const getEligibleVendorFilter = () => ({
   ],
 });
 
-const getVendorTierAmountMinor = (tier, exchangeRate = process.env.VENDOR_TIER_USD_NGN_RATE) => {
+const getCheckoutEligibleVendorFilter = () => {
+  const eligibleVendorFilter = getEligibleVendorFilter();
+  if (
+    process.env.NODE_ENV === "production" ||
+    process.env.DEMO_ALLOW_UNVERIFIED_VENDOR_CHECKOUT !== "true"
+  ) {
+    return eligibleVendorFilter;
+  }
+
+  return {
+    $or: [
+      eligibleVendorFilter,
+      { accountStatus: "ACTIVE" },
+      { status: "approved" },
+      { isActive: true },
+    ],
+  };
+};
+
+const getVendorTierAmountMinor = (
+  tier,
+  exchangeRate = process.env.VENDOR_TIER_USD_NGN_RATE,
+) => {
   const usdPrice = Object.hasOwn(VENDOR_TIER_PRICES_USD, tier)
     ? VENDOR_TIER_PRICES_USD[tier]
     : null;
@@ -65,6 +90,7 @@ const getVendorTierAmountMinor = (tier, exchangeRate = process.env.VENDOR_TIER_U
 module.exports = {
   VENDOR_TIER_PRICES_USD,
   getEligibleVendorFilter,
+  getCheckoutEligibleVendorFilter,
   getVendorTier,
   getVendorTierAmountMinor,
   isTier2Verified,

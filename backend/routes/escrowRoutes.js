@@ -16,7 +16,7 @@ const authenticateToken = require("../middleware/authenticateToken");
 const confirmEscrowPayment = require("../services/confirmEscrowPayment");
 const calculateCurrentPrice = require("../services/dynamicPricing");
 const isValidDeliveryProof = require("../services/deliveryProof");
-const { getEligibleVendorFilter } = require("../services/vendorTiers");
+const { getCheckoutEligibleVendorFilter } = require("../services/vendorTiers");
 const {
   creditPending,
   getWalletForUpdate,
@@ -100,8 +100,7 @@ const getDailyVendorVolume = async (sellerId, dayStart, now, session) => {
       total +
       (contract.items || []).reduce(
         (sum, item) =>
-          String(item.vendorId || item.sellerId || "") ===
-          sellerId.toString()
+          String(item.vendorId || item.sellerId || "") === sellerId.toString()
             ? sum +
               toMinorUnits(
                 item.lineTotal ??
@@ -130,13 +129,12 @@ const createReceipt = (contract, finalizedAt, status = "RELEASED") => ({
     lineTotal: item.lineTotal ?? item.price * item.quantity,
     vendorTier: item.vendorTier || "TIER_1",
     commissionRate: item.commissionRate ?? 0.1,
-    platformFee:
-      status === "RELEASED" ? item.platformFee ?? 0 : 0,
+    platformFee: status === "RELEASED" ? (item.platformFee ?? 0) : 0,
     vendorNetAmount:
       status === "RELEASED"
-        ? item.vendorNetAmount ??
+        ? (item.vendorNetAmount ??
           (item.lineTotal ?? item.price * item.quantity) -
-            (item.platformFee ?? 0)
+            (item.platformFee ?? 0))
         : 0,
   })),
   subtotal: contract.subtotal,
@@ -180,7 +178,9 @@ const createLegacyVendorPayouts = async (contract, session) => {
     const sellerId = String(item.vendorId || item.sellerId || "");
     const seller = sellersById.get(sellerId);
     if (!seller) {
-      throw new Error("Cannot settle this order because a vendor account is unavailable.");
+      throw new Error(
+        "Cannot settle this order because a vendor account is unavailable.",
+      );
     }
     const policy = getVendorPolicy(seller);
     const grossMinor = toMinorUnits(
@@ -418,29 +418,31 @@ const toVendorOrder = (contract, sellerId) => {
         (item) =>
           String(item.vendorId || item.sellerId || "") === sellerId.toString(),
       )
-      .map(({
-        name,
-        price,
-        quantity,
-        vendor,
-        vendorId,
-        lineTotal,
-        platformFee,
-        vendorNetAmount,
-        vendorTier,
-        commissionRate,
-      }) => ({
-        name,
-        price,
-        quantity,
-        vendor,
-        vendorId,
-        lineTotal,
-        platformFee,
-        vendorNetAmount,
-        vendorTier,
-        commissionRate,
-      })),
+      .map(
+        ({
+          name,
+          price,
+          quantity,
+          vendor,
+          vendorId,
+          lineTotal,
+          platformFee,
+          vendorNetAmount,
+          vendorTier,
+          commissionRate,
+        }) => ({
+          name,
+          price,
+          quantity,
+          vendor,
+          vendorId,
+          lineTotal,
+          platformFee,
+          vendorNetAmount,
+          vendorTier,
+          commissionRate,
+        }),
+      ),
     fulfillmentStatuses: (order.fulfillmentStatuses || [])
       .filter((entry) => entry.sellerId.toString() === sellerId.toString())
       .map(({ sellerId: fulfillmentSellerId, status, updatedAt }) => ({
@@ -517,16 +519,18 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
     for (const item of requestedItems) {
       const productId = String(item?.productId || item?.id || "");
       const quantity = Number(item?.quantity);
-      if (!mongoose.isValidObjectId(productId) || !Number.isInteger(quantity) || quantity < 1) {
+      if (
+        !mongoose.isValidObjectId(productId) ||
+        !Number.isInteger(quantity) ||
+        quantity < 1
+      ) {
         return res.status(400).json({
           success: false,
-          message: "Each order line requires a valid product and positive whole-number quantity.",
+          message:
+            "Each order line requires a valid product and positive whole-number quantity.",
         });
       }
-      quantities.set(
-        productId,
-        (quantities.get(productId) || 0) + quantity,
-      );
+      quantities.set(productId, (quantities.get(productId) || 0) + quantity);
     }
 
     const products = await Product.find({
@@ -540,16 +544,20 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
     }
 
     const sellers = await User.find({
-      _id: { $in: [...new Set(products.map((product) => product.vendor.toString()))] },
-      role: "SELLER",
+      _id: {
+        $in: [...new Set(products.map((product) => product.vendor.toString()))],
+      },
+      role: { $in: ["SELLER", "vendor"] },
       accountStatus: { $ne: "SUSPENDED" },
-      ...getEligibleVendorFilter(),
+      ...getCheckoutEligibleVendorFilter(),
     })
       .select(
         "name email role accountStatus verification storeName vendorDetails.businessName vendorDetails.tier",
       )
       .lean();
-    const sellersById = new Map(sellers.map((seller) => [seller._id.toString(), seller]));
+    const sellersById = new Map(
+      sellers.map((seller) => [seller._id.toString(), seller]),
+    );
     if (
       products.some((product) => !sellersById.has(product.vendor.toString()))
     ) {
@@ -563,15 +571,21 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
     const orderItems = products.map((product) => {
       const quantity = quantities.get(product._id.toString());
       if (!Number.isInteger(product.stock) || product.stock < quantity) {
-        throw Object.assign(new Error(`${product.title} does not have enough stock.`), {
-          statusCode: 409,
-        });
+        throw Object.assign(
+          new Error(`${product.title} does not have enough stock.`),
+          {
+            statusCode: 409,
+          },
+        );
       }
       const unitPriceMinor = toMinorUnits(calculateCurrentPrice(product));
       if (unitPriceMinor < 1) {
-        throw Object.assign(new Error(`${product.title} has an invalid price.`), {
-          statusCode: 409,
-        });
+        throw Object.assign(
+          new Error(`${product.title} has an invalid price.`),
+          {
+            statusCode: 409,
+          },
+        );
       }
       const sellerId = product.vendor.toString();
       const seller = sellersById.get(sellerId);
@@ -610,9 +624,7 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
         price: fromMinorUnits(unitPriceMinor),
         quantity,
         vendor:
-          seller.storeName ||
-          seller.vendorDetails?.businessName ||
-          seller.name,
+          seller.storeName || seller.vendorDetails?.businessName || seller.name,
         vendorId: sellerId,
         lineTotal: fromMinorUnits(lineTotalMinor),
         platformFee: fromMinorUnits(commissionMinor),
@@ -652,7 +664,9 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
             { $inc: { vendorLimitRevision: 1 } },
             { new: true, session, runValidators: true },
           )
-            .select("_id verification.tier verification.status vendorDetails.tier")
+            .select(
+              "_id verification.tier verification.status vendorDetails.tier",
+            )
             .lean();
           if (!seller) {
             const error = new Error(
@@ -667,9 +681,9 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
           for (const item of orderItems) {
             if (item.vendorId !== sellerId) continue;
             const lineTotalMinor = toMinorUnits(item.lineTotal);
-            const platformFeeMinor = Math.round(
-              lineTotalMinor * totals.policy.commissionRate,
-            ) + toMinorUnits(item.demandSurgeCommission || 0);
+            const platformFeeMinor =
+              Math.round(lineTotalMinor * totals.policy.commissionRate) +
+              toMinorUnits(item.demandSurgeCommission || 0);
             totals.feeMinor += platformFeeMinor;
             item.platformFee = fromMinorUnits(platformFeeMinor);
             item.commissionRate = totals.policy.commissionRate;
@@ -801,7 +815,9 @@ router.post("/verify", authenticateToken, async (req, res) => {
         message: "Escrow order not found for this payment reference.",
       });
     }
-    if (contract.buyerId.toString() !== (req.user._id || req.user.id).toString()) {
+    if (
+      contract.buyerId.toString() !== (req.user._id || req.user.id).toString()
+    ) {
       return res.status(403).json({
         success: false,
         message: "You can only verify your own payment.",
@@ -943,7 +959,8 @@ router.patch(
       if (!["PENDING", "PROCESSING", "SHIPPED"].includes(status)) {
         return res.status(400).json({
           success: false,
-          message: "Vendors can update fulfillment to PENDING, PROCESSING, or SHIPPED.",
+          message:
+            "Vendors can update fulfillment to PENDING, PROCESSING, or SHIPPED.",
         });
       }
 
@@ -1020,7 +1037,9 @@ router.post("/rider/seed", authenticateToken, async (req, res) => {
       }
 
       const demoEmail = `rider-demo-vendor-${String(riderId)}@invalid.local`;
-      let demoVendor = await User.findOne({ email: demoEmail }).session(session);
+      let demoVendor = await User.findOne({ email: demoEmail }).session(
+        session,
+      );
       if (!demoVendor) {
         [demoVendor] = await User.create(
           [
@@ -1172,12 +1191,12 @@ router.get("/rider/orders", authenticateToken, async (req, res) => {
     const [contracts, completedCount, todayEarnings, completedContracts] =
       await Promise.all([
         EscrowContract.find(filter)
-      .select(
-        "paymentReference items vendorPayouts subtotal status deliveryStatus deliveryUpdatedAt fulfillmentStatuses createdAt buyerId customerName deliveryAddress customerPhone pickupAddress isMockDelivery",
-      )
-      .populate("buyerId", "name phone")
-      .sort({ createdAt: -1 })
-      .lean(),
+          .select(
+            "paymentReference items vendorPayouts subtotal status deliveryStatus deliveryUpdatedAt fulfillmentStatuses createdAt buyerId customerName deliveryAddress customerPhone pickupAddress isMockDelivery",
+          )
+          .populate("buyerId", "name phone")
+          .sort({ createdAt: -1 })
+          .lean(),
         EscrowContract.countDocuments(completedFilter),
         EscrowContract.aggregate([
           {
@@ -1200,7 +1219,8 @@ router.get("/rider/orders", authenticateToken, async (req, res) => {
       success: true,
       contracts: contracts.map((contract) => ({
         ...contract,
-        customerName: contract.customerName || contract.buyerId?.name || "Customer",
+        customerName:
+          contract.customerName || contract.buyerId?.name || "Customer",
         customerPhone:
           contract.customerPhone || contract.buyerId?.phone || "Not provided",
         deliveryAddress: contract.deliveryAddress || "Address not provided",
@@ -1227,138 +1247,144 @@ router.patch(
   authenticateToken,
   parseDeliveryProof,
   async (req, res) => {
-  const isAdmin = req.user.role === "ADMIN";
-  if (!isAdmin && req.user.role !== "DELIVERY_PARTNER") {
-    return res.status(403).json({
-      success: false,
-      message: "Delivery partner or admin role required.",
-    });
-  }
-  const { contractId } = req.params;
-  const { status } = req.body || {};
-  if (!mongoose.isValidObjectId(contractId)) {
-    return res.status(400).json({
-      success: false,
-      message: "A valid contractId is required.",
-    });
-  }
-  if (!["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(status)) {
-    return res.status(400).json({
-      success: false,
-      message: "Status must be ACCEPTED, PICKED_UP, IN_TRANSIT, or DELIVERED.",
-    });
-  }
-
-  try {
-    const contractFilter = {
-      _id: contractId,
-      status: { $in: ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"] },
-    };
-    if (isAdmin) {
-      contractFilter.deliveryPartnerId = { $ne: null };
-    } else {
-      contractFilter.deliveryPartnerId = req.user._id || req.user.id;
-    }
-    const contract = await EscrowContract.findOne(contractFilter);
-    if (!contract) {
-      return res.status(404).json({
+    const isAdmin = req.user.role === "ADMIN";
+    if (!isAdmin && req.user.role !== "DELIVERY_PARTNER") {
+      return res.status(403).json({
         success: false,
-        message: "Assigned active delivery not found.",
+        message: "Delivery partner or admin role required.",
       });
     }
-
-    const nextStatus = {
-      PENDING: "ACCEPTED",
-      ASSIGNED: "ACCEPTED",
-      ACCEPTED: "IN_TRANSIT",
-      PICKED_UP: "IN_TRANSIT",
-      IN_TRANSIT: "DELIVERED",
-      DELIVERED: null,
-    };
-    if (nextStatus[contract.deliveryStatus] !== status) {
-      return res.status(409).json({
+    const { contractId } = req.params;
+    const { status } = req.body || {};
+    if (!mongoose.isValidObjectId(contractId)) {
+      return res.status(400).json({
         success: false,
-        message: `Delivery status must advance from ${contract.deliveryStatus}.`,
+        message: "A valid contractId is required.",
       });
     }
     if (
-      status === "PICKED_UP" &&
-      contract.fulfillmentStatuses.some(
-        (fulfillment) => fulfillment.status !== "SHIPPED",
-      )
+      !["ACCEPTED", "PICKED_UP", "IN_TRANSIT", "DELIVERED"].includes(status)
     ) {
-      return res.status(409).json({
+      return res.status(400).json({
         success: false,
-        message: "All vendors must mark their packages as shipped before pickup.",
+        message:
+          "Status must be ACCEPTED, PICKED_UP, IN_TRANSIT, or DELIVERED.",
       });
     }
 
-    if (status === "DELIVERED") {
-      if (!req.file) {
-        return res.status(400).json({
+    try {
+      const contractFilter = {
+        _id: contractId,
+        status: { $in: ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"] },
+      };
+      if (isAdmin) {
+        contractFilter.deliveryPartnerId = { $ne: null };
+      } else {
+        contractFilter.deliveryPartnerId = req.user._id || req.user.id;
+      }
+      const contract = await EscrowContract.findOne(contractFilter);
+      if (!contract) {
+        return res.status(404).json({
           success: false,
-          message: "Upload a delivery photo before marking this order delivered.",
+          message: "Assigned active delivery not found.",
         });
       }
-      if (!isValidDeliveryProof(req.file.buffer, req.file.mimetype)) {
-        return res.status(400).json({
-          success: false,
-          message: "The uploaded file is not a valid JPEG, PNG, or WebP image.",
-        });
-      }
-      const completedAt = new Date();
-      const fulfillmentStatuses = contract.fulfillmentStatuses.map(
-        (fulfillment) => ({
-          ...fulfillment.toObject(),
-          status: "DELIVERED",
-          updatedAt: completedAt,
-        }),
-      );
-      const completedContract = await releaseEscrowToWallets(
-        contract._id,
-        {
-          deliveryPartnerId: isAdmin
-            ? contract.deliveryPartnerId
-            : req.user._id || req.user.id,
-          deliveryStatus: contract.deliveryStatus,
-        },
-        ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"],
-        {
-          deliveryStatus: "DELIVERED",
-          deliveryUpdatedAt: completedAt,
-          fulfillmentStatuses,
-          deliveryProof: `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
-          riderEarning: RIDER_DELIVERY_FEE,
-        },
-      );
-      if (!completedContract) {
+
+      const nextStatus = {
+        PENDING: "ACCEPTED",
+        ASSIGNED: "ACCEPTED",
+        ACCEPTED: "IN_TRANSIT",
+        PICKED_UP: "IN_TRANSIT",
+        IN_TRANSIT: "DELIVERED",
+        DELIVERED: null,
+      };
+      if (nextStatus[contract.deliveryStatus] !== status) {
         return res.status(409).json({
           success: false,
-          message: "The delivery has already been completed or changed.",
+          message: `Delivery status must advance from ${contract.deliveryStatus}.`,
         });
       }
+      if (
+        status === "PICKED_UP" &&
+        contract.fulfillmentStatuses.some(
+          (fulfillment) => fulfillment.status !== "SHIPPED",
+        )
+      ) {
+        return res.status(409).json({
+          success: false,
+          message:
+            "All vendors must mark their packages as shipped before pickup.",
+        });
+      }
+
+      if (status === "DELIVERED") {
+        if (!req.file) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "Upload a delivery photo before marking this order delivered.",
+          });
+        }
+        if (!isValidDeliveryProof(req.file.buffer, req.file.mimetype)) {
+          return res.status(400).json({
+            success: false,
+            message:
+              "The uploaded file is not a valid JPEG, PNG, or WebP image.",
+          });
+        }
+        const completedAt = new Date();
+        const fulfillmentStatuses = contract.fulfillmentStatuses.map(
+          (fulfillment) => ({
+            ...fulfillment.toObject(),
+            status: "DELIVERED",
+            updatedAt: completedAt,
+          }),
+        );
+        const completedContract = await releaseEscrowToWallets(
+          contract._id,
+          {
+            deliveryPartnerId: isAdmin
+              ? contract.deliveryPartnerId
+              : req.user._id || req.user.id,
+            deliveryStatus: contract.deliveryStatus,
+          },
+          ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"],
+          {
+            deliveryStatus: "DELIVERED",
+            deliveryUpdatedAt: completedAt,
+            fulfillmentStatuses,
+            deliveryProof: `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
+            riderEarning: RIDER_DELIVERY_FEE,
+          },
+        );
+        if (!completedContract) {
+          return res.status(409).json({
+            success: false,
+            message: "The delivery has already been completed or changed.",
+          });
+        }
+        return res.json({
+          success: true,
+          message: "Delivery marked delivered and escrow funds released.",
+          contract: completedContract,
+        });
+      }
+
+      contract.deliveryStatus = status;
+      contract.deliveryUpdatedAt = new Date();
+      await contract.save();
       return res.json({
         success: true,
-        message: "Delivery marked delivered and escrow funds released.",
-        contract: completedContract,
+        message: `Delivery marked ${status.toLowerCase().replace("_", " ")}.`,
+        contract,
+      });
+    } catch (error) {
+      console.error("Rider could not update delivery status:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Unable to update delivery status.",
       });
     }
-
-    contract.deliveryStatus = status;
-    contract.deliveryUpdatedAt = new Date();
-    await contract.save();
-    return res.json({
-      success: true,
-      message: `Delivery marked ${status.toLowerCase().replace("_", " ")}.`,
-      contract,
-    });
-  } catch (error) {
-    console.error("Rider could not update delivery status:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Unable to update delivery status.",
-    });
-  }
   },
 );
 
@@ -1386,8 +1412,7 @@ router.get("/wallet", authenticateToken, async (req, res) => {
       .limit(20)
       .select("-vendorId")
       .lean();
-    const availableBalance =
-      wallet?.availableBalance ?? wallet?.balance ?? 0;
+    const availableBalance = wallet?.availableBalance ?? wallet?.balance ?? 0;
     return res.json({
       success: true,
       wallet: {
@@ -1573,11 +1598,7 @@ router.post(
 
       const contract =
         decision === "RELEASE"
-          ? await releaseEscrowToWallets(
-              contractId,
-              {},
-              ["IN_DISPUTE"],
-            )
+          ? await releaseEscrowToWallets(contractId, {}, ["IN_DISPUTE"])
           : await finalizeRefundReceipt(contractId);
 
       if (!contract) {
@@ -1643,7 +1664,9 @@ router.get("/:contractId/receipt", authenticateToken, async (req, res) => {
 
     const items = (contract.receipt.items || []).flatMap((item, index) => {
       const vendorId =
-        item.vendorId || contract.items[index]?.vendorId || contract.items[index]?.sellerId;
+        item.vendorId ||
+        contract.items[index]?.vendorId ||
+        contract.items[index]?.sellerId;
       if (String(vendorId || "") !== userId) return [];
       const sellerItem = { ...item };
       delete sellerItem.vendorId;

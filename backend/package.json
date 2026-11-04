@@ -7,6 +7,7 @@
     "test": "node --test",
     "seed:admin": "node scripts/provisionAdmin.js",
     "seed:marketplace": "node scripts/seedMarketplace.js",
+    "activate:vendors": "node scripts/activateVendorAccounts.js",
     "seed:verify-primary-vendor": "node scripts/verifyPrimaryTestVendor.js",
     "publish:existing-products": "node scripts/publishExistingProducts.js",
     "promote:vendor": "node scripts/promoteVendor.js",
