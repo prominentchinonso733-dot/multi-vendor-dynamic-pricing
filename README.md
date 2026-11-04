@@ -139,3 +139,18 @@ uses a fixed dummy test key for these synthetic records. Set a private
 64-character hexadecimal key if you need to decrypt seeded values locally.
 This fallback is limited to this seeder; it does not configure encryption for
 the application or other flows.
+
+To make an existing **local test seller** eligible to publish its inventory,
+configure `MONGO_URI` (or `MONGODB_URI`) to a localhost MongoDB instance and
+provide that seller's `.test` email:
+
+```sh
+npm --prefix backend run seed:verify-primary-vendor -- primary@example.test
+```
+
+The helper only accepts `.test` email accounts already registered as
+non-suspended sellers and only connects to `localhost`, `127.0.0.1`, or `::1`.
+It enables synthetic Tier 1 marketplace visibility for local development; it
+does not validate identity, resolve a bank account, or satisfy real vendor
+onboarding or payment requirements. It must not be used for production
+approvals.
