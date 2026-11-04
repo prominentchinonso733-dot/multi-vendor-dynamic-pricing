@@ -14,9 +14,77 @@ const {
   isTier2VerifiedVendor,
   isVendorEligibleToSell,
 } = require("../services/vendorTiers");
-const { emitFeaturedUpdate, emitProductUpdate } = require("../services/realtime");
+const {
+  emitFeaturedUpdate,
+  emitProductUpdate,
+} = require("../services/realtime");
 
 const router = express.Router();
+const marketplaceVendorSelect =
+  "name storeName role accountStatus isFeatured vendorDetails.businessName vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified verification.tier verification.status";
+const publishedProductFilter = {
+  isApproved: true,
+  status: "active",
+  isPublished: true,
+};
+
+const serializeMarketplaceProduct = (product) => ({
+  ...product,
+  id: product._id.toString(),
+  name: product.title,
+  currentPrice: calculateCurrentPrice(product),
+  price: calculateCurrentPrice(product),
+  vendorId: product.vendor?._id?.toString(),
+  vendor:
+    product.vendor?.storeName ||
+    product.vendor?.vendorDetails?.businessName ||
+    product.vendor?.name ||
+    "Marketplace seller",
+  vendorTier: getVendorTier(product.vendor),
+  isVerifiedVendor: isTier2VerifiedVendor(product.vendor),
+  isFeatured: product.isFeatured === true,
+  vendorFeatured: product.vendor?.isFeatured === true,
+});
+
+const findKeywordMatches = async (query) => {
+  const terms = [...new Set(query.toLowerCase().split(/\s+/).filter(Boolean))];
+  const escapedTerms = terms.map((term) =>
+    term.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"),
+  );
+  const products = await Product.find({
+    ...publishedProductFilter,
+    $or: escapedTerms.flatMap((term) => [
+      { title: { $regex: term, $options: "i" } },
+      { description: { $regex: term, $options: "i" } },
+      { category: { $regex: term, $options: "i" } },
+    ]),
+  })
+    .populate({ path: "vendor", select: marketplaceVendorSelect })
+    .sort({ createdAt: -1 })
+    .limit(250)
+    .lean();
+
+  return products
+    .map((product) => {
+      const title = String(product.title || "").toLowerCase();
+      const description = String(product.description || "").toLowerCase();
+      const category = String(product.category || "").toLowerCase();
+      const score = terms.reduce(
+        (total, term) =>
+          total +
+          (title.includes(term) ? 3 : 0) +
+          (category.includes(term) ? 2 : 0) +
+          (description.includes(term) ? 1 : 0),
+        0,
+      );
+      return { product, score };
+    })
+    .filter(({ score }) => score > 0)
+    .sort((left, right) => right.score - left.score)
+    .slice(0, 12)
+    .map(({ product }) => serializeMarketplaceProduct(product));
+};
+
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
   api_key: process.env.CLOUDINARY_API_KEY,
@@ -111,8 +179,7 @@ const parseProductUpload = (req, res, next) => {
   });
 };
 
-const canManageProducts = (user) =>
-  ["SELLER", "ADMIN"].includes(user.role);
+const canManageProducts = (user) => ["SELLER", "ADMIN"].includes(user.role);
 
 const requireProductManager = (req, res, next) => {
   if (!canManageProducts(req.user)) {
@@ -196,115 +263,116 @@ router.post(
   requireTier1Verification,
   parseProductUpload,
   async (req, res) => {
-  const toNumber = (value) =>
-    typeof value === "string" && value.trim() ? Number(value) : value;
-  const { title, description, category } = req.body || {};
-  const competitorPrice = toNumber(req.body?.competitorPrice);
-  const basePrice = toNumber(req.body?.basePrice);
-  const stock = toNumber(req.body?.stock);
-  const demandScore = toNumber(req.body?.demandScore ?? 0);
-  const priceFloor = toNumber(req.body?.priceFloor);
-  const priceCeiling = toNumber(req.body?.priceCeiling);
+    const toNumber = (value) =>
+      typeof value === "string" && value.trim() ? Number(value) : value;
+    const { title, description, category } = req.body || {};
+    const competitorPrice = toNumber(req.body?.competitorPrice);
+    const basePrice = toNumber(req.body?.basePrice);
+    const stock = toNumber(req.body?.stock);
+    const demandScore = toNumber(req.body?.demandScore ?? 0);
+    const priceFloor = toNumber(req.body?.priceFloor);
+    const priceCeiling = toNumber(req.body?.priceCeiling);
 
-  if (typeof title !== "string" || !title.trim()) {
-    return res
-      .status(400)
-      .json({ success: false, message: "A product title is required." });
-  }
+    if (typeof title !== "string" || !title.trim()) {
+      return res
+        .status(400)
+        .json({ success: false, message: "A product title is required." });
+    }
 
-  const numericFields = {
-    basePrice,
-    stock,
-    demandScore,
-    priceFloor,
-    priceCeiling,
-  };
-  if (
-    Object.entries(numericFields).some(
-      ([field, value]) => typeof value !== "number" || !Number.isFinite(value),
-    )
-  ) {
-    return res.status(400).json({
-      success: false,
-      message:
-        "Base price, stock, demand score, price floor, and price ceiling must be finite numbers.",
-    });
-  }
-  if (basePrice <= 0 || priceFloor <= 0 || priceCeiling <= 0) {
-    return res.status(400).json({
-      success: false,
-      message: "Base price, price floor, and price ceiling must be positive.",
-    });
-  }
-  if (priceFloor > priceCeiling || stock < 0 || !Number.isInteger(stock)) {
-    return res.status(400).json({
-      success: false,
-      message:
-        "Price floor cannot exceed price ceiling, and stock must be a non-negative whole number.",
-    });
-  }
-  if (demandScore < 0 || demandScore > 100) {
-    return res.status(400).json({
-      success: false,
-      message: "Demand score must be between 0 and 100.",
-    });
-  }
-  if (
-    competitorPrice !== undefined &&
-    competitorPrice !== null &&
-    (typeof competitorPrice !== "number" ||
-      !Number.isFinite(competitorPrice) ||
-      competitorPrice <= 0)
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Competitor price must be a positive number when provided.",
-    });
-  }
-  if (
-    (description !== undefined && typeof description !== "string") ||
-    (category !== undefined && typeof category !== "string")
-  ) {
-    return res.status(400).json({
-      success: false,
-      message: "Description and category must be text.",
-    });
-  }
-
-  try {
-    const currentPrice = calculateCurrentPrice({
+    const numericFields = {
       basePrice,
-      demandScore,
-      priceFloor,
-      priceCeiling,
-      stock,
-    });
-
-    const product = await Product.create({
-      vendor: req.user._id,
-      title: title.trim(),
-      description: description?.trim() || "",
-      category: category?.trim() || "",
-      imageUrl: req.file?.path,
-      imagePublicId: req.file?.filename,
-      basePrice,
-      currentPrice,
       stock,
       demandScore,
       priceFloor,
       priceCeiling,
-      competitorPrice: competitorPrice ?? undefined,
-    });
+    };
+    if (
+      Object.entries(numericFields).some(
+        ([field, value]) =>
+          typeof value !== "number" || !Number.isFinite(value),
+      )
+    ) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Base price, stock, demand score, price floor, and price ceiling must be finite numbers.",
+      });
+    }
+    if (basePrice <= 0 || priceFloor <= 0 || priceCeiling <= 0) {
+      return res.status(400).json({
+        success: false,
+        message: "Base price, price floor, and price ceiling must be positive.",
+      });
+    }
+    if (priceFloor > priceCeiling || stock < 0 || !Number.isInteger(stock)) {
+      return res.status(400).json({
+        success: false,
+        message:
+          "Price floor cannot exceed price ceiling, and stock must be a non-negative whole number.",
+      });
+    }
+    if (demandScore < 0 || demandScore > 100) {
+      return res.status(400).json({
+        success: false,
+        message: "Demand score must be between 0 and 100.",
+      });
+    }
+    if (
+      competitorPrice !== undefined &&
+      competitorPrice !== null &&
+      (typeof competitorPrice !== "number" ||
+        !Number.isFinite(competitorPrice) ||
+        competitorPrice <= 0)
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Competitor price must be a positive number when provided.",
+      });
+    }
+    if (
+      (description !== undefined && typeof description !== "string") ||
+      (category !== undefined && typeof category !== "string")
+    ) {
+      return res.status(400).json({
+        success: false,
+        message: "Description and category must be text.",
+      });
+    }
 
-    emitProductUpdate(product);
-    return res.status(201).json({ success: true, product });
-  } catch (error) {
-    console.error("Vendor product could not be created:", error);
-    return res.status(500).json({
-      success: false,
-      message: "Unable to create product.",
-    });
-  }
+    try {
+      const currentPrice = calculateCurrentPrice({
+        basePrice,
+        demandScore,
+        priceFloor,
+        priceCeiling,
+        stock,
+      });
+
+      const product = await Product.create({
+        vendor: req.user._id,
+        title: title.trim(),
+        description: description?.trim() || "",
+        category: category?.trim() || "",
+        imageUrl: req.file?.path,
+        imagePublicId: req.file?.filename,
+        basePrice,
+        currentPrice,
+        stock,
+        demandScore,
+        priceFloor,
+        priceCeiling,
+        competitorPrice: competitorPrice ?? undefined,
+      });
+
+      emitProductUpdate(product);
+      return res.status(201).json({ success: true, product });
+    } catch (error) {
+      console.error("Vendor product could not be created:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Unable to create product.",
+      });
+    }
   },
 );
 
@@ -487,39 +555,14 @@ router.get("/store/:vendorId", async (req, res) => {
 
 router.get("/", async (_req, res) => {
   try {
-    const products = await Product.find()
+    const products = await Product.find(publishedProductFilter)
       .populate({
         path: "vendor",
-        select:
-          "name storeName role accountStatus isFeatured vendorDetails.businessName vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified verification.tier verification.status",
-        match: {
-          role: "SELLER",
-          accountStatus: { $ne: "SUSPENDED" },
-          ...getEligibleVendorFilter(),
-        },
+        select: marketplaceVendorSelect,
       })
       .sort({ createdAt: -1 })
-      .lean()
-      .then((entries) => entries.filter((product) => product.vendor));
-    return res.json(
-      products.map((product) => ({
-        ...product,
-        id: product._id.toString(),
-        name: product.title,
-        currentPrice: calculateCurrentPrice(product),
-        price: calculateCurrentPrice(product),
-        vendorId: product.vendor?._id?.toString(),
-        vendor:
-          product.vendor?.storeName ||
-          product.vendor?.vendorDetails?.businessName ||
-          product.vendor?.name ||
-          "Marketplace seller",
-        vendorTier: getVendorTier(product.vendor),
-        isVerifiedVendor: isTier2VerifiedVendor(product.vendor),
-        isFeatured: product.isFeatured === true,
-        vendorFeatured: product.vendor?.isFeatured === true,
-      })),
-    );
+      .lean();
+    return res.json(products.map(serializeMarketplaceProduct));
   } catch (error) {
     console.error("Marketplace products could not be loaded:", error);
     return res.status(500).json({
@@ -579,7 +622,8 @@ router.get("/featured", async (_req, res) => {
 });
 
 router.post("/search/semantic", async (req, res) => {
-  const query = typeof req.body?.query === "string" ? req.body.query.trim() : "";
+  const query =
+    typeof req.body?.query === "string" ? req.body.query.trim() : "";
   if (!query || query.length > 300) {
     return res.status(400).json({
       success: false,
@@ -587,15 +631,25 @@ router.post("/search/semantic", async (req, res) => {
     });
   }
   try {
-    const { semanticProductSearch } = require("../services/gemini");
+    const {
+      isGeminiCredentialError,
+      semanticProductSearch,
+    } = require("../services/gemini");
     const products = await semanticProductSearch(query);
     return res.json({ success: true, products });
   } catch (error) {
-    if (error.code === "GEMINI_NOT_CONFIGURED") {
-      return res.status(503).json({
-        success: false,
-        message: "Semantic search is not configured.",
-      });
+    const { isGeminiCredentialError } = require("../services/gemini");
+    if (isGeminiCredentialError(error)) {
+      try {
+        const products = await findKeywordMatches(query);
+        return res.json({ success: true, products, searchMode: "keyword" });
+      } catch (fallbackError) {
+        console.error("Keyword product search failed:", fallbackError.message);
+        return res.status(500).json({
+          success: false,
+          message: "Unable to complete product search.",
+        });
+      }
     }
     console.error("Semantic product search failed:", error.message);
     return res.status(502).json({

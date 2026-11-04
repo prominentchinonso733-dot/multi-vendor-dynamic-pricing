@@ -8,6 +8,7 @@
     "seed:admin": "node scripts/provisionAdmin.js",
     "seed:marketplace": "node scripts/seedMarketplace.js",
     "seed:verify-primary-vendor": "node scripts/verifyPrimaryTestVendor.js",
+    "publish:existing-products": "node scripts/publishExistingProducts.js",
     "promote:vendor": "node scripts/promoteVendor.js",
     "reassign:products": "node scripts/reassignProductsToSeller.js"
   },

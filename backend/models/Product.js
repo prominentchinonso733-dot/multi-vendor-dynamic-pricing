@@ -26,6 +26,9 @@ const ProductSchema = new mongoose.Schema(
 
     demandScore: { type: Number, default: 0 },
     isFeatured: { type: Boolean, default: false },
+    isApproved: { type: Boolean, default: false },
+    status: { type: String, enum: ["active", "inactive"], default: "inactive" },
+    isPublished: { type: Boolean, default: false },
     embedding: { type: [Number], select: false },
     embeddingUpdatedAt: { type: Date, select: false },
     embeddingTextHash: { type: String, select: false },

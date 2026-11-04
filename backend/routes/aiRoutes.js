@@ -1,16 +1,27 @@
 const express = require("express");
-const { generateSupportReply } = require("../services/gemini");
+const {
+  generateSupportReply,
+  isGeminiCredentialError,
+} = require("../services/gemini");
 
 const router = express.Router();
+const STATIC_SUPPORT_REPLY =
+  "You can track orders from My Orders. Payments are held in escrow until delivery is confirmed. If an order is late, missing, or incorrect, open it in My Orders and raise a dispute for admin review. I cannot access account-specific order details, and you should never share passwords or payment details in chat.";
 
 router.post("/support", async (req, res) => {
   const message =
     typeof req.body?.message === "string" ? req.body.message.trim() : "";
   const history = req.body?.history ?? [];
-  if (!message || message.length > 1200 || !Array.isArray(history) || history.length > 10) {
+  if (
+    !message ||
+    message.length > 1200 ||
+    !Array.isArray(history) ||
+    history.length > 10
+  ) {
     return res.status(400).json({
       success: false,
-      message: "Provide a message up to 1,200 characters and at most 10 history entries.",
+      message:
+        "Provide a message up to 1,200 characters and at most 10 history entries.",
     });
   }
   if (
@@ -31,10 +42,11 @@ router.post("/support", async (req, res) => {
     const reply = await generateSupportReply({ message, history });
     return res.json({ success: true, reply });
   } catch (error) {
-    if (error.code === "GEMINI_NOT_CONFIGURED") {
-      return res.status(503).json({
-        success: false,
-        message: "AI customer support is not configured.",
+    if (isGeminiCredentialError(error)) {
+      return res.json({
+        success: true,
+        reply: STATIC_SUPPORT_REPLY,
+        fallback: true,
       });
     }
     console.error("AI support response could not be generated:", error.message);

@@ -1,11 +1,31 @@
 const crypto = require("crypto");
 const Product = require("../models/Product");
-const { getEligibleVendorFilter, getVendorTier, isTier2VerifiedVendor } =
-  require("./vendorTiers");
+const {
+  getEligibleVendorFilter,
+  getVendorTier,
+  isTier2VerifiedVendor,
+} = require("./vendorTiers");
 const calculateCurrentPrice = require("./dynamicPricing");
 
 const EMBEDDING_MODEL = "gemini-embedding-001";
 const SEARCH_LIMIT = 12;
+
+const isGeminiCredentialError = (error) => {
+  if (error?.code === "GEMINI_NOT_CONFIGURED") return true;
+  const status = Number(
+    error?.status ?? error?.statusCode ?? error?.response?.status,
+  );
+  const code = String(error?.code || error?.error?.status || "").toUpperCase();
+  const message = String(error?.message || "");
+  return (
+    status === 401 ||
+    status === 403 ||
+    /API_KEY_INVALID|UNAUTHENTICATED|PERMISSION_DENIED/.test(code) ||
+    /api[\s_-]?key.{0,60}(invalid|not valid|expired|revoked)|invalid api key/i.test(
+      message,
+    )
+  );
+};
 
 const getGeminiClient = () => {
   const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
@@ -47,7 +67,9 @@ const cosineSimilarity = (left, right) => {
     leftNorm += left[index] ** 2;
     rightNorm += right[index] ** 2;
   }
-  return leftNorm && rightNorm ? dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm)) : -1;
+  return leftNorm && rightNorm
+    ? dot / (Math.sqrt(leftNorm) * Math.sqrt(rightNorm))
+    : -1;
 };
 
 const semanticProductSearch = async (query) => {
@@ -75,7 +97,10 @@ const semanticProductSearch = async (query) => {
       batch.map(async (product) => {
         const text = productSearchText(product);
         const textHash = crypto.createHash("sha256").update(text).digest("hex");
-        if (!product.embedding?.length || product.embeddingTextHash !== textHash) {
+        if (
+          !product.embedding?.length ||
+          product.embeddingTextHash !== textHash
+        ) {
           product.embedding = await getEmbedding(
             client,
             text,
@@ -143,5 +168,6 @@ module.exports = {
   cosineSimilarity,
   generateSupportReply,
   getEmbedding,
+  isGeminiCredentialError,
   semanticProductSearch,
 };

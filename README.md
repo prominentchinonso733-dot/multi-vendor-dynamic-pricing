@@ -3,6 +3,7 @@
 A modern web application that enables multiple vendors to list and sell products while leveraging automated, algorithmic dynamic pricing to maximize revenue and keep prices competitive.
 
 ## Core Features
+
 - **Automated Dynamic Pricing Engine:** Adjusts prices based on demand spikes, inventory levels, and competitor rates.
 - **Multi-Vendor Management:** Dashboard for sellers to onboard, set price guardrails (floors/ceilings), and manage stock.
 - **Unified Shopping & Checkout:** Customer portal with real-time price updates and single cart checkout.
@@ -62,6 +63,7 @@ For Kubernetes, copy `k8s/secrets.env.example` to the ignored `k8s/secrets.env`,
 **Credential rotation required:** credentials were previously stored in a committed Kubernetes secret manifest. Removing that file does not erase it from Git history. Rotate the MongoDB credential, JWT signing secret, and admin bootstrap password in the deployment secret store; invalidate previously issued JWTs by changing `JWT_SECRET`.
 
 ## Tech Stack
+
 - **Frontend:** React.js, Tailwind CSS
 - **Backend:** Node.js, Express.js
 - **Database:** MongoDB
@@ -117,7 +119,20 @@ ownership of every existing product document, including products currently
 assigned to other sellers.
 
 The public `GET /api/products` endpoint reads product documents from MongoDB.
+It returns products marked `isApproved: true`, `status: "active"`, and
+`isPublished: true`, without filtering by vendor subscription eligibility.
 Demo product seed data is not run on server startup.
+
+To publish the existing 40 product records, first run the guarded dry run and
+then apply the update:
+
+```sh
+npm --prefix backend run publish:existing-products
+npm --prefix backend run publish:existing-products -- --apply
+```
+
+The script refuses to write unless exactly 40 products are present, and checks
+that all three publication flags were updated afterward.
 
 ### Seeding local marketplace demo data
 
