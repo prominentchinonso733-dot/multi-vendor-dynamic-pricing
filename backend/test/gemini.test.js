@@ -18,6 +18,14 @@ test("recognizes missing and invalid Gemini credentials for fallbacks", () => {
     true,
   );
   assert.equal(isGeminiCredentialError({ status: 401 }), true);
+  assert.equal(isGeminiCredentialError({ status: 403 }), true);
+  assert.equal(
+    isGeminiCredentialError({
+      code: "API_KEY_INVALID",
+      status: 400,
+    }),
+    true,
+  );
   assert.equal(
     isGeminiCredentialError({ message: "API key not valid. Please retry." }),
     true,

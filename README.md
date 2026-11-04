@@ -34,7 +34,7 @@ Set `VERIFICATION_DOCUMENT_ENCRYPTION_KEY` to a persistent, randomly generated 3
 
 The backend is authoritative for order prices, quantities, vendor tiers, transaction caps, and fees. Prices are adjusted using seller demand, stock thresholds, and units ordered in the previous 24 hours, then rounded to two decimals and clamped to each seller's price floor and ceiling. Twenty percent of any positive stock/order-driven price uplift is withheld as a demand-surge platform share and recorded in the admin commission ledger. It remains pending until escrow release and is reversed on refund. Tier 1 vendors are limited to **₦100,000 per order** and **₦500,000 in daily gross sales** with a **10% vendor commission**. Tier 2 vendors with approved identity review have a **₦1,000,000 per-order** and **₦5,000,000 daily** cap and a **5% commission**. The buyer escrow fee remains **2.5% of the server-calculated order subtotal**. These policies are defined in `backend/services/financialPolicy.js`.
 
-The public storefront uses Socket.io to broadcast committed price/stock updates and featured-listing changes. Gemini features require `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) on the backend; `GEMINI_CHAT_MODEL` optionally overrides the support-chat model. `POST /api/products/search/semantic` uses Gemini embeddings and caches product vectors in MongoDB; `POST /api/ai/support` provides policy-guided customer support. Feature/unfeature vendors and products in the admin **Featured listings** section. Surge-share entries are available to administrators under **Commission ledger**.
+The public storefront uses Socket.io to broadcast committed price/stock updates and featured-listing changes. Gemini features use `GEMINI_API_KEY` (or `GOOGLE_API_KEY`) on the backend; `GEMINI_CHAT_MODEL` optionally overrides the support-chat model. `POST /api/products/search/semantic` uses Gemini embeddings and caches product vectors in MongoDB, falling back to keyword search when Gemini credentials are missing or invalid. `POST /api/ai/support` provides policy-guided customer and vendor support, including request categorization and draft dispute-ticket summaries; it returns knowledge-base answers when Gemini credentials are missing or invalid. Drafts do not submit tickets or trigger order, payout, or refund actions. Feature/unfeature vendors and products in the admin **Featured listings** section. Surge-share entries are available to administrators under **Commission ledger**.
 
 The customer storefront and vendor storefront use one shared cart, so buyers can check out products from multiple eligible vendors in a single escrow order. The checkout API creates an expiring payment order from current database prices and stock, not client-supplied amounts. A successful Paystack verification or signed webhook locks funds and decrements inventory. If payment arrives after the order hold expires or its inventory is no longer available, the order is flagged for admin dispute review rather than silently treated as a successful checkout.
 
@@ -99,7 +99,8 @@ store profile with `PUT /api/auth/profile`. The update accepts `storeName`,
 `storeLogo`, `storeBanner`, and `storeDescription`; image fields must be HTTP
 or HTTPS URLs.
 
-`POST /api/products` creates a product for the authenticated seller. Provide
+`POST /api/products` creates a product for the authenticated seller. New
+products default to approved, active, and published. Provide
 `title`, `basePrice`, `stock`, `priceFloor`, and `priceCeiling`; `description`,
 `category`, `demandScore`, and `competitorPrice` are optional. Product
 ownership is assigned from the authenticated token, not from request data.

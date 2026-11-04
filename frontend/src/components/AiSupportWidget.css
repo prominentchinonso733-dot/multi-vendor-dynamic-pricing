@@ -89,6 +89,49 @@
   white-space: pre-wrap;
 }
 
+.ai-support__entry {
+  display: grid;
+  max-width: 92%;
+  gap: 5px;
+}
+
+.ai-support__entry--user {
+  justify-items: end;
+  align-self: flex-end;
+}
+
+.ai-support__meta {
+  display: grid;
+  gap: 3px;
+  padding: 0 12px;
+  color: #64736c;
+  font-size: 0.72rem;
+}
+
+.ai-support__meta strong {
+  color: #164b3f;
+}
+
+.ai-support__meta details {
+  margin-top: 3px;
+}
+
+.ai-support__meta summary {
+  color: #164b3f;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.ai-support__meta p {
+  margin: 5px 0;
+  color: #243a32;
+}
+
+.ai-support__meta small {
+  display: block;
+  line-height: 1.4;
+}
+
 .ai-support__message--user {
   align-self: flex-end;
   background: #1b6553;

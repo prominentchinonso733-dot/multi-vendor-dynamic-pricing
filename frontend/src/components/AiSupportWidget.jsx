@@ -27,10 +27,15 @@ export default function AiSupportWidget() {
     setPending(true);
     setError("");
     try {
-      const { reply } = await aiService.support(content, history);
-      setMessages((current) => [...current, { role: "assistant", content: reply }]);
+      const { reply, support } = await aiService.support(content, history);
+      setMessages((current) => [
+        ...current,
+        { role: "assistant", content: reply, support },
+      ]);
     } catch (requestError) {
-      setError(getApiErrorMessage(requestError, "Support is unavailable right now."));
+      setError(
+        getApiErrorMessage(requestError, "Support is unavailable right now."),
+      );
     } finally {
       setPending(false);
     }
@@ -39,27 +44,75 @@ export default function AiSupportWidget() {
   return (
     <aside className="ai-support" aria-label="AI customer support">
       {open && (
-        <section className="ai-support__panel" aria-labelledby="ai-support-title">
+        <section
+          className="ai-support__panel"
+          aria-labelledby="ai-support-title"
+        >
           <header className="ai-support__header">
             <div>
               <p>MARKETPLACE HELP</p>
               <h2 id="ai-support-title">Customer support</h2>
             </div>
-            <button aria-label="Close support chat" onClick={() => setOpen(false)} type="button">
+            <button
+              aria-label="Close support chat"
+              onClick={() => setOpen(false)}
+              type="button"
+            >
               <X size={19} />
             </button>
           </header>
           <div className="ai-support__messages" aria-live="polite">
             {messages.map((entry, index) => (
-              <p className={`ai-support__message ai-support__message--${entry.role}`} key={`${entry.role}-${index}`}>
-                {entry.content}
-              </p>
+              <div
+                className={`ai-support__entry ai-support__entry--${entry.role}`}
+                key={`${entry.role}-${index}`}
+              >
+                <p
+                  className={`ai-support__message ai-support__message--${entry.role}`}
+                >
+                  {entry.content}
+                </p>
+                {entry.support && (
+                  <section
+                    aria-label="Support classification"
+                    className="ai-support__meta"
+                  >
+                    <strong>
+                      {String(entry.support.category || "GENERAL").replaceAll(
+                        "_",
+                        " ",
+                      )}
+                    </strong>
+                    <span>{entry.support.priority} priority</span>
+                    {entry.support.ticketDraft && (
+                      <details>
+                        <summary>Dispute ticket draft</summary>
+                        <p>{entry.support.ticketDraft.summary}</p>
+                        <small>
+                          {entry.support.ticketDraft.nextStep}{" "}
+                          {entry.support.ticketDraft.note}
+                        </small>
+                      </details>
+                    )}
+                  </section>
+                )}
+              </div>
             ))}
-            {pending && <p className="ai-support__typing" role="status">Thinking…</p>}
-            {error && <p className="ai-support__error" role="alert">{error}</p>}
+            {pending && (
+              <p className="ai-support__typing" role="status">
+                Thinking…
+              </p>
+            )}
+            {error && (
+              <p className="ai-support__error" role="alert">
+                {error}
+              </p>
+            )}
           </div>
           <form className="ai-support__form" onSubmit={sendMessage}>
-            <label className="ai-support__sr-only" htmlFor="ai-support-message">Message customer support</label>
+            <label className="ai-support__sr-only" htmlFor="ai-support-message">
+              Message customer support
+            </label>
             <input
               id="ai-support-message"
               maxLength={1200}
@@ -67,7 +120,11 @@ export default function AiSupportWidget() {
               placeholder="Ask us a question..."
               value={message}
             />
-            <button aria-label="Send message" disabled={pending || !message.trim()} type="submit">
+            <button
+              aria-label="Send message"
+              disabled={pending || !message.trim()}
+              type="submit"
+            >
               <Send size={17} />
             </button>
           </form>

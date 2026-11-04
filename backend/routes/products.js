@@ -18,15 +18,11 @@ const {
   emitFeaturedUpdate,
   emitProductUpdate,
 } = require("../services/realtime");
+const { publishedProductFilter } = require("../services/productVisibility");
 
 const router = express.Router();
 const marketplaceVendorSelect =
   "name storeName role accountStatus isFeatured vendorDetails.businessName vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified verification.tier verification.status";
-const publishedProductFilter = {
-  isApproved: true,
-  status: "active",
-  isPublished: true,
-};
 
 const serializeMarketplaceProduct = (product) => ({
   ...product,

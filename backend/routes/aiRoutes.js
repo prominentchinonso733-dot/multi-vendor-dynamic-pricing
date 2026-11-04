@@ -3,11 +3,12 @@ const {
   generateSupportReply,
   isGeminiCredentialError,
 } = require("../services/gemini");
+const {
+  classifySupportRequest,
+  getStaticSupportReply,
+} = require("../services/supportAssistant");
 
 const router = express.Router();
-const STATIC_SUPPORT_REPLY =
-  "You can track orders from My Orders. Payments are held in escrow until delivery is confirmed. If an order is late, missing, or incorrect, open it in My Orders and raise a dispute for admin review. I cannot access account-specific order details, and you should never share passwords or payment details in chat.";
-
 router.post("/support", async (req, res) => {
   const message =
     typeof req.body?.message === "string" ? req.body.message.trim() : "";
@@ -38,14 +39,16 @@ router.post("/support", async (req, res) => {
     });
   }
 
+  const support = classifySupportRequest(message);
   try {
     const reply = await generateSupportReply({ message, history });
-    return res.json({ success: true, reply });
+    return res.json({ success: true, reply, support, fallback: false });
   } catch (error) {
     if (isGeminiCredentialError(error)) {
       return res.json({
         success: true,
-        reply: STATIC_SUPPORT_REPLY,
+        reply: getStaticSupportReply(support.category),
+        support,
         fallback: true,
       });
     }
