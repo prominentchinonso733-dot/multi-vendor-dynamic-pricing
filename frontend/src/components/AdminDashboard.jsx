@@ -27,6 +27,8 @@ const sections = [
   ["accounts", "User accounts"],
   ["delivery", "Delivery & riders"],
   ["verification", "Identity review"],
+  ["promotions", "Featured listings"],
+  ["commission", "Commission ledger"],
 ];
 const formatDate = (date) =>
   date ? dateFormatter.format(new Date(date)) : "—";
@@ -62,6 +64,8 @@ export default function AdminDashboard() {
   const [section, setSection] = useState("overview");
   const [overview, setOverview] = useState(null);
   const [pendingVerifications, setPendingVerifications] = useState([]);
+  const [featuredItems, setFeaturedItems] = useState({ vendors: [], products: [] });
+  const [commissionLedger, setCommissionLedger] = useState(null);
   const [usersPage, setUsersPage] = useState(1);
   const [ordersPage, setOrdersPage] = useState(1);
   const [refreshVersion, setRefreshVersion] = useState(0);
@@ -94,13 +98,26 @@ export default function AdminDashboard() {
         { signal: controller.signal },
       ),
       adminService.getPendingVerifications({ signal: controller.signal }),
+      section === "promotions"
+        ? adminService.getFeaturedItems({ signal: controller.signal })
+        : Promise.resolve(null),
+      section === "commission"
+        ? adminService.getCommissionLedger({}, { signal: controller.signal })
+        : Promise.resolve(null),
     ])
-      .then(([data, verificationQueue]) => {
+      .then(([data, verificationQueue, featured, ledger]) => {
         if (!data?.success || !Array.isArray(data.users) || !Array.isArray(data.orders)) {
           throw new Error("The admin API returned invalid oversight data.");
         }
         setOverview(data);
         setPendingVerifications(verificationQueue);
+        if (featured?.success) {
+          setFeaturedItems({
+            vendors: featured.vendors || [],
+            products: featured.products || [],
+          });
+        }
+        if (ledger?.success) setCommissionLedger(ledger);
       })
       .catch((loadError) => {
         if (!controller.signal.aborted) {
@@ -111,7 +128,7 @@ export default function AdminDashboard() {
         if (!controller.signal.aborted) setLoading(false);
       });
     return () => controller.abort();
-  }, [usersPage, ordersPage, refreshVersion, usersRole]);
+  }, [usersPage, ordersPage, refreshVersion, usersRole, section]);
 
   const users = overview?.users || [];
   const orders = overview?.orders || [];
@@ -215,6 +232,89 @@ export default function AdminDashboard() {
       },
       "Delivery assignment updated.",
     );
+
+  const setFeatured = (entity, item, isFeatured) =>
+    runAction(
+      {
+        key: `featured-${entity}-${item._id}`,
+        run: () => adminService.setFeatured(entity, item._id, isFeatured),
+      },
+      `${entity === "vendor" ? item.storeName || item.name : item.title} ${isFeatured ? "featured" : "removed from featured listings"}.`,
+    );
+
+  const renderFeatured = () => (
+    <div className="admin-dashboard__featured">
+      <p className="admin-dashboard__hint">
+        Featured vendors and products appear in the marketplace homepage carousel.
+      </p>
+      <h2>Vendors</h2>
+      <div className="admin-dashboard__table-wrap">
+        <table className="admin-dashboard__table">
+          <thead><tr><th>Vendor</th><th>Email</th><th>Account</th><th>Promotion</th></tr></thead>
+          <tbody>
+            {featuredItems.vendors.map((vendor) => (
+              <tr key={vendor._id}>
+                <td>{vendor.storeName || vendor.name}</td>
+                <td>{vendor.email}</td>
+                <td>{displayStatus(vendor.accountStatus)}</td>
+                <td><button className="admin-dashboard__text-button" disabled={pendingAction === `featured-vendor-${vendor._id}`} onClick={() => setFeatured("vendor", vendor, !vendor.isFeatured)} type="button">{vendor.isFeatured ? "Remove featured" : "Feature vendor"}</button></td>
+              </tr>
+            ))}
+            {!featuredItems.vendors.length && <tr><td colSpan="4">No vendors available.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <h2>Products</h2>
+      <div className="admin-dashboard__table-wrap">
+        <table className="admin-dashboard__table">
+          <thead><tr><th>Product</th><th>Category</th><th>Vendor</th><th>Promotion</th></tr></thead>
+          <tbody>
+            {featuredItems.products.map((product) => (
+              <tr key={product._id}>
+                <td>{product.title}</td>
+                <td>{product.category || "—"}</td>
+                <td>{product.vendor?.storeName || product.vendor?.name || "—"}</td>
+                <td><button className="admin-dashboard__text-button" disabled={pendingAction === `featured-product-${product._id}`} onClick={() => setFeatured("product", product, !product.isFeatured)} type="button">{product.isFeatured ? "Remove featured" : "Feature product"}</button></td>
+              </tr>
+            ))}
+            {!featuredItems.products.length && <tr><td colSpan="4">No products available.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+    </div>
+  );
+
+  const renderCommissionLedger = () => (
+    <>
+      <div className="admin-dashboard__stats">
+        {["PENDING", "AVAILABLE", "REVERSED"].map((status) => (
+          <article key={status}>
+            <span>{displayStatus(status)} demand-surge share</span>
+            <strong>{currencyFormatter.format(commissionLedger?.totals?.[status]?.amount || 0)}</strong>
+          </article>
+        ))}
+      </div>
+      <div className="admin-dashboard__table-wrap">
+        <table className="admin-dashboard__table">
+          <thead><tr><th>Payment reference</th><th>Source</th><th>Amount</th><th>Settlement</th><th>Order</th><th>Created</th></tr></thead>
+          <tbody>
+            {(commissionLedger?.entries || []).map((entry) => (
+              <tr key={entry._id}>
+                <td>{entry.paymentReference}</td>
+                <td>{displayStatus(entry.source)}</td>
+                <td>{currencyFormatter.format(Number(entry.amount) || 0)}</td>
+                <td>{displayStatus(entry.status)}</td>
+                <td>{displayStatus(entry.contractId?.status)}</td>
+                <td>{formatDate(entry.createdAt)}</td>
+              </tr>
+            ))}
+            {!commissionLedger?.entries?.length && <tr><td colSpan="6">No demand-surge commission entries yet.</td></tr>}
+          </tbody>
+        </table>
+      </div>
+      <p className="admin-dashboard__hint">Surge shares remain pending in escrow until the buyer confirms delivery; refunded orders reverse their pending entry.</p>
+    </>
+  );
 
   const renderUsers = (records) => (
     <>
@@ -478,6 +578,8 @@ export default function AdminDashboard() {
           {section === "accounts" && renderUsers(displayedAccounts)}
           {section === "orders" && renderOrders()}
           {section === "verification" && renderVerificationQueue()}
+          {section === "promotions" && renderFeatured()}
+          {section === "commission" && renderCommissionLedger()}
           {section === "delivery" && (
             <>
               <h2>Delivery partner accounts</h2>

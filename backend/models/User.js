@@ -38,6 +38,7 @@ const UserSchema = new mongoose.Schema(
     storeLogo: { type: String, trim: true, maxlength: 2048 },
     storeBanner: { type: String, trim: true, maxlength: 2048 },
     storeDescription: { type: String, trim: true, maxlength: 1000 },
+    isFeatured: { type: Boolean, default: false },
 
     // Vendor-Specific Details
     vendorDetails: {
@@ -60,9 +61,15 @@ const UserSchema = new mongoose.Schema(
       },
       subscriptionStatus: {
         type: String,
-        enum: ["ACTIVE", "INACTIVE", "PENDING"],
+        enum: ["ACTIVE", "INACTIVE", "PENDING", "PAST_DUE", "CANCELLED"],
         default: "INACTIVE",
       },
+      subscriptionCode: { type: String, select: false },
+      subscriptionEmailToken: { type: String, select: false },
+      subscriptionPlanCode: { type: String, select: false },
+      subscriptionPeriodEnd: { type: Date },
+      subscriptionLastPaidAt: { type: Date },
+      subscriptionFailureCount: { type: Number, default: 0 },
       tierEntryPendingTier: {
         type: String,
         enum: ["TIER_1", "TIER_2"],
@@ -70,6 +77,7 @@ const UserSchema = new mongoose.Schema(
       tierEntryPaymentReference: { type: String, select: false },
       tierEntryPaymentAmountMinor: { type: Number, select: false },
       tierEntryPaymentCurrency: { type: String, select: false },
+      tierEntryPlanCode: { type: String, select: false },
       tierEntryPaidReference: { type: String, select: false },
       tierEntryPaidAmountMinor: { type: Number, select: false },
       tierEntryPaidAt: { type: Date },

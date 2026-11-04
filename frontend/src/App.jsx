@@ -1,5 +1,6 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import PropTypes from "prop-types";
+import { io } from "socket.io-client";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import ProductList from "./components/ProductList";
@@ -12,8 +13,10 @@ import VendorStorefront from "./components/VendorStorefront";
 import AccountAuth from "./components/AccountAuth";
 import VerificationPanel from "./components/VerificationPanel";
 import RiderDashboard from "./components/RiderDashboard";
+import AiSupportWidget from "./components/AiSupportWidget";
 import { useAuth } from "./context/AuthContext";
 import { getRoleHomeRoute } from "./services/roleRoutes";
+import { BACKEND_BASE_URL } from "./api";
 
 function RequireRole({ role, allowAdmin = false, children }) {
   const { isAuthenticated, role: activeRole } = useAuth();
@@ -112,6 +115,25 @@ function App() {
 
   const totalCartCount = cart.reduce((sum, item) => sum + item.quantity, 0);
 
+  useEffect(() => {
+    const socket = io(BACKEND_BASE_URL, { transports: ["websocket", "polling"] });
+    socket.on("product:updated", (update) => {
+      setCart((items) =>
+        items.map((item) =>
+          (item.id || item._id) === update.id
+            ? {
+                ...item,
+                price: update.currentPrice,
+                currentPrice: update.currentPrice,
+                stock: update.stock,
+              }
+            : item,
+        ),
+      );
+    });
+    return () => socket.disconnect();
+  }, []);
+
   return (
     <div className="app-shell">
       <Navbar
@@ -200,6 +222,7 @@ function App() {
           setOrdersRefreshVersion((version) => version + 1)
         }
       />
+      <AiSupportWidget />
     </div>
   );
 }

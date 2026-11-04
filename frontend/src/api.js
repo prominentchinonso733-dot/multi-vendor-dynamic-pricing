@@ -9,7 +9,7 @@ export const API_BASE_URL = /\/api$/i.test(normalizedBaseUrl)
   ? normalizedBaseUrl
   : `${normalizedBaseUrl}/api`;
 
-const BACKEND_BASE_URL = normalizedBaseUrl.replace(/\/api$/i, "");
+export const BACKEND_BASE_URL = normalizedBaseUrl.replace(/\/api$/i, "");
 
 export const getAssetUrl = (url) => {
   if (typeof url !== "string" || !/^\/?uploads\//i.test(url)) {

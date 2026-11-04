@@ -7,6 +7,7 @@ const escrowContractSchema = new mongoose.Schema(
       ref: "User",
       required: true,
     },
+    demandSurgeCommission: { type: Number, default: 0, min: 0 },
     items: [
       {
         productId: String,
@@ -20,12 +21,14 @@ const escrowContractSchema = new mongoose.Schema(
         commissionRate: Number,
         vendorTier: String,
         vendorNetAmount: Number,
+        demandSurgeCommission: { type: Number, default: 0, min: 0 },
       },
     ],
     subtotal: {
       type: Number,
       required: true,
     },
+    demandSurgeCommission: { type: Number, default: 0, min: 0 },
     vaultFee: {
       type: Number,
       required: true, // 2.5% fee
@@ -47,6 +50,7 @@ const escrowContractSchema = new mongoose.Schema(
         netAmount: { type: Number, required: true, min: 0 },
         tier: { type: String, enum: ["TIER_1", "TIER_2"], required: true },
         commissionRate: { type: Number, required: true, min: 0, max: 1 },
+        demandSurgeCommission: { type: Number, default: 0, min: 0 },
       },
     ],
     buyerEmail: {

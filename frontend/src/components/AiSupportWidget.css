@@ -1,0 +1,150 @@
+.ai-support {
+  position: fixed;
+  z-index: 1200;
+  right: 24px;
+  bottom: 24px;
+  display: grid;
+  justify-items: end;
+  gap: 12px;
+}
+
+.ai-support__toggle {
+  display: grid;
+  width: 56px;
+  height: 56px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: #1b6553;
+  color: #fff;
+  box-shadow: 0 8px 24px rgb(15 45 37 / 24%);
+  cursor: pointer;
+}
+
+.ai-support__panel {
+  display: flex;
+  width: min(360px, calc(100vw - 32px));
+  height: min(490px, calc(100vh - 120px));
+  flex-direction: column;
+  overflow: hidden;
+  border: 1px solid #dfe8e3;
+  border-radius: 14px;
+  background: #fff;
+  box-shadow: 0 16px 48px rgb(15 45 37 / 20%);
+}
+
+.ai-support__header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 16px 18px;
+  background: #164b3f;
+  color: white;
+}
+
+.ai-support__header p {
+  margin: 0 0 4px;
+  color: #c6dfd5;
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.ai-support__header h2 {
+  margin: 0;
+  font-size: 1.05rem;
+}
+
+.ai-support__header button,
+.ai-support__form button {
+  display: grid;
+  width: 36px;
+  height: 36px;
+  place-items: center;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: inherit;
+  cursor: pointer;
+}
+
+.ai-support__messages {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  gap: 10px;
+  overflow-y: auto;
+  padding: 16px;
+}
+
+.ai-support__message {
+  max-width: 88%;
+  margin: 0;
+  padding: 10px 12px;
+  border-radius: 12px;
+  background: #f0f4f1;
+  color: #243a32;
+  font-size: 0.88rem;
+  line-height: 1.5;
+  white-space: pre-wrap;
+}
+
+.ai-support__message--user {
+  align-self: flex-end;
+  background: #1b6553;
+  color: white;
+}
+
+.ai-support__typing,
+.ai-support__error {
+  margin: 0;
+  color: #687871;
+  font-size: 0.82rem;
+}
+
+.ai-support__error {
+  color: #a33131;
+}
+
+.ai-support__form {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  border-top: 1px solid #e6ece8;
+}
+
+.ai-support__form input {
+  min-width: 0;
+  flex: 1;
+  border: 0;
+  padding: 10px;
+  color: #20352f;
+  font: inherit;
+}
+
+.ai-support__form button {
+  background: #1b6553;
+  color: white;
+}
+
+.ai-support__form button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.ai-support__sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+}
+
+@media (max-width: 480px) {
+  .ai-support {
+    right: 16px;
+    bottom: 16px;
+  }
+}

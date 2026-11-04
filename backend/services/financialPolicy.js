@@ -12,6 +12,7 @@ const VENDOR_POLICY = {
 };
 
 const BUYER_ESCROW_FEE_RATE = 0.025;
+const DEMAND_SURGE_PROFIT_SHARE = 0.2;
 const CURRENCY = "NGN";
 
 const getVendorPolicy = (vendor) => {
@@ -31,6 +32,7 @@ const fromMinorUnits = (amount) => amount / 100;
 
 module.exports = {
   BUYER_ESCROW_FEE_RATE,
+  DEMAND_SURGE_PROFIT_SHARE,
   CURRENCY,
   VENDOR_POLICY,
   fromMinorUnits,

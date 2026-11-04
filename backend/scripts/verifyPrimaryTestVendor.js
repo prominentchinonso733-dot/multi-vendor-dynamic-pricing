@@ -83,6 +83,9 @@ async function verifyPrimaryTestVendor() {
         "vendorDetails.tier": "TIER_1",
         "vendorDetails.tier1Verified": true,
         "vendorDetails.subscriptionStatus": "ACTIVE",
+        "vendorDetails.subscriptionPeriodEnd": new Date(
+          now.getTime() + 30 * 24 * 60 * 60 * 1000,
+        ),
       },
     },
     { runValidators: true },

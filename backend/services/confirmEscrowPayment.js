@@ -2,6 +2,9 @@ const mongoose = require("mongoose");
 const EscrowContract = require("../models/EscrowContract");
 const Product = require("../models/Product");
 const VendorWalletTransaction = require("../models/VendorWalletTransaction");
+const PlatformCommissionEntry = require("../models/PlatformCommissionEntry");
+const calculateCurrentPrice = require("./dynamicPricing");
+const { emitProductUpdate } = require("./realtime");
 const { CURRENCY, toMinorUnits } = require("./financialPolicy");
 const { creditPending, getWalletForUpdate } = require("./vendorWallet");
 
@@ -9,9 +12,11 @@ const confirmEscrowPayment = async (contractId, paymentReference) => {
   const session = await mongoose.startSession();
   let contract;
   let disputeReason = "";
+  let updatedProducts = [];
 
   try {
     await session.withTransaction(async () => {
+      updatedProducts = [];
       contract = await EscrowContract.findOneAndUpdate(
         {
           _id: contractId,
@@ -28,14 +33,10 @@ const confirmEscrowPayment = async (contractId, paymentReference) => {
       if (!contract) return;
 
       for (const item of contract.items) {
-        const product = await Product.findOneAndUpdate(
-          {
-            _id: item.productId,
-            stock: { $gte: item.quantity },
-          },
-          { $inc: { stock: -item.quantity } },
-          { new: true, session, runValidators: true },
-        );
+        const product = await Product.findOne({
+          _id: item.productId,
+          stock: { $gte: item.quantity },
+        }).session(session);
         if (!product) {
           const error = new Error(
             "One or more products no longer have enough stock.",
@@ -43,6 +44,18 @@ const confirmEscrowPayment = async (contractId, paymentReference) => {
           error.code = "ORDER_STOCK_UNAVAILABLE";
           throw error;
         }
+        const now = new Date();
+        const lastOrderedWithinDay =
+          product.lastOrderAt &&
+          product.lastOrderAt.getTime() > now.getTime() - 24 * 60 * 60 * 1000;
+        product.stock -= item.quantity;
+        product.orderUnitsLast24h =
+          (lastOrderedWithinDay ? product.orderUnitsLast24h || 0 : 0) +
+          item.quantity;
+        product.lastOrderAt = now;
+        product.currentPrice = calculateCurrentPrice(product);
+        await product.save({ session });
+        updatedProducts.push(product.toObject());
       }
 
       for (const payout of contract.vendorPayouts || []) {
@@ -67,12 +80,32 @@ const confirmEscrowPayment = async (contractId, paymentReference) => {
         creditPending(wallet, toMinorUnits(payout.netAmount));
         await wallet.save({ session });
       }
+
+      if (contract.demandSurgeCommission > 0) {
+        await PlatformCommissionEntry.create(
+          [
+            {
+              contractId: contract._id,
+              paymentReference: contract.paymentReference,
+              amount: contract.demandSurgeCommission,
+              currency: contract.currency || CURRENCY,
+              source: "DEMAND_SURGE",
+              status: "PENDING",
+            },
+          ],
+          { session },
+        );
+      }
     });
   } catch (error) {
     if (error.code !== "ORDER_STOCK_UNAVAILABLE") throw error;
     disputeReason = error.message;
   } finally {
     await session.endSession();
+  }
+
+  if (contract) {
+    for (const product of updatedProducts) emitProductUpdate(product);
   }
 
   if (!contract) {

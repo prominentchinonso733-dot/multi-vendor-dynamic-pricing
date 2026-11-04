@@ -1,6 +1,6 @@
 const VENDOR_TIER_PRICES_USD = Object.freeze({
-  TIER_1: 10,
-  TIER_2: 20,
+  TIER_1: 5,
+  TIER_2: 10,
 });
 
 const isTier2Verified = (vendor) =>
@@ -16,6 +16,12 @@ const isTier2VerifiedVendor = (vendor) =>
 
 const isVendorEligibleToSell = (vendor) => {
   if (vendor?.vendorDetails?.subscriptionStatus !== "ACTIVE") return false;
+  const subscriptionPeriodEnd = new Date(
+    vendor.vendorDetails.subscriptionPeriodEnd,
+  ).getTime();
+  if (!Number.isFinite(subscriptionPeriodEnd) || subscriptionPeriodEnd <= Date.now()) {
+    return false;
+  }
   if (getVendorTier(vendor) === "TIER_2") return isTier2VerifiedVendor(vendor);
   return vendor?.vendorDetails?.tier1Verified === true;
 };
@@ -24,11 +30,13 @@ const getEligibleVendorFilter = () => ({
   $or: [
     {
       "vendorDetails.subscriptionStatus": "ACTIVE",
+      "vendorDetails.subscriptionPeriodEnd": { $gt: new Date() },
       "vendorDetails.tier": "TIER_1",
       "vendorDetails.tier1Verified": true,
     },
     {
       "vendorDetails.subscriptionStatus": "ACTIVE",
+      "vendorDetails.subscriptionPeriodEnd": { $gt: new Date() },
       "vendorDetails.tier": "TIER_2",
       "verification.tier": "TIER_2",
       "verification.status": "VERIFIED",

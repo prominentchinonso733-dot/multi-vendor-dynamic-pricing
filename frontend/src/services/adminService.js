@@ -50,4 +50,25 @@ export const adminService = {
     );
     return data.order;
   },
+
+  async getFeaturedItems(config = {}) {
+    const { data } = await api.get("/admin/featured", config);
+    return data;
+  },
+
+  async setFeatured(entity, id, isFeatured) {
+    const { data } = await api.patch(
+      `/admin/featured/${encodeURIComponent(entity)}/${encodeURIComponent(id)}`,
+      { isFeatured },
+    );
+    return data.item;
+  },
+
+  async getCommissionLedger(params = {}, config = {}) {
+    const { data } = await api.get("/admin/commission-ledger", {
+      params,
+      ...config,
+    });
+    return data;
+  },
 };

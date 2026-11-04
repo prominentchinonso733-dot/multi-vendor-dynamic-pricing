@@ -253,8 +253,8 @@ const AccountAuth = ({ role }) => {
                 }}
                 value={vendorTier}
               >
-                <option value="TIER_1">Tier 1 — $10 one-time entry fee</option>
-                <option value="TIER_2">Tier 2 — $20 one-time entry fee</option>
+                <option value="TIER_1">Tier 1 Basic — $5/month</option>
+                <option value="TIER_2">Tier 2 Verified — $10/month</option>
               </select>
             </label>
             {vendorTier === "TIER_1" ? (
@@ -366,7 +366,7 @@ const AccountAuth = ({ role }) => {
                 </label>
               </>
             )}
-            <p>After registering, you’ll continue to the selected tier’s entry fee payment.</p>
+            <p>After registering, you can activate the selected monthly vendor plan from your dashboard.</p>
           </>
         )}
         <label style={{ display: "grid", gap: "0.35rem" }}>

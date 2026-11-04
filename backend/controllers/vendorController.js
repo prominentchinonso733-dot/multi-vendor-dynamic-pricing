@@ -4,6 +4,7 @@ const { randomUUID } = require("crypto");
 const User = require("../models/User");
 const VendorWallet = require("../models/VendorWallet");
 const VendorWithdrawal = require("../models/VendorWithdrawal");
+const PaystackPlan = require("../models/PaystackPlan");
 const authenticateToken = require("../middleware/authenticateToken");
 const {
   decryptSensitiveValue,
@@ -67,6 +68,7 @@ const paystackRequest = (path, { method = "GET", body } = {}) =>
         response.on("data", (chunk) => {
           responseBody += chunk;
         });
+
         response.on("end", () => {
           try {
             const payload = JSON.parse(responseBody);
@@ -111,6 +113,37 @@ const paystackRequest = (path, { method = "GET", body } = {}) =>
     });
     request.end(requestBody || undefined);
   });
+
+const ensureMonthlyPaystackPlan = async (tier, amountMinor) => {
+  let plan = await PaystackPlan.findOne({ tier });
+  if (plan?.amountMinor === amountMinor && plan.currency === CURRENCY) {
+    return plan;
+  }
+  const providerPlan = await paystackRequest("/plan", {
+    method: "POST",
+    body: {
+      name: `${tier.replace("_", " ")} Vendor Monthly`,
+      amount: amountMinor,
+      currency: CURRENCY,
+      interval: "monthly",
+    },
+  });
+  if (!providerPlan?.plan_code) {
+    throw new Error("Paystack returned an invalid monthly vendor plan.");
+  }
+  return PaystackPlan.findOneAndUpdate(
+    { tier },
+    {
+      $set: {
+        providerCode: providerPlan.plan_code,
+        amountMinor,
+        currency: CURRENCY,
+        interval: "monthly",
+      },
+    },
+    { new: true, upsert: true, runValidators: true },
+  );
+};
 
 const normalizeName = (value) =>
   String(value || "")
@@ -276,7 +309,7 @@ router.post(
         accountStatus: { $ne: "SUSPENDED" },
       })
         .select(
-          "email vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tierEntryPendingTier vendorDetails.tierEntryPaymentReference vendorDetails.tierEntryPaymentAmountMinor",
+          "email vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.subscriptionCode vendorDetails.tierEntryPendingTier vendorDetails.tierEntryPaymentReference vendorDetails.tierEntryPaymentAmountMinor",
         )
         .lean();
       if (!seller) {
@@ -292,6 +325,13 @@ router.post(
         return res.status(409).json({
           success: false,
           message: "This vendor tier is already active.",
+        });
+      }
+      if (seller.vendorDetails?.subscriptionStatus === "ACTIVE") {
+        return res.status(409).json({
+          success: false,
+          message:
+            "Cancel the current recurring plan before selecting a different tier.",
         });
       }
       if (seller.vendorDetails?.tierEntryPaymentReference) {
@@ -312,11 +352,13 @@ router.post(
               (seller.vendorDetails.tierEntryPaymentAmountMinor ?? amountMinor) /
               100,
             currency: "NGN",
+            interval: "monthly",
             email: seller.email,
           },
         });
       }
 
+      const plan = await ensureMonthlyPaystackPlan(tier, amountMinor);
       const reference = `vendor_${randomUUID()}`;
       const payment = await paystackRequest("/transaction/initialize", {
         method: "POST",
@@ -324,12 +366,15 @@ router.post(
           email: seller.email,
           amount: amountMinor,
           currency: "NGN",
+          plan: plan.providerCode,
           reference,
           metadata: {
-            purpose: "vendor_tier_entry_fee",
+            purpose: "vendor_monthly_subscription",
             vendor_id: String(userId),
             tier,
             price_usd: VENDOR_TIER_PRICES_USD[tier],
+            billing_interval: "monthly",
+            plan_code: plan.providerCode,
           },
         },
       });
@@ -353,6 +398,7 @@ router.post(
             "vendorDetails.tierEntryPaymentReference": reference,
             "vendorDetails.tierEntryPaymentAmountMinor": amountMinor,
             "vendorDetails.tierEntryPaymentCurrency": "NGN",
+            "vendorDetails.tierEntryPlanCode": plan.providerCode,
           },
         },
       );
@@ -369,6 +415,8 @@ router.post(
           amountMinor,
           amountNgn: amountMinor / 100,
           currency: "NGN",
+          interval: "monthly",
+          planCode: plan.providerCode,
           email: seller.email,
         },
       });
@@ -424,7 +472,7 @@ router.post(
         "vendorDetails.tierEntryPaymentReference": reference,
       })
         .select(
-          "email vendorDetails.tierEntryPendingTier vendorDetails.tierEntryPaymentAmountMinor vendorDetails.tierEntryPaymentCurrency",
+          "email vendorDetails.tierEntryPendingTier vendorDetails.tierEntryPaymentAmountMinor vendorDetails.tierEntryPaymentCurrency vendorDetails.tierEntryPlanCode",
         )
         .lean();
       if (!seller?.vendorDetails?.tierEntryPendingTier) {
@@ -441,6 +489,10 @@ router.post(
         payment.status !== "success" ||
         payment.amount !== seller.vendorDetails.tierEntryPaymentAmountMinor ||
         payment.currency !== seller.vendorDetails.tierEntryPaymentCurrency ||
+        payment.metadata?.purpose !== "vendor_monthly_subscription" ||
+        payment.metadata?.vendor_id !== String(userId) ||
+        payment.metadata?.tier !== seller.vendorDetails.tierEntryPendingTier ||
+        payment.metadata?.plan_code !== seller.vendorDetails.tierEntryPlanCode ||
         String(payment.customer?.email || "").toLowerCase() !==
           seller.email.toLowerCase()
       ) {
@@ -468,12 +520,20 @@ router.post(
             "vendorDetails.tierEntryPaidReference": reference,
             "vendorDetails.tierEntryPaidAmountMinor": payment.amount,
             "vendorDetails.tierEntryPaidAt": verifiedAt,
+            "vendorDetails.subscriptionPlanCode":
+              seller.vendorDetails.tierEntryPlanCode,
+            "vendorDetails.subscriptionLastPaidAt": verifiedAt,
+            "vendorDetails.subscriptionPeriodEnd": new Date(
+              verifiedAt.getTime() + 32 * 24 * 60 * 60 * 1000,
+            ),
+            "vendorDetails.subscriptionFailureCount": 0,
           },
           $unset: {
             "vendorDetails.tierEntryPendingTier": "",
             "vendorDetails.tierEntryPaymentReference": "",
             "vendorDetails.tierEntryPaymentAmountMinor": "",
             "vendorDetails.tierEntryPaymentCurrency": "",
+            "vendorDetails.tierEntryPlanCode": "",
           },
         },
         { new: true, runValidators: true },
@@ -491,6 +551,47 @@ router.post(
         subscriptionStatus: updatedSeller.vendorDetails.subscriptionStatus,
         paidAt: verifiedAt,
       });
+    } catch (error) {
+      return sendTierPaymentProviderError(error, res);
+    }
+  },
+);
+
+router.post(
+  "/tier-subscription/cancel",
+  authenticateToken,
+  requireSeller,
+  async (req, res) => {
+    try {
+      const seller = await User.findOne({
+        _id: req.user._id || req.user.id,
+        role: "SELLER",
+        accountStatus: { $ne: "SUSPENDED" },
+      })
+        .select("+vendorDetails.subscriptionCode +vendorDetails.subscriptionEmailToken")
+        .lean();
+      const subscription = seller?.vendorDetails;
+      if (!subscription?.subscriptionCode || !subscription?.subscriptionEmailToken) {
+        return res.status(404).json({
+          success: false,
+          message: "An active Paystack subscription was not found.",
+        });
+      }
+      await paystackRequest("/subscription/disable", {
+        method: "POST",
+        body: {
+          code: subscription.subscriptionCode,
+          token: subscription.subscriptionEmailToken,
+        },
+      });
+      await User.updateOne(
+        {
+          _id: seller._id,
+          "vendorDetails.subscriptionCode": subscription.subscriptionCode,
+        },
+        { $set: { "vendorDetails.subscriptionStatus": "CANCELLED" } },
+      );
+      return res.json({ success: true, subscriptionStatus: "CANCELLED" });
     } catch (error) {
       return sendTierPaymentProviderError(error, res);
     }

@@ -11,6 +11,7 @@ const User = require("../models/User");
 const VendorWallet = require("../models/VendorWallet");
 const VendorWalletTransaction = require("../models/VendorWalletTransaction");
 const VendorWithdrawal = require("../models/VendorWithdrawal");
+const PlatformCommissionEntry = require("../models/PlatformCommissionEntry");
 const authenticateToken = require("../middleware/authenticateToken");
 const confirmEscrowPayment = require("../services/confirmEscrowPayment");
 const calculateCurrentPrice = require("../services/dynamicPricing");
@@ -25,6 +26,7 @@ const {
 const {
   BUYER_ESCROW_FEE_RATE,
   CURRENCY,
+  DEMAND_SURGE_PROFIT_SHARE,
   fromMinorUnits,
   getVendorPolicy,
   toMinorUnits,
@@ -273,6 +275,12 @@ const releaseEscrowToWallets = async (
         await wallet.save({ session });
       }
 
+      await PlatformCommissionEntry.updateOne(
+        { contractId: contract._id, status: "PENDING" },
+        { $set: { status: "AVAILABLE", settledAt: new Date() } },
+        { session },
+      );
+
       const finalizedAt = new Date();
       contract.receiptFinalizedAt = finalizedAt;
       contract.receipt = createReceipt(contract, finalizedAt);
@@ -328,6 +336,12 @@ const finalizeRefundReceipt = async (contractId) => {
         refundEscrow(wallet, toMinorUnits(payout.netAmount));
         await wallet.save({ session });
       }
+
+      await PlatformCommissionEntry.updateOne(
+        { contractId: contract._id, status: "PENDING" },
+        { $set: { status: "REVERSED", settledAt: new Date() } },
+        { session },
+      );
 
       const finalizedAt = new Date();
       contract.status = "REFUNDED";
@@ -563,16 +577,31 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
       const seller = sellersById.get(sellerId);
       const policy = getVendorPolicy(seller);
       const lineTotalMinor = unitPriceMinor * quantity;
-      const commissionMinor = Math.round(
-        lineTotalMinor * policy.commissionRate,
+      const baseDemandPriceMinor = toMinorUnits(
+        calculateCurrentPrice({
+          ...product,
+          stock: undefined,
+          orderUnitsLast24h: 0,
+          lastOrderAt: undefined,
+        }),
       );
+      const surgeCommissionMinor = Math.round(
+        Math.max(0, unitPriceMinor - baseDemandPriceMinor) *
+          quantity *
+          DEMAND_SURGE_PROFIT_SHARE,
+      );
+      const commissionMinor =
+        Math.round(lineTotalMinor * policy.commissionRate) +
+        surgeCommissionMinor;
       const vendorTotal = vendorTotals.get(sellerId) || {
         grossMinor: 0,
         feeMinor: 0,
+        surgeMinor: 0,
         policy,
       };
       vendorTotal.grossMinor += lineTotalMinor;
       vendorTotal.feeMinor += commissionMinor;
+      vendorTotal.surgeMinor += surgeCommissionMinor;
       vendorTotals.set(sellerId, vendorTotal);
 
       return {
@@ -587,6 +616,7 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
         vendorId: sellerId,
         lineTotal: fromMinorUnits(lineTotalMinor),
         platformFee: fromMinorUnits(commissionMinor),
+        demandSurgeCommission: fromMinorUnits(surgeCommissionMinor),
         commissionRate: policy.commissionRate,
         vendorTier: policy.tier,
         vendorNetAmount: fromMinorUnits(lineTotalMinor - commissionMinor),
@@ -633,13 +663,13 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
           }
 
           totals.policy = getVendorPolicy(seller);
-          totals.feeMinor = 0;
+          totals.feeMinor = totals.surgeMinor;
           for (const item of orderItems) {
             if (item.vendorId !== sellerId) continue;
             const lineTotalMinor = toMinorUnits(item.lineTotal);
             const platformFeeMinor = Math.round(
               lineTotalMinor * totals.policy.commissionRate,
-            );
+            ) + toMinorUnits(item.demandSurgeCommission || 0);
             totals.feeMinor += platformFeeMinor;
             item.platformFee = fromMinorUnits(platformFeeMinor);
             item.commissionRate = totals.policy.commissionRate;
@@ -679,6 +709,7 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
             netAmount: fromMinorUnits(totals.grossMinor - totals.feeMinor),
             tier: totals.policy.tier,
             commissionRate: totals.policy.commissionRate,
+            demandSurgeCommission: fromMinorUnits(totals.surgeMinor),
           });
         }
 
@@ -691,6 +722,12 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
           totalHoldAmount: fromMinorUnits(totalHoldMinor),
           currency: CURRENCY,
           vendorPayouts,
+          demandSurgeCommission: fromMinorUnits(
+            [...vendorTotals.values()].reduce(
+              (sum, totals) => sum + totals.surgeMinor,
+              0,
+            ),
+          ),
           buyerEmail: buyer.email,
           customerName: buyer.name,
           deliveryAddress,

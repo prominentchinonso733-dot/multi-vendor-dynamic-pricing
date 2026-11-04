@@ -47,4 +47,14 @@ export const productsService = {
     const { data } = await api.get("/products", config);
     return data;
   },
+
+  async semanticSearch(query) {
+    const { data } = await api.post("/products/search/semantic", { query });
+    return data.products;
+  },
+
+  async featured(config = {}) {
+    const { data } = await api.get("/products/featured", config);
+    return data.products;
+  },
 };

@@ -14,6 +14,8 @@ const ProductSchema = new mongoose.Schema(
     imagePublicId: { type: String },
     image: { type: String },
     stock: { type: Number, required: true, default: 0 },
+    orderUnitsLast24h: { type: Number, default: 0, min: 0 },
+    lastOrderAt: { type: Date },
 
     // Real-Time Dynamic Pricing Controls
     basePrice: { type: Number, required: true },
@@ -23,6 +25,10 @@ const ProductSchema = new mongoose.Schema(
     competitorPrice: { type: Number },
 
     demandScore: { type: Number, default: 0 },
+    isFeatured: { type: Boolean, default: false },
+    embedding: { type: [Number], select: false },
+    embeddingUpdatedAt: { type: Date, select: false },
+    embeddingTextHash: { type: String, select: false },
   },
   { timestamps: true },
 );

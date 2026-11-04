@@ -62,4 +62,9 @@ export const authService = {
     const { data } = await api.post("/vendor/tier-entry/verify", { reference });
     return data;
   },
+
+  async cancelVendorTierSubscription() {
+    const { data } = await api.post("/vendor/tier-subscription/cancel");
+    return data;
+  },
 };

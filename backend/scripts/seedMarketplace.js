@@ -90,6 +90,7 @@ async function seedMarketplace() {
       verificationData,
       payoutDetails,
       subscriptionStatus: "ACTIVE",
+      subscriptionPeriodEnd: new Date(now.getTime() + 30 * 24 * 60 * 60 * 1000),
       isVendor: true,
       isVerified: isTier2,
       commissionRate: isTier2 ? 0.05 : 0.1,

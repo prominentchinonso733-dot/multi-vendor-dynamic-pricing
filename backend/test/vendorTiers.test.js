@@ -15,20 +15,22 @@ afterEach(() => {
   }
 });
 
-test("calculates NGN entry fees from the configured USD exchange rate", () => {
-  assert.equal(getVendorTierAmountMinor("TIER_1", 1500), 1500000);
-  assert.equal(getVendorTierAmountMinor("TIER_2", 1500), 3000000);
+test("calculates monthly NGN subscription amounts from the configured USD exchange rate", () => {
+  assert.equal(getVendorTierAmountMinor("TIER_1", 1500), 750000);
+  assert.equal(getVendorTierAmountMinor("TIER_2", 1500), 1500000);
   assert.throws(() => getVendorTierAmountMinor("TIER_1", 0), {
     code: "VENDOR_TIER_PRICING_NOT_CONFIGURED",
   });
 });
 
-test("requires active entry payment and tier-specific verification to sell", () => {
+test("requires an unexpired subscription and tier-specific verification to sell", () => {
+  const subscriptionPeriodEnd = new Date(Date.now() + 60_000);
   assert.equal(
     isVendorEligibleToSell({
       vendorDetails: {
         tier: "TIER_1",
         subscriptionStatus: "ACTIVE",
+        subscriptionPeriodEnd,
         tier1Verified: true,
       },
     }),
@@ -39,6 +41,7 @@ test("requires active entry payment and tier-specific verification to sell", () 
       vendorDetails: {
         tier: "TIER_1",
         subscriptionStatus: "INACTIVE",
+        subscriptionPeriodEnd,
         tier1Verified: true,
       },
     }),
@@ -49,6 +52,7 @@ test("requires active entry payment and tier-specific verification to sell", () 
       vendorDetails: {
         tier: "TIER_2",
         subscriptionStatus: "ACTIVE",
+        subscriptionPeriodEnd,
         tier1Verified: true,
       },
       verification: { tier: "TIER_2", status: "PENDING" },
@@ -57,9 +61,34 @@ test("requires active entry payment and tier-specific verification to sell", () 
   );
   assert.equal(
     isVendorEligibleToSell({
-      vendorDetails: { tier: "TIER_2", subscriptionStatus: "ACTIVE" },
+      vendorDetails: {
+        tier: "TIER_2",
+        subscriptionStatus: "ACTIVE",
+        subscriptionPeriodEnd,
+      },
       verification: { tier: "TIER_2", status: "VERIFIED" },
     }),
     true,
+  );
+  assert.equal(
+    isVendorEligibleToSell({
+      vendorDetails: {
+        tier: "TIER_1",
+        subscriptionStatus: "ACTIVE",
+        subscriptionPeriodEnd: new Date(Date.now() - 60_000),
+        tier1Verified: true,
+      },
+    }),
+    false,
+  );
+  assert.equal(
+    isVendorEligibleToSell({
+      vendorDetails: {
+        tier: "TIER_1",
+        subscriptionStatus: "ACTIVE",
+        tier1Verified: true,
+      },
+    }),
+    false,
   );
 });

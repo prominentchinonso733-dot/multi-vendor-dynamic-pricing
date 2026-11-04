@@ -130,14 +130,30 @@ router.post("/calculate", authenticateToken, async (req, res) => {
 
     const normalizedDemand = demandScore;
     const referencePrice = basePrice;
-    const calculatedPrice =
-      basePrice * (1 + (normalizedDemand - 50) / 100);
     const currentPrice = calculateCurrentPrice({
       basePrice,
       demandScore: normalizedDemand,
       priceFloor,
       priceCeiling,
+      stock,
+      orderUnitsLast24h:
+        product.lastOrderAt &&
+        product.lastOrderAt.getTime() > Date.now() - 24 * 60 * 60 * 1000
+          ? product.orderUnitsLast24h
+          : 0,
     });
+    const adjustedDemandScore =
+      calculateCurrentPrice.adjustDemandScore?.({
+        demandScore: normalizedDemand,
+        stock,
+        orderUnitsLast24h:
+          product.lastOrderAt &&
+          product.lastOrderAt.getTime() > Date.now() - 24 * 60 * 60 * 1000
+            ? product.orderUnitsLast24h
+            : 0,
+      }) ?? normalizedDemand;
+    const calculatedPrice =
+      basePrice * (1 + (adjustedDemandScore - 50) / 100);
 
     const floorCeilingStatus =
       calculatedPrice <= priceFloor
@@ -154,6 +170,7 @@ router.post("/calculate", authenticateToken, async (req, res) => {
     product.competitorPrice = competitorPrice ?? null;
     product.currentPrice = currentPrice;
     await product.save();
+    require("../services/realtime").emitProductUpdate(product);
 
     return res.json({
       success: true,
@@ -167,13 +184,14 @@ router.post("/calculate", authenticateToken, async (req, res) => {
       referencePrice,
       calculatedPrice,
       currentPrice,
+      adjustedDemandScore,
       adjustments: {
         competitorPriceApplied:
           competitorPrice !== undefined &&
           competitorPrice !== null &&
           competitorPrice < basePrice,
-        demandPercent: normalizedDemand - 50,
-        stockPercent: 0,
+        demandPercent: adjustedDemandScore - 50,
+        stockPercent: adjustedDemandScore - normalizedDemand,
       },
       floorCeilingStatus,
     });

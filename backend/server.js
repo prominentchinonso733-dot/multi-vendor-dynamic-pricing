@@ -5,10 +5,14 @@ require("dotenv").config({
 const express = require("express");
 const cors = require("cors");
 const mongoose = require("mongoose");
+const http = require("http");
 const path = require("path");
 const ensureAdmin = require("./adminBootstrap");
+const { attachRealtime } = require("./services/realtime");
 
 const app = express();
+const httpServer = http.createServer(app);
+attachRealtime(httpServer);
 const PORT = process.env.PORT || 5000;
 
 app.use(cors());
@@ -28,6 +32,7 @@ const productsRoutes = require("./routes/products");
 const pricingRoutes = require("./routes/pricingRoutes");
 const webhookRoutes = require("./routes/webhooks");
 const adminRoutes = require("./routes/adminRoutes");
+const aiRoutes = require("./routes/aiRoutes");
 app.use("/api/auth", authRoutes);
 app.use("/api/vendor", vendorRoutes);
 app.use("/api/admin", adminRoutes);
@@ -35,6 +40,7 @@ app.use("/api/escrow", escrowRoutes);
 app.use("/api/products", productsRoutes);
 app.use("/api/pricing", pricingRoutes);
 app.use("/api/webhooks", webhookRoutes);
+app.use("/api/ai", aiRoutes);
 
 const frontendDistPath = path.resolve(__dirname, "..", "frontend", "dist");
 app.use("/uploads", express.static(path.join(__dirname, "uploads")));
@@ -72,7 +78,7 @@ async function startServer() {
       );
     }
 
-    app.listen(PORT, () => {
+    httpServer.listen(PORT, () => {
       console.log(`Backend server running on http://127.0.0.1:${PORT}`);
     });
   } catch (error) {

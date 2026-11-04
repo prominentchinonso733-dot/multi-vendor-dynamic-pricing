@@ -837,7 +837,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
           <div>
             <strong>
               {accountSummary.subscriptionStatus !== "ACTIVE"
-                ? "Vendor tier entry fee required"
+                ? "Vendor monthly plan required"
                 : accountSummary.vendorTier === "TIER_2"
                   ? accountSummary.isVerified
                     ? "Tier 2 · Verified Store"
@@ -1172,7 +1172,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
             >
               <ShieldCheck aria-hidden="true" size={18} />
               <span>
-                Complete your tier entry fee and the required identity review in
+                Activate your monthly plan and complete the required identity review in
                 Store Settings before listing products or changing prices.
               </span>
               <button

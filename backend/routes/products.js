@@ -14,6 +14,7 @@ const {
   isTier2VerifiedVendor,
   isVendorEligibleToSell,
 } = require("../services/vendorTiers");
+const { emitFeaturedUpdate, emitProductUpdate } = require("../services/realtime");
 
 const router = express.Router();
 cloudinary.config({
@@ -276,6 +277,7 @@ router.post(
       demandScore,
       priceFloor,
       priceCeiling,
+      stock,
     });
 
     const product = await Product.create({
@@ -294,6 +296,7 @@ router.post(
       competitorPrice: competitorPrice ?? undefined,
     });
 
+    emitProductUpdate(product);
     return res.status(201).json({ success: true, product });
   } catch (error) {
     console.error("Vendor product could not be created:", error);
@@ -351,6 +354,7 @@ router.patch(
       }
       product.currentPrice = calculateCurrentPrice(product);
       await product.save();
+      emitProductUpdate(product);
 
       if (req.file && oldImagePublicId) {
         await removeCloudinaryImage(oldImagePublicId);
@@ -422,7 +426,7 @@ router.get("/store/:vendorId", async (req, res) => {
   try {
     const vendor = await User.findById(vendorId)
       .select(
-        "name email role accountStatus storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified verification.tier verification.status createdAt",
+        "name email role accountStatus storeName storeLogo storeBanner storeDescription isFeatured vendorDetails.businessName vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified verification.tier verification.status createdAt",
       )
       .lean();
     if (
@@ -453,6 +457,7 @@ router.get("/store/:vendorId", async (req, res) => {
         storeDescription: vendor.storeDescription || "",
         tier: getVendorTier(vendor),
         isVerified: isTier2VerifiedVendor(vendor),
+        isFeatured: vendor.isFeatured === true,
         isTier1Verified: vendor.vendorDetails?.tier1Verified === true,
         memberSince: vendor.createdAt,
       },
@@ -467,6 +472,8 @@ router.get("/store/:vendorId", async (req, res) => {
           vendor.storeName || vendor.vendorDetails?.businessName || vendor.name,
         vendorTier: getVendorTier(vendor),
         isVerifiedVendor: isTier2VerifiedVendor(vendor),
+        isFeatured: product.isFeatured === true,
+        vendorFeatured: vendor.isFeatured === true,
       })),
     });
   } catch (error) {
@@ -484,7 +491,7 @@ router.get("/", async (_req, res) => {
       .populate({
         path: "vendor",
         select:
-          "name storeName role accountStatus vendorDetails.businessName vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified verification.tier verification.status",
+          "name storeName role accountStatus isFeatured vendorDetails.businessName vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified verification.tier verification.status",
         match: {
           role: "SELLER",
           accountStatus: { $ne: "SUSPENDED" },
@@ -509,6 +516,8 @@ router.get("/", async (_req, res) => {
           "Marketplace seller",
         vendorTier: getVendorTier(product.vendor),
         isVerifiedVendor: isTier2VerifiedVendor(product.vendor),
+        isFeatured: product.isFeatured === true,
+        vendorFeatured: product.vendor?.isFeatured === true,
       })),
     );
   } catch (error) {
@@ -516,6 +525,82 @@ router.get("/", async (_req, res) => {
     return res.status(500).json({
       success: false,
       message: "Unable to load marketplace products.",
+    });
+  }
+});
+
+router.get("/featured", async (_req, res) => {
+  try {
+    const products = await Product.find()
+      .populate({
+        path: "vendor",
+        select:
+          "name storeName role accountStatus isFeatured vendorDetails.businessName vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified verification.tier verification.status",
+        match: {
+          role: "SELLER",
+          accountStatus: { $ne: "SUSPENDED" },
+          ...getEligibleVendorFilter(),
+        },
+      })
+      .sort({ updatedAt: -1 })
+      .limit(250)
+      .lean();
+    const featuredProducts = products
+      .filter(
+        (product) =>
+          product.vendor &&
+          (product.isFeatured === true || product.vendor.isFeatured === true),
+      )
+      .slice(0, 12)
+      .map((product) => ({
+        ...product,
+        id: product._id.toString(),
+        name: product.title,
+        currentPrice: calculateCurrentPrice(product),
+        price: calculateCurrentPrice(product),
+        vendorId: product.vendor._id.toString(),
+        vendor:
+          product.vendor.storeName ||
+          product.vendor.vendorDetails?.businessName ||
+          product.vendor.name,
+        vendorTier: getVendorTier(product.vendor),
+        isVerifiedVendor: isTier2VerifiedVendor(product.vendor),
+        isFeatured: true,
+        vendorFeatured: product.vendor.isFeatured === true,
+      }));
+    return res.json({ success: true, products: featuredProducts });
+  } catch (error) {
+    console.error("Featured marketplace products could not be loaded:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to load featured products.",
+    });
+  }
+});
+
+router.post("/search/semantic", async (req, res) => {
+  const query = typeof req.body?.query === "string" ? req.body.query.trim() : "";
+  if (!query || query.length > 300) {
+    return res.status(400).json({
+      success: false,
+      message: "Search query must contain between 1 and 300 characters.",
+    });
+  }
+  try {
+    const { semanticProductSearch } = require("../services/gemini");
+    const products = await semanticProductSearch(query);
+    return res.json({ success: true, products });
+  } catch (error) {
+    if (error.code === "GEMINI_NOT_CONFIGURED") {
+      return res.status(503).json({
+        success: false,
+        message: "Semantic search is not configured.",
+      });
+    }
+    console.error("Semantic product search failed:", error.message);
+    return res.status(502).json({
+      success: false,
+      message: "Unable to complete semantic product search.",
     });
   }
 });

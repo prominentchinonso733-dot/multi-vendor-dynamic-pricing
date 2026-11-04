@@ -104,7 +104,7 @@ export default function VendorTierPlanPanel({
             );
             onUpdated?.(verified);
             setNotice(
-              `${verified.tier.replace("_", " ")} entry fee paid successfully.`,
+              `${verified.tier.replace("_", " ")} monthly plan activated.`,
             );
           } catch (verifyError) {
             setError(
@@ -129,6 +129,23 @@ export default function VendorTierPlanPanel({
     }
   };
 
+  const cancelSubscription = async () => {
+    setPending("cancelling");
+    setError("");
+    setNotice("");
+    try {
+      const result = await authService.cancelVendorTierSubscription();
+      onUpdated?.(result);
+      setNotice("The recurring vendor plan was cancelled.");
+    } catch (cancelError) {
+      setError(
+        getApiErrorMessage(cancelError, "Unable to cancel the monthly plan."),
+      );
+    } finally {
+      setPending("");
+    }
+  };
+
   const activePlan = subscriptionStatus === "ACTIVE";
   const selectedPlan = plans.find((plan) => plan.tier === selectedTier);
   const isCurrentTier = activePlan && selectedTier === vendorTier;
@@ -142,7 +159,7 @@ export default function VendorTierPlanPanel({
         <div>
           <p className="vendor-tier-plan__eyebrow">VENDOR ONBOARDING</p>
           <h2 id="vendor-tier-plan-title">Choose your vendor tier</h2>
-          <p>One-time entry fees; these are not recurring subscriptions.</p>
+          <p>Monthly vendor subscriptions, billed securely through Paystack.</p>
         </div>
         {activePlan && (
           <span className="vendor-tier-plan__active">
@@ -181,7 +198,7 @@ export default function VendorTierPlanPanel({
                 <span className="vendor-tier-plan__option-title">
                   {plan.tier.replace("_", " ")}
                 </span>
-                <strong>${plan.priceUSD} one-time</strong>
+                <strong>${plan.priceUSD}/month</strong>
                 <span>
                   {plan.amountNgn === null
                     ? "NGN conversion unavailable"
@@ -197,7 +214,7 @@ export default function VendorTierPlanPanel({
           </div>
           {selectedPlan && selectedPlan.amountNgn !== null && (
             <p className="vendor-tier-plan__conversion">
-              Paystack will charge {nairaFormatter.format(selectedPlan.amountNgn)}.
+              Paystack will charge {nairaFormatter.format(selectedPlan.amountNgn)} each month.
               The NGN amount uses the marketplace-configured exchange rate.
             </p>
           )}
@@ -220,8 +237,18 @@ export default function VendorTierPlanPanel({
                   ? "Complete payment in Paystack"
                   : isCurrentTier
                     ? "Current tier active"
-                    : `Pay $${selectedPlan?.priceUSD ?? ""} entry fee${selectedTier === "TIER_2" ? " & Submit Tier 2 Review" : ""}`}
+                    : `Subscribe for $${selectedPlan?.priceUSD ?? ""}/month${selectedTier === "TIER_2" ? " · Submit Tier 2 Review" : ""}`}
           </button>
+          {subscriptionStatus === "ACTIVE" && (
+            <button
+              className="vendor-tier-plan__pay"
+              disabled={Boolean(pending)}
+              onClick={cancelSubscription}
+              type="button"
+            >
+              {pending === "cancelling" ? "Cancelling plan..." : "Cancel monthly subscription"}
+            </button>
+          )}
         </>
       )}
     </section>

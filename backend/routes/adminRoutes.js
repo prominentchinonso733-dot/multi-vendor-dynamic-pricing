@@ -5,8 +5,10 @@ const User = require("../models/User");
 const Product = require("../models/Product");
 const EscrowContract = require("../models/EscrowContract");
 const VerificationDocument = require("../models/VerificationDocument");
+const PlatformCommissionEntry = require("../models/PlatformCommissionEntry");
 const authenticateToken = require("../middleware/authenticateToken");
 const { decryptDocument } = require("../services/verificationDocuments");
+const { emitFeaturedUpdate } = require("../services/realtime");
 
 const router = express.Router();
 router.use(authenticateToken, (req, res, next) => {
@@ -71,7 +73,7 @@ router.get("/overview", async (req, res) => {
       EscrowContract.countDocuments(),
       User.find(userPageFilter)
         .select(
-          "name email role accountStatus createdAt verification vendorDetails.isVerified",
+          "name email role accountStatus createdAt verification vendorDetails.isVerified isFeatured",
         )
         .sort({ createdAt: -1 })
         .skip((usersPage - 1) * pageSize)
@@ -138,11 +140,135 @@ router.get("/verification/pending", async (_req, res) => {
         },
       })),
     });
+
   } catch (error) {
     console.error("Pending identity reviews could not be loaded:", error);
     return res.status(500).json({
       success: false,
       message: "Unable to load pending identity reviews.",
+    });
+  }
+});
+
+router.get("/featured", async (_req, res) => {
+  try {
+    const [vendors, products] = await Promise.all([
+      User.find({ role: "SELLER" })
+        .select("name email storeName isFeatured accountStatus")
+        .sort({ isFeatured: -1, storeName: 1 })
+        .limit(100)
+        .lean(),
+      Product.find()
+        .select("title category isFeatured vendor")
+        .populate("vendor", "name storeName")
+        .sort({ isFeatured: -1, updatedAt: -1 })
+        .limit(100)
+        .lean(),
+    ]);
+    return res.json({ success: true, vendors, products });
+  } catch (error) {
+    console.error("Featured marketplace items could not be loaded:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to load featured marketplace items.",
+    });
+  }
+});
+
+router.get("/commission-ledger", async (req, res) => {
+  const page = Number(req.query.page || 1);
+  if (!Number.isInteger(page) || page < 1) {
+    return res.status(400).json({
+      success: false,
+      message: "Page must be a positive whole number.",
+    });
+  }
+  const pageSize = 50;
+  try {
+    const [entries, total, totals] = await Promise.all([
+      PlatformCommissionEntry.find()
+        .populate("contractId", "status createdAt")
+        .sort({ createdAt: -1 })
+        .skip((page - 1) * pageSize)
+        .limit(pageSize)
+        .lean(),
+      PlatformCommissionEntry.countDocuments(),
+      PlatformCommissionEntry.aggregate([
+        {
+          $group: {
+            _id: "$status",
+            amount: { $sum: "$amount" },
+            count: { $sum: 1 },
+          },
+        },
+      ]),
+    ]);
+    return res.json({
+      success: true,
+      entries,
+      totals: Object.fromEntries(
+        totals.map(({ _id, amount, count }) => [_id, { amount, count }]),
+      ),
+      page,
+      pageSize,
+      total,
+    });
+  } catch (error) {
+    console.error("Platform commission ledger could not be loaded:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to load platform commission ledger.",
+    });
+  }
+});
+
+router.patch("/featured/:entity/:id", async (req, res) => {
+  const { entity, id } = req.params;
+  const { isFeatured } = req.body || {};
+  if (!["vendor", "product"].includes(entity) || !mongoose.isValidObjectId(id)) {
+    return res.status(400).json({
+      success: false,
+      message: "Choose a valid featured item and identifier.",
+    });
+  }
+  if (typeof isFeatured !== "boolean") {
+    return res.status(400).json({
+      success: false,
+      message: "isFeatured must be a boolean.",
+    });
+  }
+
+  try {
+    const updated =
+      entity === "vendor"
+        ? await User.findOneAndUpdate(
+            { _id: id, role: "SELLER" },
+            { $set: { isFeatured } },
+            { new: true, runValidators: true },
+          )
+            .select("name email storeName isFeatured")
+            .lean()
+        : await Product.findByIdAndUpdate(
+            id,
+            { $set: { isFeatured } },
+            { new: true, runValidators: true },
+          )
+            .select("title category isFeatured vendor")
+            .populate("vendor", "name storeName")
+            .lean();
+    if (!updated) {
+      return res.status(404).json({
+        success: false,
+        message: "Featured marketplace item not found.",
+      });
+    }
+    emitFeaturedUpdate();
+    return res.json({ success: true, entity, item: updated });
+  } catch (error) {
+    console.error("Featured marketplace status could not be updated:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to update featured marketplace status.",
     });
   }
 });
