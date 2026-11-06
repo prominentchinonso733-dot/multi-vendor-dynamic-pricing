@@ -7,6 +7,7 @@ const User = require("../models/User");
 const PaystackPlan = require("../models/PaystackPlan");
 const confirmEscrowPayment = require("../services/confirmEscrowPayment");
 const { toMinorUnits } = require("../services/financialPolicy");
+const { SELLER_ROLE_VALUES } = require("../services/roles");
 const {
   getWalletForUpdate,
   restoreAvailable,
@@ -97,7 +98,7 @@ const handleVendorSubscriptionWebhook = async (event, data) => {
     const updated = await User.findOneAndUpdate(
       {
         email,
-        role: "SELLER",
+        role: { $in: SELLER_ROLE_VALUES },
         "vendorDetails.subscriptionPlanCode": plan.providerCode,
       },
       {
@@ -119,7 +120,7 @@ const handleVendorSubscriptionWebhook = async (event, data) => {
     const result = await User.updateOne(
       {
         email,
-        role: "SELLER",
+        role: { $in: SELLER_ROLE_VALUES },
         ...(planCode && { "vendorDetails.subscriptionPlanCode": planCode }),
       },
       {
@@ -134,7 +135,7 @@ const handleVendorSubscriptionWebhook = async (event, data) => {
     const result = await User.updateOne(
       {
         email,
-        role: "SELLER",
+        role: { $in: SELLER_ROLE_VALUES },
         ...(planCode && { "vendorDetails.subscriptionPlanCode": planCode }),
       },
       {
@@ -157,7 +158,7 @@ const handleVendorSubscriptionWebhook = async (event, data) => {
     const result = await User.updateOne(
       {
         email,
-        role: "SELLER",
+        role: { $in: SELLER_ROLE_VALUES },
         ...(data.subscription_code && {
           "vendorDetails.subscriptionCode": data.subscription_code,
         }),
@@ -203,7 +204,7 @@ const settleVendorSubscriptionCharge = async (payment) => {
     {
       _id: vendorId,
       email: String(payment.customer?.email || "").toLowerCase(),
-      role: "SELLER",
+      role: { $in: SELLER_ROLE_VALUES },
       accountStatus: { $ne: "SUSPENDED" },
       "vendorDetails.tierEntryPendingTier": tier,
       "vendorDetails.tierEntryPaymentReference": payment.reference,

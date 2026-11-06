@@ -1,10 +1,12 @@
 import { useEffect, useState } from "react";
 import PropTypes from "prop-types";
+import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import { getApiErrorMessage } from "../api";
 import { useAuth } from "../context/AuthContext";
 import { getRoleHomeRoute } from "../services/roleRoutes";
 import { authService } from "../services/authService";
+import "./AccountAuth.css";
 
 const AccountAuth = ({ role }) => {
   const { login, register } = useAuth();
@@ -14,6 +16,7 @@ const AccountAuth = ({ role }) => {
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [phone, setPhone] = useState("");
   const [vendorTier, setVendorTier] = useState("TIER_1");
   const [banks, setBanks] = useState([]);
@@ -125,18 +128,12 @@ const AccountAuth = ({ role }) => {
   };
 
   return (
-    <section
-      aria-labelledby="account-auth-title"
-      style={{
-        maxWidth: "28rem",
-        margin: "2rem auto",
-        padding: "2rem",
-        background: "#fff",
-        borderRadius: "0.75rem",
-        boxShadow: "0 1px 4px #0002",
-      }}
-    >
-      <h1 id="account-auth-title">
+    <section className="account-auth" aria-labelledby="account-auth-title">
+      <header className="account-auth__header">
+        <span className="account-auth__eyebrow">
+          {isRegistering ? "JOIN THE MARKETPLACE" : "WELCOME BACK"}
+        </span>
+        <h1 id="account-auth-title">
         {isBuyer
           ? isRegistering
             ? "Create your shopper account"
@@ -150,7 +147,13 @@ const AccountAuth = ({ role }) => {
               : isRegistering
                 ? "Create your vendor account"
                 : "Vendor sign in"}
-      </h1>
+        </h1>
+        <p>
+          {isRegistering
+            ? "Enter your details to get started."
+            : "Sign in to continue to your account."}
+        </p>
+      </header>
       {role === "DELIVERY_PARTNER" && (
         <div
           className="rider-auth__tabs"
@@ -203,7 +206,7 @@ const AccountAuth = ({ role }) => {
           </button>
         </div>
       )}
-      <form onSubmit={submit} style={{ display: "grid", gap: "1rem" }}>
+      <form className="account-auth__form" onSubmit={submit}>
         {isRegistering && (
           <label style={{ display: "grid", gap: "0.35rem" }}>
             {isBuyer ? "Name" : "Full name"}
@@ -369,7 +372,7 @@ const AccountAuth = ({ role }) => {
             <p>After registering, you can activate the selected monthly vendor plan from your dashboard.</p>
           </>
         )}
-        <label style={{ display: "grid", gap: "0.35rem" }}>
+        <label className="account-auth__field">
           Email
           <input
             autoComplete="username"
@@ -379,21 +382,49 @@ const AccountAuth = ({ role }) => {
             value={email}
           />
         </label>
-        <label style={{ display: "grid", gap: "0.35rem" }}>
-          Password
-          <input
-            autoComplete={isRegistering ? "new-password" : "current-password"}
-            onChange={(event) => setPassword(event.target.value)}
-            minLength={
-              isRegistering && role === "DELIVERY_PARTNER" ? 8 : undefined
-            }
-            required
-            type="password"
-            value={password}
-          />
-        </label>
-        {error && <p role="alert">{error}</p>}
-        <button disabled={isPending} type="submit">
+        <div className="account-auth__field">
+          <label htmlFor="account-auth-password">Password</label>
+          <span className="account-auth__password">
+            <input
+              id="account-auth-password"
+              autoComplete={
+                isRegistering ? "new-password" : "current-password"
+              }
+              onChange={(event) => setPassword(event.target.value)}
+              minLength={
+                isRegistering && role === "DELIVERY_PARTNER" ? 8 : undefined
+              }
+              required
+              type={showPassword ? "text" : "password"}
+              value={password}
+            />
+            <button
+              aria-label={showPassword ? "Hide password" : "Show password"}
+              aria-controls="account-auth-password"
+              aria-pressed={showPassword}
+              className="account-auth__password-toggle"
+              onClick={() => setShowPassword((isVisible) => !isVisible)}
+              type="button"
+            >
+              {showPassword ? (
+                <EyeOff aria-hidden="true" size={18} />
+              ) : (
+                <Eye aria-hidden="true" size={18} />
+              )}
+              <span>{showPassword ? "Hide" : "Show"}</span>
+            </button>
+          </span>
+        </div>
+        {error && (
+          <p className="account-auth__error" role="alert">
+            {error}
+          </p>
+        )}
+        <button
+          className="account-auth__submit"
+          disabled={isPending}
+          type="submit"
+        >
           {isPending
             ? "Please wait..."
             : isRegistering
@@ -401,10 +432,11 @@ const AccountAuth = ({ role }) => {
               : "Sign In"}
         </button>
       </form>
-      {canRegister && (
-        role !== "DELIVERY_PARTNER" && <p>
+      {canRegister && role !== "DELIVERY_PARTNER" && (
+        <p className="account-auth__switch">
           {isRegistering ? "Already have an account?" : "New to the marketplace?"}{" "}
           <button
+            className="account-auth__switch-button"
             onClick={() => {
               setError("");
               setMode(isRegistering ? "login" : "register");

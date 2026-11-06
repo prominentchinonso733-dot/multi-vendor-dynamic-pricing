@@ -14,6 +14,7 @@ const {
   isTier2VerifiedVendor,
   isVendorEligibleToSell,
 } = require("../services/vendorTiers");
+const { SELLER_ROLE_VALUES, isSellerRole } = require("../services/roles");
 const {
   emitFeaturedUpdate,
   emitProductUpdate,
@@ -175,7 +176,8 @@ const parseProductUpload = (req, res, next) => {
   });
 };
 
-const canManageProducts = (user) => ["SELLER", "ADMIN"].includes(user.role);
+const canManageProducts = (user) =>
+  isSellerRole(user.role) || user.role === "ADMIN";
 
 const requireProductManager = (req, res, next) => {
   if (!canManageProducts(req.user)) {
@@ -191,7 +193,7 @@ const requireTier1Verification = async (req, res, next) => {
   try {
     const seller = await User.findOne({
       _id: req.user._id,
-      role: "SELLER",
+      role: { $in: SELLER_ROLE_VALUES },
       accountStatus: { $ne: "SUSPENDED" },
       ...getEligibleVendorFilter(),
     })
@@ -217,7 +219,7 @@ const requireTier1Verification = async (req, res, next) => {
 
 const canManageProduct = (user, product) =>
   user.role === "ADMIN" ||
-  (user.role === "SELLER" && product.vendor.toString() === user.id);
+  (isSellerRole(user.role) && product.vendor.toString() === user.id);
 
 const loadManagedProduct = async (req, res, next) => {
   const { productId } = req.params;
@@ -495,7 +497,7 @@ router.get("/store/:vendorId", async (req, res) => {
       .lean();
     if (
       !vendor ||
-      vendor.role !== "SELLER" ||
+      !isSellerRole(vendor.role) ||
       vendor.accountStatus === "SUSPENDED" ||
       !isVendorEligibleToSell(vendor)
     ) {
@@ -576,7 +578,7 @@ router.get("/featured", async (_req, res) => {
         select:
           "name storeName role accountStatus isFeatured vendorDetails.businessName vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified verification.tier verification.status",
         match: {
-          role: "SELLER",
+          role: { $in: SELLER_ROLE_VALUES },
           accountStatus: { $ne: "SUSPENDED" },
           ...getEligibleVendorFilter(),
         },

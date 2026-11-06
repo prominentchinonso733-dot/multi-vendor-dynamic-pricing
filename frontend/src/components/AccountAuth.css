@@ -1,0 +1,153 @@
+.account-auth {
+  width: min(100%, 32rem);
+  margin: clamp(1.5rem, 5vh, 3.5rem) auto;
+  padding: clamp(1.5rem, 5vw, 2.75rem);
+  border: 1px solid #e4ebe6;
+  border-radius: 1.25rem;
+  background: #fff;
+  box-shadow: 0 20px 55px rgb(26 56 41 / 10%);
+  color: #20352f;
+}
+
+.account-auth__header {
+  margin-bottom: 1.75rem;
+}
+
+.account-auth__eyebrow {
+  color: #176f5d;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.account-auth__header h1 {
+  margin: 0.65rem 0 0.5rem;
+  font-size: clamp(1.65rem, 5vw, 2.1rem);
+  line-height: 1.15;
+  letter-spacing: -0.035em;
+}
+
+.account-auth__header p {
+  margin: 0;
+  color: #65756d;
+  line-height: 1.55;
+}
+
+.account-auth__form {
+  display: grid;
+  gap: 1rem;
+}
+
+.account-auth__field {
+  display: grid;
+  gap: 0.45rem;
+  color: #344b40;
+  font-size: 0.9rem;
+  font-weight: 650;
+}
+
+.account-auth input:not([type="file"]),
+.account-auth select {
+  width: 100%;
+  min-height: 2.9rem;
+  padding: 0.7rem 0.85rem;
+  border: 1px solid #d5e0d9;
+  border-radius: 0.65rem;
+  background: #fff;
+  color: #20352f;
+  font-weight: 400;
+  transition: border-color 150ms ease, box-shadow 150ms ease;
+}
+
+.account-auth input:not([type="file"]):focus,
+.account-auth select:focus {
+  border-color: #31826e;
+  outline: none;
+  box-shadow: 0 0 0 3px rgb(49 130 110 / 14%);
+}
+
+.account-auth__password {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.account-auth__password input {
+  padding-right: 5.5rem !important;
+}
+
+.account-auth__password-toggle {
+  position: absolute;
+  right: 0.55rem;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.35rem;
+  padding: 0.4rem;
+  border: 0;
+  border-radius: 0.4rem;
+  background: transparent;
+  color: #526a5f;
+  cursor: pointer;
+  font-size: 0.8rem;
+  font-weight: 700;
+}
+
+.account-auth__password-toggle:hover {
+  color: #176f5d;
+}
+
+.account-auth__submit {
+  min-height: 3rem;
+  margin-top: 0.25rem;
+  padding: 0.75rem 1rem;
+  border: 0;
+  border-radius: 0.65rem;
+  background: #176f5d;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 750;
+  transition: background-color 150ms ease, transform 150ms ease;
+}
+
+.account-auth__submit:hover:not(:disabled) {
+  transform: translateY(-1px);
+  background: #115c4d;
+}
+
+.account-auth__submit:disabled {
+  cursor: wait;
+  opacity: 0.7;
+}
+
+.account-auth__error {
+  margin: 0;
+  padding: 0.8rem 0.9rem;
+  border: 1px solid #f1c6c2;
+  border-radius: 0.6rem;
+  background: #fff5f4;
+  color: #9c302a;
+  font-size: 0.9rem;
+  line-height: 1.45;
+}
+
+.account-auth__switch {
+  margin: 1.5rem 0 0;
+  color: #65756d;
+  text-align: center;
+  font-size: 0.9rem;
+}
+
+.account-auth__switch-button {
+  padding: 0.25rem;
+  border: 0;
+  background: transparent;
+  color: #176f5d;
+  cursor: pointer;
+  font-weight: 750;
+}
+
+@media (max-width: 480px) {
+  .account-auth {
+    border-radius: 1rem;
+  }
+}

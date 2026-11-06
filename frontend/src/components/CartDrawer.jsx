@@ -213,11 +213,12 @@ export default function CartDrawer({
           maxHeight: "90vh",
           boxSizing: "border-box",
           backgroundColor: "#fff",
-          padding: "24px",
+          padding: "28px 24px",
           overflowY: "auto",
           display: "flex",
           flexDirection: "column",
           justifyContent: "flex-start",
+          lineHeight: 1.5,
         }}
       >
         <div
@@ -228,13 +229,16 @@ export default function CartDrawer({
             minHeight: 0,
           }}
         >
-          <div className="flex justify-between items-center pb-4 border-b">
-            <h2 className="text-xl font-bold">Escrow Shopping Cart</h2>
+          <div className="flex justify-between items-center gap-4 pb-4 border-b">
+            <h2 className="min-w-0 flex-1 text-xl font-bold leading-tight">
+              Escrow Shopping Cart
+            </h2>
             <button
               aria-label="Close cart"
               onClick={onClose}
               className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 font-bold text-xl transition hover:border-gray-500 hover:bg-gray-100 hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
               type="button"
+              style={{ flexShrink: 0, marginTop: "2px", marginRight: "4px" }}
             >
               ✕
             </button>
@@ -365,7 +369,7 @@ export default function CartDrawer({
                 limits on the server.
               </p>
             )}
-            <div style={{ display: "grid", gap: "8px", marginTop: "16px" }}>
+            <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
               <label
                 htmlFor="paystack-buyer-email"
                 className="text-sm font-semibold"
@@ -381,10 +385,12 @@ export default function CartDrawer({
                 value={buyerEmail}
                 placeholder="you@example.com"
                 style={{
-                  minHeight: "42px",
+                  height: "44px",
                   padding: "0 10px",
                   border: "1px solid #cbd5e1",
-                  borderRadius: "4px",
+                  borderRadius: "6px",
+                  marginBottom: "4px",
+                  boxSizing: "border-box",
                 }}
               />
               <label
@@ -403,10 +409,14 @@ export default function CartDrawer({
                 rows={3}
                 value={deliveryAddress}
                 style={{
-                  minHeight: "70px",
+                  height: "96px",
                   padding: "10px",
                   border: "1px solid #cbd5e1",
-                  borderRadius: "4px",
+                  borderRadius: "6px",
+                  marginBottom: "4px",
+                  boxSizing: "border-box",
+                  lineHeight: 1.5,
+                  resize: "vertical",
                 }}
               />
               <label htmlFor="delivery-phone" className="text-sm font-semibold">
@@ -422,10 +432,12 @@ export default function CartDrawer({
                 type="tel"
                 value={customerPhone}
                 style={{
-                  minHeight: "42px",
+                  height: "44px",
                   padding: "0 10px",
                   border: "1px solid #cbd5e1",
-                  borderRadius: "4px",
+                  borderRadius: "6px",
+                  marginBottom: "4px",
+                  boxSizing: "border-box",
                 }}
               />
               <div

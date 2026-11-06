@@ -1,5 +1,6 @@
 const jwt = require("jsonwebtoken");
 const User = require("../models/User");
+const { normalizeRole } = require("../services/roles");
 
 const authenticateToken = async (req, res, next) => {
   const authorization = req.headers.authorization || "";
@@ -26,12 +27,16 @@ const authenticateToken = async (req, res, next) => {
         .status(403)
         .json({ success: false, message: "This account is not active." });
     }
-    if (account.role !== user.role) {
+    if (normalizeRole(account.role) !== normalizeRole(user.role)) {
       return res
         .status(403)
         .json({ success: false, message: "Account permissions have changed." });
     }
-    req.user = { ...user, _id: user._id || user.id };
+    req.user = {
+      ...user,
+      role: normalizeRole(user.role),
+      _id: user._id || user.id,
+    };
     return next();
   } catch (error) {
     if (error.name !== "JsonWebTokenError" && error.name !== "TokenExpiredError") {

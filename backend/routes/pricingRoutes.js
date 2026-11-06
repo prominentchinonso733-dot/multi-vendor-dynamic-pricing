@@ -5,20 +5,21 @@ const User = require("../models/User");
 const authenticateToken = require("../middleware/authenticateToken");
 const { getEligibleVendorFilter } = require("../services/vendorTiers");
 const calculateCurrentPrice = require("../services/dynamicPricing");
+const { SELLER_ROLE_VALUES, isSellerRole } = require("../services/roles");
 
 const router = express.Router();
 
 router.post("/calculate", authenticateToken, async (req, res) => {
-  if (!["SELLER", "ADMIN"].includes(req.user.role)) {
+  if (!isSellerRole(req.user.role) && req.user.role !== "ADMIN") {
     return res
       .status(403)
       .json({ success: false, message: "Seller or admin role required." });
   }
-  if (req.user.role === "SELLER") {
+  if (isSellerRole(req.user.role)) {
     try {
       const eligibleSeller = await User.exists({
         _id: req.user._id,
-        role: "SELLER",
+        role: { $in: SELLER_ROLE_VALUES },
         accountStatus: { $ne: "SUSPENDED" },
         ...getEligibleVendorFilter(),
       });
@@ -93,7 +94,7 @@ router.post("/calculate", authenticateToken, async (req, res) => {
     }
     if (
       req.user.role !== "ADMIN" &&
-      (req.user.role !== "SELLER" ||
+      (!isSellerRole(req.user.role) ||
         product.vendor.toString() !== req.user.id)
     ) {
       return res

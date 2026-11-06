@@ -14,6 +14,11 @@ const {
   encryptDocument,
 } = require("../services/verificationDocuments");
 const { VENDOR_TIER_PRICES_USD } = require("../services/vendorTiers");
+const {
+  SELLER_ROLE_VALUES,
+  normalizeRole,
+  isSellerRole,
+} = require("../services/roles");
 
 const uploadVerificationDocument = multer({
   storage: multer.memoryStorage(),
@@ -75,13 +80,6 @@ const isValidImageUrl = (value) => {
     return false;
   }
 };
-
-const normalizeRole = (role) =>
-  ({
-    ROLE_CUSTOMER: "BUYER",
-    ROLE_VENDOR: "SELLER",
-    ROLE_ADMIN: "ADMIN",
-  })[role] || role;
 
 const hasVendorAccess = (user) => normalizeRole(user.role) === "SELLER";
 
@@ -310,7 +308,7 @@ router.post(
 
     try {
       const userId = req.user._id || req.user.id;
-      const isVendor = req.user.role === "SELLER";
+      const isVendor = isSellerRole(req.user.role);
       if (isVendor) {
         const seller = await User.findById(userId)
           .select("vendorDetails.payoutDetails.bankCode")
@@ -335,7 +333,7 @@ router.post(
         await session.withTransaction(async () => {
           const user = await User.findOne({
             _id: userId,
-            role: { $in: ["BUYER", "SELLER"] },
+            role: { $in: ["BUYER", ...SELLER_ROLE_VALUES] },
             accountStatus: { $ne: "SUSPENDED" },
             "verification.status": { $nin: ["PENDING", "VERIFIED"] },
           }).session(session);
@@ -410,7 +408,7 @@ router.post(
 );
 
 router.get("/profile", authenticateToken, async (req, res) => {
-  if (req.user.role !== "SELLER") {
+  if (!isSellerRole(req.user.role)) {
     return res
       .status(403)
       .json({ success: false, message: "Seller role required." });
@@ -473,7 +471,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
 });
 
 router.put("/profile", authenticateToken, async (req, res) => {
-  if (req.user.role !== "SELLER") {
+  if (!isSellerRole(req.user.role)) {
     return res
       .status(403)
       .json({ success: false, message: "Seller role required." });
@@ -527,7 +525,10 @@ router.put("/profile", authenticateToken, async (req, res) => {
     const user = await User.findOneAndUpdate(
       {
         _id: req.user._id,
-        $or: [{ role: "SELLER" }, { "vendorDetails.isVendor": true }],
+        $or: [
+          { role: { $in: SELLER_ROLE_VALUES } },
+          { "vendorDetails.isVendor": true },
+        ],
       },
       { $set: updates },
       { new: true, runValidators: true },

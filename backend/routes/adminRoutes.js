@@ -7,6 +7,7 @@ const EscrowContract = require("../models/EscrowContract");
 const VerificationDocument = require("../models/VerificationDocument");
 const PlatformCommissionEntry = require("../models/PlatformCommissionEntry");
 const authenticateToken = require("../middleware/authenticateToken");
+const { SELLER_ROLE_VALUES } = require("../services/roles");
 const { decryptDocument } = require("../services/verificationDocuments");
 const { emitFeaturedUpdate } = require("../services/realtime");
 
@@ -36,11 +37,11 @@ router.get("/overview", async (req, res) => {
   const usersRole = req.query.usersRole || "accounts";
   const userFilter =
     usersRole === "vendors"
-      ? { role: "SELLER" }
+      ? { role: { $in: SELLER_ROLE_VALUES } }
       : usersRole === "riders"
         ? { role: "DELIVERY_PARTNER" }
         : usersRole === "accounts"
-          ? { role: { $in: ["BUYER", "SELLER"] } }
+          ? { role: { $in: ["BUYER", ...SELLER_ROLE_VALUES] } }
           : null;
   if (!userFilter) {
     return res.status(400).json({
@@ -63,7 +64,7 @@ router.get("/overview", async (req, res) => {
       users,
       orders,
     ] = await Promise.all([
-      User.countDocuments({ role: "SELLER" }),
+      User.countDocuments({ role: { $in: SELLER_ROLE_VALUES } }),
       User.countDocuments({ role: "BUYER" }),
       User.countDocuments({ role: "DELIVERY_PARTNER" }),
       Product.countDocuments(),
@@ -153,7 +154,7 @@ router.get("/verification/pending", async (_req, res) => {
 router.get("/featured", async (_req, res) => {
   try {
     const [vendors, products] = await Promise.all([
-      User.find({ role: "SELLER" })
+      User.find({ role: { $in: SELLER_ROLE_VALUES } })
         .select("name email storeName isFeatured accountStatus")
         .sort({ isFeatured: -1, storeName: 1 })
         .limit(100)
@@ -242,7 +243,7 @@ router.patch("/featured/:entity/:id", async (req, res) => {
     const updated =
       entity === "vendor"
         ? await User.findOneAndUpdate(
-            { _id: id, role: "SELLER" },
+            { _id: id, role: { $in: SELLER_ROLE_VALUES } },
             { $set: { isFeatured } },
             { new: true, runValidators: true },
           )
@@ -439,7 +440,7 @@ router.patch("/verification/:userId", async (req, res) => {
         user = await User.findOneAndUpdate(
           {
             _id: userId,
-            role: { $in: ["BUYER", "SELLER"] },
+            role: { $in: ["BUYER", ...SELLER_ROLE_VALUES] },
             accountStatus: { $ne: "SUSPENDED" },
             "verification.status": "PENDING",
           },

@@ -17,6 +17,7 @@ const confirmEscrowPayment = require("../services/confirmEscrowPayment");
 const calculateCurrentPrice = require("../services/dynamicPricing");
 const isValidDeliveryProof = require("../services/deliveryProof");
 const { getCheckoutEligibleVendorFilter } = require("../services/vendorTiers");
+const { SELLER_ROLE_VALUES, isSellerRole } = require("../services/roles");
 const {
   creditPending,
   getWalletForUpdate,
@@ -165,7 +166,10 @@ const createLegacyVendorPayouts = async (contract, session) => {
         .filter((id) => mongoose.isValidObjectId(id)),
     ),
   ];
-  const sellers = await User.find({ _id: { $in: sellerIds }, role: "SELLER" })
+  const sellers = await User.find({
+    _id: { $in: sellerIds },
+    role: { $in: SELLER_ROLE_VALUES },
+  })
     .select("verification.tier verification.status vendorDetails.tier")
     .session(session)
     .lean();
@@ -547,7 +551,7 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
       _id: {
         $in: [...new Set(products.map((product) => product.vendor.toString()))],
       },
-      role: { $in: ["SELLER", "vendor"] },
+      role: { $in: SELLER_ROLE_VALUES },
       accountStatus: { $ne: "SUSPENDED" },
       ...getCheckoutEligibleVendorFilter(),
     })
@@ -657,7 +661,7 @@ router.post("/lock-funds", authenticateToken, async (req, res) => {
           const seller = await User.findOneAndUpdate(
             {
               _id: sellerId,
-              role: "SELLER",
+              role: { $in: SELLER_ROLE_VALUES },
               accountStatus: "ACTIVE",
               ...getEligibleVendorFilter(),
             },
@@ -892,7 +896,7 @@ router.post("/verify", authenticateToken, async (req, res) => {
 // GET /api/escrow/vendor/orders
 router.get("/vendor/orders", authenticateToken, async (req, res) => {
   try {
-    if (req.user.role !== "SELLER") {
+    if (!isSellerRole(req.user.role)) {
       return res
         .status(403)
         .json({ success: false, message: "Vendor role required." });
@@ -935,7 +939,7 @@ router.patch(
   authenticateToken,
   async (req, res) => {
     try {
-      if (req.user.role !== "SELLER") {
+      if (!isSellerRole(req.user.role)) {
         return res
           .status(403)
           .json({ success: false, message: "Vendor role required." });
@@ -1050,7 +1054,7 @@ router.post("/rider/seed", authenticateToken, async (req, res) => {
                 crypto.randomBytes(48).toString("hex"),
                 10,
               ),
-              role: "SELLER",
+              role: { $in: SELLER_ROLE_VALUES },
               accountStatus: "SUSPENDED",
             },
           ],
@@ -1389,7 +1393,7 @@ router.patch(
 );
 
 router.get("/wallet", authenticateToken, async (req, res) => {
-  if (req.user.role !== "SELLER") {
+  if (!isSellerRole(req.user.role)) {
     return res.status(403).json({
       success: false,
       message: "Vendor role required.",
@@ -1640,7 +1644,7 @@ router.get("/:contractId/receipt", authenticateToken, async (req, res) => {
 
     const userId = (req.user._id || req.user.id).toString();
     const isSeller =
-      req.user.role === "SELLER" &&
+      isSellerRole(req.user.role) &&
       contract.sellerIds.some((sellerId) => sellerId.toString() === userId);
     const canView =
       req.user.role === "ADMIN" ||

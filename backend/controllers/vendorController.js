@@ -24,11 +24,12 @@ const {
   VENDOR_TIER_PRICES_USD,
   getVendorTierAmountMinor,
 } = require("../services/vendorTiers");
+const { SELLER_ROLE_VALUES, isSellerRole } = require("../services/roles");
 
 const router = express.Router();
 
 const requireSeller = (req, res, next) => {
-  if (req.user.role !== "SELLER") {
+  if (!isSellerRole(req.user.role)) {
     return res.status(403).json({
       success: false,
       message: "Seller role required.",
@@ -305,7 +306,7 @@ router.post(
       const userId = req.user._id || req.user.id;
       const seller = await User.findOne({
         _id: userId,
-        role: "SELLER",
+        role: { $in: SELLER_ROLE_VALUES },
         accountStatus: { $ne: "SUSPENDED" },
       })
         .select(
@@ -388,7 +389,7 @@ router.post(
       const paymentIntentOwner = await User.updateOne(
         {
           _id: seller._id,
-          role: "SELLER",
+          role: { $in: SELLER_ROLE_VALUES },
           accountStatus: { $ne: "SUSPENDED" },
           "vendorDetails.tierEntryPaymentReference": { $exists: false },
         },
@@ -451,7 +452,7 @@ router.post(
       const userId = req.user._id || req.user.id;
       const existingPayment = await User.findOne({
         _id: userId,
-        role: "SELLER",
+        role: { $in: SELLER_ROLE_VALUES },
         "vendorDetails.tierEntryPaidReference": reference,
       })
         .select("vendorDetails.tier vendorDetails.subscriptionStatus")
@@ -467,7 +468,7 @@ router.post(
 
       const seller = await User.findOne({
         _id: userId,
-        role: "SELLER",
+        role: { $in: SELLER_ROLE_VALUES },
         accountStatus: { $ne: "SUSPENDED" },
         "vendorDetails.tierEntryPaymentReference": reference,
       })
@@ -507,7 +508,7 @@ router.post(
       const updatedSeller = await User.findOneAndUpdate(
         {
           _id: userId,
-          role: "SELLER",
+          role: { $in: SELLER_ROLE_VALUES },
           accountStatus: { $ne: "SUSPENDED" },
           "vendorDetails.tierEntryPaymentReference": reference,
           "vendorDetails.tierEntryPendingTier":
@@ -565,7 +566,7 @@ router.post(
     try {
       const seller = await User.findOne({
         _id: req.user._id || req.user.id,
-        role: "SELLER",
+        role: { $in: SELLER_ROLE_VALUES },
         accountStatus: { $ne: "SUSPENDED" },
       })
         .select("+vendorDetails.subscriptionCode +vendorDetails.subscriptionEmailToken")
@@ -670,7 +671,7 @@ router.post(
       const user = await User.findOneAndUpdate(
         {
           _id: userId,
-          role: "SELLER",
+          role: { $in: SELLER_ROLE_VALUES },
           accountStatus: { $ne: "SUSPENDED" },
           "vendorDetails.tier1Verified": { $ne: true },
         },
@@ -770,7 +771,7 @@ router.post(
       const user = await User.findOneAndUpdate(
         {
           _id: userId,
-          role: "SELLER",
+          role: { $in: SELLER_ROLE_VALUES },
           accountStatus: { $ne: "SUSPENDED" },
         },
         {
@@ -850,7 +851,7 @@ router.post(
     try {
       seller = await User.findOne({
         _id: userId,
-        role: "SELLER",
+        role: { $in: SELLER_ROLE_VALUES },
         accountStatus: { $ne: "SUSPENDED" },
       }).select(
         "name vendorDetails.verificationData.legalName vendorDetails.payoutDetails",

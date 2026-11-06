@@ -8,7 +8,15 @@ const UserSchema = new mongoose.Schema(
     phone: { type: String, trim: true, maxlength: 30 },
     role: {
       type: String,
-      enum: ["BUYER", "SELLER", "ADMIN", "DELIVERY_PARTNER"],
+      enum: [
+        "BUYER",
+        "SELLER",
+        "VENDOR",
+        "vendor",
+        "ROLE_VENDOR",
+        "ADMIN",
+        "DELIVERY_PARTNER",
+      ],
       default: "BUYER",
     },
     accountStatus: {
