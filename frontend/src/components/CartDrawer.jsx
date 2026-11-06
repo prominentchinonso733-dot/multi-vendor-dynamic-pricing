@@ -233,7 +233,7 @@ export default function CartDrawer({
             <button
               aria-label="Close cart"
               onClick={onClose}
-              className="text-gray-500 hover:text-black font-bold text-xl"
+              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 font-bold text-xl transition hover:border-gray-500 hover:bg-gray-100 hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
               type="button"
             >
               ✕
@@ -246,11 +246,12 @@ export default function CartDrawer({
             </p>
           ) : (
             <div
-              className="mt-4 space-y-4"
+              aria-label="Cart items"
+              className="mt-4 max-h-[35vh] space-y-4 overflow-y-auto"
               style={{
                 flex: "0 1 auto",
-                minHeight: "200px",
-                maxHeight: "40vh",
+                minHeight: 0,
+                maxHeight: "35vh",
                 overflowY: "auto",
                 backgroundColor: "#f8fafc",
                 border: "1px solid #e2e8f0",

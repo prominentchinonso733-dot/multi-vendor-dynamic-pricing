@@ -27,7 +27,7 @@ const sections = [
   ["orders", "Orders"],
   ["accounts", "User accounts"],
   ["delivery", "Delivery & riders"],
-  ["verification", "Identity review"],
+  ["verification", "Vendor Verifications"],
   ["promotions", "Featured listings"],
   ["commission", "Commission ledger"],
 ];
@@ -590,106 +590,119 @@ export default function AdminDashboard() {
   );
 
   const renderVerificationQueue = () => (
-    <div className="admin-dashboard__review-list">
-      {pendingVerifications.length ? (
-        pendingVerifications.map((user) => (
-          <article className="admin-dashboard__review-card" key={user._id}>
-            <div className="admin-dashboard__review-header">
-              <div>
-                <h3>{user.name}</h3>
-                <p>
-                  {user.email} · {displayStatus(user.role)} · submitted{" "}
-                  {formatDate(user.verification?.submittedAt)}
-                </p>
+    <>
+      <header>
+        <h2>Vendor Verifications</h2>
+        <p className="admin-dashboard__hint">
+          Review pending vendor and customer identity documents, including
+          Tier 2 verification requests.
+        </p>
+      </header>
+      <div className="admin-dashboard__review-list">
+        {pendingVerifications.length ? (
+          pendingVerifications.map((user) => (
+            <article className="admin-dashboard__review-card" key={user._id}>
+              <div className="admin-dashboard__review-header">
+                <div>
+                  <h3>{user.name}</h3>
+                  <p>
+                    {user.email} · {displayStatus(user.role)} · submitted{" "}
+                    {formatDate(user.verification?.submittedAt)}
+                  </p>
+                </div>
+                <span className="admin-dashboard__status admin-dashboard__status--pending">
+                  Pending review
+                </span>
               </div>
-              <span className="admin-dashboard__status admin-dashboard__status--pending">
-                Pending review
-              </span>
-            </div>
-            <dl>
-              <div>
-                <dt>Legal name</dt>
-                <dd>{user.verification?.legalName || "—"}</dd>
-              </div>
-              <div>
-                <dt>Document type</dt>
-                <dd>{displayStatus(user.verification?.documentType)}</dd>
-              </div>
-            </dl>
-            <button
-              disabled={
-                !user.verification?.documentAvailable ||
-                downloadingDocumentUserId === user._id
-              }
-              onClick={() => downloadIdentityDocument(user)}
-              type="button"
-            >
-              {downloadingDocumentUserId === user._id
-                ? "Preparing secure download..."
-                : user.verification?.documentAvailable
-                  ? "Download identity document"
-                  : "Identity document unavailable"}
-            </button>
-            <label>
-              Review note (optional)
-              <input
-                maxLength={500}
-                onChange={(event) =>
-                  setReviewNotes((current) => ({
-                    ...current,
-                    [user._id]: event.target.value,
-                  }))
-                }
-                value={reviewNotes[user._id] || ""}
-              />
-            </label>
-            <p className="admin-dashboard__hint">
-              Review the uploaded document before deciding. Identity document
-              files are deleted after approval or rejection.
-            </p>
-            <label className="admin-dashboard__identity-confirmation">
-              <input
-                checked={identityChecks[user._id] === true}
-                onChange={(event) =>
-                  setIdentityChecks((current) => ({
-                    ...current,
-                    [user._id]: event.target.checked,
-                  }))
-                }
-                type="checkbox"
-              />
-              I confirm the applicant&apos;s identity was checked through the
-              approved process.
-            </label>
-            <div className="admin-dashboard__review-actions">
+              <dl>
+                <div>
+                  <dt>Requested tier</dt>
+                  <dd>{displayStatus(user.verification?.tier || "TIER_1")}</dd>
+                </div>
+                <div>
+                  <dt>Legal name</dt>
+                  <dd>{user.verification?.legalName || "—"}</dd>
+                </div>
+                <div>
+                  <dt>Document type</dt>
+                  <dd>{displayStatus(user.verification?.documentType)}</dd>
+                </div>
+              </dl>
               <button
                 disabled={
-                  pendingAction === `verification-${user._id}` ||
-                  identityChecks[user._id] !== true ||
-                  !user.verification?.documentAvailable
+                  !user.verification?.documentAvailable ||
+                  downloadingDocumentUserId === user._id
                 }
-                onClick={() => reviewIdentity(user, "APPROVE")}
+                onClick={() => downloadIdentityDocument(user)}
                 type="button"
               >
-                Approve Tier 2
+                {downloadingDocumentUserId === user._id
+                  ? "Preparing secure download..."
+                  : user.verification?.documentAvailable
+                    ? "Download identity document"
+                    : "Identity document unavailable"}
               </button>
-              <button
-                className="admin-dashboard__reject"
-                disabled={pendingAction === `verification-${user._id}`}
-                onClick={() => reviewIdentity(user, "REJECT")}
-                type="button"
-              >
-                Reject
-              </button>
-            </div>
-          </article>
-        ))
-      ) : (
-        <p className="admin-dashboard__empty">
-          No identity requests are waiting for review.
-        </p>
-      )}
-    </div>
+              <label>
+                Review note (optional)
+                <input
+                  maxLength={500}
+                  onChange={(event) =>
+                    setReviewNotes((current) => ({
+                      ...current,
+                      [user._id]: event.target.value,
+                    }))
+                  }
+                  value={reviewNotes[user._id] || ""}
+                />
+              </label>
+              <p className="admin-dashboard__hint">
+                Review the uploaded document before deciding. Identity document
+                files are deleted after approval or rejection.
+              </p>
+              <label className="admin-dashboard__identity-confirmation">
+                <input
+                  checked={identityChecks[user._id] === true}
+                  onChange={(event) =>
+                    setIdentityChecks((current) => ({
+                      ...current,
+                      [user._id]: event.target.checked,
+                    }))
+                  }
+                  type="checkbox"
+                />
+                I confirm the applicant&apos;s identity was checked through the
+                approved process.
+              </label>
+              <div className="admin-dashboard__review-actions">
+                <button
+                  disabled={
+                    pendingAction === `verification-${user._id}` ||
+                    identityChecks[user._id] !== true ||
+                    !user.verification?.documentAvailable
+                  }
+                  onClick={() => reviewIdentity(user, "APPROVE")}
+                  type="button"
+                >
+                  Approve Tier 2
+                </button>
+                <button
+                  className="admin-dashboard__reject"
+                  disabled={pendingAction === `verification-${user._id}`}
+                  onClick={() => reviewIdentity(user, "REJECT")}
+                  type="button"
+                >
+                  Reject
+                </button>
+              </div>
+            </article>
+          ))
+        ) : (
+          <p className="admin-dashboard__empty">
+            No identity or vendor verification requests are waiting for review.
+          </p>
+        )}
+      </div>
+    </>
   );
 
   return (
