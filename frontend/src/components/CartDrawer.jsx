@@ -1,9 +1,15 @@
 /* eslint-disable react/prop-types */
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { useAuth } from "../context/AuthContext";
 import { API_BASE_URL } from "../api";
+import "./CartDrawer.css";
 
 const PAYSTACK_PUBLIC_KEY = import.meta.env.VITE_PAYSTACK_PUBLIC_KEY;
+const currencyFormatter = new Intl.NumberFormat("en-NG", {
+  style: "currency",
+  currency: "NGN",
+  maximumFractionDigits: 2,
+});
 
 const loadPaystackInline = () => {
   if (window.PaystackPop) return Promise.resolve(window.PaystackPop);
@@ -25,7 +31,7 @@ const loadPaystackInline = () => {
   });
 };
 
-export default function CartDrawer({
+export default function CartAndCheckoutDrawer({
   isOpen,
   onClose,
   cart,
@@ -40,6 +46,18 @@ export default function CartDrawer({
   const [customerPhone, setCustomerPhone] = useState(user?.phone || "");
   const [checkoutMessage, setCheckoutMessage] = useState("");
   const [checkoutPending, setCheckoutPending] = useState(false);
+  const [serverTotals, setServerTotals] = useState(null);
+  const [isClosing, setIsClosing] = useState(false);
+  const closeTimer = useRef(null);
+
+  const handleClose = useCallback(() => {
+    if (isClosing) return;
+    setIsClosing(true);
+    closeTimer.current = window.setTimeout(() => {
+      setIsClosing(false);
+      onClose();
+    }, 180);
+  }, [isClosing, onClose]);
 
   useEffect(() => {
     if (user?.email) setBuyerEmail(user.email);
@@ -50,25 +68,50 @@ export default function CartDrawer({
 
     const previousBodyOverflow = document.body.style.overflow;
     const previousRootOverflow = document.documentElement.style.overflow;
+    const handleKeyDown = (event) => {
+      if (event.key === "Escape") handleClose();
+    };
+
     document.body.style.overflow = "hidden";
     document.documentElement.style.overflow = "hidden";
+    document.addEventListener("keydown", handleKeyDown);
 
     return () => {
       document.body.style.overflow = previousBodyOverflow;
       document.documentElement.style.overflow = previousRootOverflow;
+      document.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isOpen]);
+  }, [isOpen, handleClose]);
+
+  useEffect(
+    () => () => {
+      if (closeTimer.current) window.clearTimeout(closeTimer.current);
+    },
+    [],
+  );
+
+  const cartSignature = cart
+    .map((item) => `${item.id || item._id}:${item.quantity}:${item.price}`)
+    .join("|");
+
+  useEffect(() => {
+    setServerTotals(null);
+  }, [cartSignature]);
 
   if (!isOpen) return null;
 
   const subtotal = cart.reduce(
-    (sum, item) => sum + item.price * item.quantity,
+    (sum, item) =>
+      sum + (Number(item.price) || 0) * (Number(item.quantity) || 0),
     0,
   );
-  const escrowFee = subtotal > 0 ? Math.round(subtotal * 0.025 * 100) / 100 : 0;
-  const grandTotal = subtotal + escrowFee;
+  const estimatedEscrowFee =
+    subtotal > 0 ? Math.round(subtotal * 0.025 * 100) / 100 : 0;
 
-  const handleInitiateEscrow = async () => {
+  const handleInitiateEscrow = async (event) => {
+    event.preventDefault();
+    if (checkoutPending) return;
+
     if (user?.role !== "BUYER" || !buyerId) {
       setCheckoutMessage("Sign in to a customer account before checking out.");
       return;
@@ -89,6 +132,7 @@ export default function CartDrawer({
     try {
       setCheckoutPending(true);
       setCheckoutMessage("Preparing secure payment...");
+      setServerTotals(null);
       const sellerIds = [
         ...new Set(
           cart
@@ -123,6 +167,23 @@ export default function CartDrawer({
       }
 
       const contract = data.contract;
+      const confirmedSubtotal = Number(contract?.subtotal);
+      const confirmedFee = Number(contract?.vaultFee);
+      const confirmedTotal = Number(contract?.totalHoldAmount);
+      if (
+        !contract?.paymentReference ||
+        !Number.isFinite(confirmedSubtotal) ||
+        !Number.isFinite(confirmedFee) ||
+        !Number.isFinite(confirmedTotal)
+      ) {
+        throw new Error("The server returned an invalid escrow total.");
+      }
+      setServerTotals({
+        subtotal: confirmedSubtotal,
+        fee: confirmedFee,
+        total: confirmedTotal,
+      });
+
       const PaystackPop = await loadPaystackInline();
       let paymentCompleted = false;
       const handlePaystackSuccess = function (payment) {
@@ -163,7 +224,7 @@ export default function CartDrawer({
       const checkout = PaystackPop.setup({
         key: PAYSTACK_PUBLIC_KEY,
         email: buyerEmail.trim(),
-        amount: Math.round(Number(contract.totalHoldAmount) * 100),
+        amount: Math.round(confirmedTotal * 100),
         currency: "NGN",
         ref: contract.paymentReference,
         metadata: {
@@ -193,276 +254,199 @@ export default function CartDrawer({
 
   return (
     <div
-      style={{
-        position: "fixed",
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        backgroundColor: "rgba(0,0,0,0.5)",
-        zIndex: 9999,
-        display: "flex",
-        justifyContent: "flex-end",
+      className={`cart-drawer__backdrop${isClosing ? " is-closing" : ""}`}
+      onMouseDown={(event) => {
+        if (event.target === event.currentTarget) handleClose();
       }}
     >
-      <div
-        style={{
-          width: "400px",
-          maxWidth: "100vw",
-          height: "90vh",
-          maxHeight: "90vh",
-          boxSizing: "border-box",
-          backgroundColor: "#fff",
-          padding: "28px 24px",
-          overflowY: "auto",
-          display: "flex",
-          flexDirection: "column",
-          justifyContent: "flex-start",
-          lineHeight: 1.5,
-        }}
+      <aside
+        aria-labelledby="cart-drawer-title"
+        aria-modal="true"
+        className="cart-drawer"
+        role="dialog"
       >
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            flex: 1,
-            minHeight: 0,
-          }}
-        >
-          <div className="flex justify-between items-center gap-4 pb-4 border-b">
-            <h2 className="min-w-0 flex-1 text-xl font-bold leading-tight">
-              Escrow Shopping Cart
-            </h2>
-            <button
-              aria-label="Close cart"
-              onClick={onClose}
-              className="flex h-10 w-10 items-center justify-center rounded-full border border-gray-300 bg-white text-gray-700 font-bold text-xl transition hover:border-gray-500 hover:bg-gray-100 hover:text-black focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-blue-600"
-              type="button"
-              style={{ flexShrink: 0, marginTop: "2px", marginRight: "4px" }}
-            >
-              ✕
-            </button>
+        <header className="cart-drawer__header">
+          <div>
+            <p className="cart-drawer__eyebrow">Secure checkout</p>
+            <h2 id="cart-drawer-title">Your cart</h2>
           </div>
-
-          {cart.length === 0 ? (
-            <p className="text-center text-gray-500 my-12">
-              Your cart is empty.
-            </p>
-          ) : (
-            <div
-              aria-label="Cart items"
-              className="mt-4 max-h-[35vh] space-y-4 overflow-y-auto"
-              style={{
-                flex: "0 1 auto",
-                minHeight: 0,
-                maxHeight: "35vh",
-                overflowY: "auto",
-                backgroundColor: "#f8fafc",
-                border: "1px solid #e2e8f0",
-                borderRadius: "8px",
-                padding: "12px",
-              }}
-            >
-              {cart.map((item) => (
-                <div
-                  key={item.id}
-                  className="flex justify-between items-center border-b pb-3"
-                >
-                  <div>
-                    <h4 className="font-semibold text-sm">{item.name}</h4>
-                    <p className="text-xs text-gray-500">
-                      Vendor: {item.vendor}
-                    </p>
-                    <p className="text-sm font-bold text-blue-600 mt-1">
-                      ₦ {(item.price * item.quantity).toLocaleString()}
-                    </p>
-                  </div>
-                  <div className="flex items-center space-x-2">
-                    <button
-                      onClick={() => onUpdateQuantity(item.id, -1)}
-                      className="px-2 py-1 bg-gray-200 rounded font-bold text-xs"
-                    >
-                      -
-                    </button>
-                    <span className="text-sm font-semibold">
-                      {item.quantity}
-                    </span>
-                    <button
-                      onClick={() => onUpdateQuantity(item.id, 1)}
-                      className="px-2 py-1 bg-gray-200 rounded font-bold text-xs"
-                    >
-                      +
-                    </button>
-                    <button
-                      aria-label={`Remove ${item.name} from cart`}
-                      onClick={() => onRemoveItem(item.id)}
-                      className="text-red-500 text-xs ml-2 hover:underline"
-                      type="button"
-                    >
-                      Remove
-                    </button>
-                  </div>
-                </div>
-              ))}
-            </div>
-          )}
-        </div>
-
-        {cart.length > 0 && (
-          <div
-            className="border-t pt-4 mt-6"
-            style={{
-              flexShrink: 0,
-              paddingBottom: "24px",
-              backgroundColor: "#fff",
-            }}
+          <button
+            aria-label="Leave or close cart"
+            className="cart-drawer__leave"
+            onClick={handleClose}
+            type="button"
           >
-            <div
-              className="text-sm py-1"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "8px",
-              }}
-            >
-              <span>Subtotal</span>
-              <span>₦ {subtotal.toLocaleString()}</span>
-            </div>
-            <div
-              className="text-sm py-1 text-gray-600"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "8px",
-              }}
-            >
-              <span>Estimated buyer escrow fee (2.5%)</span>
-              <span>₦ {escrowFee.toLocaleString()}</span>
-            </div>
-            <div
-              className="text-lg font-bold py-2 border-t mt-2"
-              style={{
-                display: "flex",
-                justifyContent: "space-between",
-                marginBottom: "8px",
-              }}
-            >
-              <span>Estimated total (server-confirmed)</span>
-              <span className="text-blue-600">
-                ₦ {grandTotal.toLocaleString()}
-              </span>
-            </div>
+            Leave / Close
+            <span aria-hidden="true">×</span>
+          </button>
+        </header>
 
-            {checkoutMessage && (
-              <div
-                className="p-3 mt-4 border text-center text-sm font-semibold"
-                role="status"
-                style={{ background: "#eff6ff", borderColor: "#bfdbfe" }}
+        <main className="cart-drawer__content">
+          {cart.length === 0 ? (
+            <p className="cart-drawer__empty">Your cart is empty.</p>
+          ) : (
+            <>
+              <section aria-label="Cart items" className="cart-drawer__items">
+                <h3>Items ({cart.length})</h3>
+                <ul>
+                  {cart.map((item) => (
+                    <li
+                      className="cart-drawer__item"
+                      key={item.id || item._id}
+                    >
+                      <div className="cart-drawer__item-info">
+                        <h4>{item.name}</h4>
+                        <p>
+                          Quantity: {item.quantity} ·{" "}
+                          {currencyFormatter.format(Number(item.price) || 0)}{" "}
+                          each
+                        </p>
+                        <strong>
+                          {currencyFormatter.format(
+                            (Number(item.price) || 0) *
+                              (Number(item.quantity) || 0),
+                          )}
+                        </strong>
+                      </div>
+                      <div className="cart-drawer__item-actions">
+                        <button
+                          aria-label={`Decrease ${item.name} quantity`}
+                          onClick={() => onUpdateQuantity(item.id, -1)}
+                          type="button"
+                        >
+                          −
+                        </button>
+                        <button
+                          aria-label={`Increase ${item.name} quantity`}
+                          onClick={() => onUpdateQuantity(item.id, 1)}
+                          type="button"
+                        >
+                          +
+                        </button>
+                        <button
+                          className="cart-drawer__remove"
+                          onClick={() => onRemoveItem(item.id)}
+                          type="button"
+                        >
+                          Remove
+                        </button>
+                      </div>
+                    </li>
+                  ))}
+                </ul>
+              </section>
+
+              <section
+                aria-label="Order summary"
+                className="cart-drawer__summary"
               >
-                {checkoutMessage}
-              </div>
-            )}
-            {user?.role === "BUYER" && (
-              <p style={{ fontSize: "0.85rem", lineHeight: 1.5 }}>
-                Vendor platform commission depends on the seller&apos;s approved
-                tier. Checkout validates product prices, stock, and transaction
-                limits on the server.
+                <h3>Order summary</h3>
+                <dl>
+                  <div>
+                    <dt>Subtotal</dt>
+                    <dd>{currencyFormatter.format(subtotal)}</dd>
+                  </div>
+                  <div>
+                    <dt>Estimated buyer escrow fee (2.5%)</dt>
+                    <dd>{currencyFormatter.format(estimatedEscrowFee)}</dd>
+                  </div>
+                  <div className="cart-drawer__total">
+                    <dt>Final server-confirmed total</dt>
+                    <dd>
+                      {serverTotals
+                        ? currencyFormatter.format(serverTotals.total)
+                        : "Confirmed at checkout"}
+                    </dd>
+                  </div>
+                </dl>
+                {serverTotals && (
+                  <p className="cart-drawer__confirmed">
+                    Server-calculated subtotal{" "}
+                    {currencyFormatter.format(serverTotals.subtotal)} and fee{" "}
+                    {currencyFormatter.format(serverTotals.fee)}.
+                  </p>
+                )}
+              </section>
+
+              <p className="cart-drawer__note">
+                Checkout validates current product prices, stock, and totals on
+                the server. Funds are held in escrow until delivery is
+                confirmed.
               </p>
-            )}
-            <div style={{ display: "grid", gap: "16px", marginTop: "16px" }}>
-              <label
-                htmlFor="paystack-buyer-email"
-                className="text-sm font-semibold"
-              >
-                Receipt email
-              </label>
-              <input
-                id="paystack-buyer-email"
-                autoComplete="email"
-                type="email"
-                required
-                readOnly
-                value={buyerEmail}
-                placeholder="you@example.com"
-                style={{
-                  height: "44px",
-                  padding: "0 10px",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "6px",
-                  marginBottom: "4px",
-                  boxSizing: "border-box",
-                }}
-              />
-              <label
-                htmlFor="delivery-address"
-                className="text-sm font-semibold"
-              >
-                Delivery address
-              </label>
-              <textarea
-                id="delivery-address"
-                autoComplete="street-address"
-                maxLength={500}
-                minLength={5}
-                onChange={(event) => setDeliveryAddress(event.target.value)}
-                required
-                rows={3}
-                value={deliveryAddress}
-                style={{
-                  height: "96px",
-                  padding: "10px",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "6px",
-                  marginBottom: "4px",
-                  boxSizing: "border-box",
-                  lineHeight: 1.5,
-                  resize: "vertical",
-                }}
-              />
-              <label htmlFor="delivery-phone" className="text-sm font-semibold">
-                Customer phone
-              </label>
-              <input
-                id="delivery-phone"
-                autoComplete="tel"
-                maxLength={30}
-                minLength={7}
-                onChange={(event) => setCustomerPhone(event.target.value)}
-                required
-                type="tel"
-                value={customerPhone}
-                style={{
-                  height: "44px",
-                  padding: "0 10px",
-                  border: "1px solid #cbd5e1",
-                  borderRadius: "6px",
-                  marginBottom: "4px",
-                  boxSizing: "border-box",
-                }}
-              />
-              <div
-                style={{
-                  display: "flex",
-                  alignItems: "stretch",
-                  gap: "8px",
-                  marginTop: "8px",
-                }}
-              >
-                <button
-                  onClick={handleInitiateEscrow}
-                  disabled={checkoutPending}
-                  className="flex-1 w-full py-3 rounded-lg font-bold text-white transition bg-blue-600 hover:bg-blue-700"
-                  style={{ flex: 1 }}
+
+              {user?.role === "BUYER" ? (
+                <form
+                  className="cart-drawer__checkout"
+                  onSubmit={handleInitiateEscrow}
                 >
-                  {checkoutPending
-                    ? "Preparing Paystack..."
-                    : "Lock funds in escrow"}
-                </button>
-              </div>
-            </div>
-          </div>
-        )}
-      </div>
+                  <label htmlFor="paystack-buyer-email">Receipt email</label>
+                  <input
+                    autoComplete="email"
+                    id="paystack-buyer-email"
+                    readOnly
+                    required
+                    type="email"
+                    value={buyerEmail}
+                  />
+
+                  <label htmlFor="delivery-address">Delivery address</label>
+                  <textarea
+                    autoComplete="street-address"
+                    id="delivery-address"
+                    maxLength={500}
+                    minLength={5}
+                    onChange={(event) => setDeliveryAddress(event.target.value)}
+                    required
+                    rows={3}
+                    value={deliveryAddress}
+                  />
+
+                  <label htmlFor="delivery-phone">Customer phone</label>
+                  <input
+                    autoComplete="tel"
+                    id="delivery-phone"
+                    maxLength={30}
+                    minLength={7}
+                    onChange={(event) => setCustomerPhone(event.target.value)}
+                    required
+                    type="tel"
+                    value={customerPhone}
+                  />
+
+                  {checkoutMessage && (
+                    <p className="cart-drawer__status" role="status">
+                      {checkoutMessage}
+                    </p>
+                  )}
+                  <button
+                    className="cart-drawer__checkout-button"
+                    disabled={checkoutPending}
+                    type="submit"
+                  >
+                    {checkoutPending
+                      ? "Preparing secure payment..."
+                      : "Lock funds in escrow"}
+                  </button>
+                </form>
+              ) : (
+                <p className="cart-drawer__status" role="status">
+                  Sign in to a customer account to check out.
+                </p>
+              )}
+            </>
+          )}
+        </main>
+
+        <footer className="cart-drawer__footer">
+          <button
+            className="cart-drawer__back"
+            onClick={handleClose}
+            type="button"
+          >
+            Back to Store
+          </button>
+        </footer>
+      </aside>
     </div>
   );
 }

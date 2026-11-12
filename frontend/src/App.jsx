@@ -4,7 +4,7 @@ import { io } from "socket.io-client";
 import { Navigate, Route, Routes } from "react-router-dom";
 import Navbar from "./components/Navbar";
 import ProductList from "./components/ProductList";
-import CartDrawer from "./components/CartDrawer";
+import CartAndCheckoutDrawer from "./components/CartDrawer";
 import SellerDashboard from "./components/SellerDashboard";
 import VendorDashboard from "./components/VendorDashboard";
 import BuyerDashboard from "./components/BuyerDashboard";
@@ -302,7 +302,7 @@ function App() {
         </Routes>
       </main>
 
-      <CartDrawer
+      <CartAndCheckoutDrawer
         isOpen={isCartOpen}
         onClose={() => setIsCartOpen(false)}
         cart={cart}
