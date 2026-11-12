@@ -243,6 +243,28 @@
   font: inherit;
 }
 
+.seller-dashboard__password {
+  position: relative;
+  display: flex;
+  align-items: center;
+}
+
+.seller-dashboard__password input {
+  padding-right: 2.8rem;
+}
+
+.seller-dashboard__password button {
+  position: absolute;
+  right: 0.4rem;
+  display: grid;
+  place-items: center;
+  padding: 0.35rem;
+  border: 0;
+  background: transparent;
+  color: #526a5f;
+  cursor: pointer;
+}
+
 .seller-dashboard__admin-login input:focus-visible {
   outline: 2px solid #14786f;
   outline-offset: 2px;

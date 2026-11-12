@@ -12,6 +12,7 @@ import { authService } from "../services/authService";
 import { pricingService } from "../services/pricingService";
 import { productsService } from "../services/productsService";
 import { escrowService } from "../services/escrowService";
+import EscrowChat from "./EscrowChat";
 import { useAuth } from "../context/AuthContext";
 import VerificationPanel from "./VerificationPanel";
 import Tier1VerificationPanel from "./Tier1VerificationPanel";
@@ -1168,7 +1169,9 @@ export default function VendorDashboard({ onPriceUpdated }) {
                       <select
                         disabled={
                           pendingOrderStatusId === order._id ||
-                          !["LOCKED", "FUNDS_LOCKED"].includes(order.status)
+                          !["LOCKED", "FUNDS_LOCKED", "HELD_IN_ESCROW"].includes(
+                            order.status,
+                          )
                         }
                         onChange={(event) =>
                           updateVendorOrderStatus(order._id, event.target.value)
@@ -1196,6 +1199,7 @@ export default function VendorDashboard({ onPriceUpdated }) {
                         {currencyFormatter.format(order.vendorPayout.netAmount)}
                       </p>
                     )}
+                    <EscrowChat contractId={order._id} />
                   </article>
                 );
               })}

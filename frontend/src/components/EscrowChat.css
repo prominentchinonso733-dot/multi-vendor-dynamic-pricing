@@ -1,0 +1,106 @@
+.escrow-chat {
+  display: grid;
+  gap: 0.6rem;
+  width: min(100%, 22rem);
+  margin-top: 0.75rem;
+  padding: 0.75rem;
+  border: 1px solid #dfe8e3;
+  border-radius: 0.75rem;
+  background: #fbfdfc;
+}
+
+.escrow-chat__title {
+  margin: 0;
+  color: #20352f;
+  font-size: 0.9rem;
+}
+
+.escrow-chat__messages {
+  display: grid;
+  align-content: start;
+  gap: 0.5rem;
+  max-height: 12rem;
+  min-height: 4rem;
+  overflow-y: auto;
+  padding: 0.35rem;
+}
+
+.escrow-chat__empty {
+  margin: 0;
+  color: #65756d;
+  font-size: 0.8rem;
+}
+
+.escrow-chat__message {
+  justify-self: start;
+  max-width: 90%;
+  padding: 0.45rem 0.6rem;
+  border-radius: 0.65rem 0.65rem 0.65rem 0.15rem;
+  background: #edf2ef;
+  overflow-wrap: anywhere;
+}
+
+.escrow-chat__message--own {
+  justify-self: end;
+  border-radius: 0.65rem 0.65rem 0.15rem 0.65rem;
+  background: #e4f4ed;
+}
+
+.escrow-chat__message span,
+.escrow-chat__message time {
+  display: block;
+  color: #65756d;
+  font-size: 0.68rem;
+}
+
+.escrow-chat__message p {
+  margin: 0.15rem 0;
+  color: #20352f;
+  font-size: 0.82rem;
+  white-space: pre-wrap;
+}
+
+.escrow-chat__form {
+  display: flex;
+  gap: 0.4rem;
+}
+
+.escrow-chat__form input {
+  min-width: 0;
+  flex: 1;
+  padding: 0.5rem;
+  border: 1px solid #d5e0d9;
+  border-radius: 0.45rem;
+}
+
+.escrow-chat__form button {
+  padding: 0.45rem 0.7rem;
+  border: 0;
+  border-radius: 0.45rem;
+  background: #176f5d;
+  color: #fff;
+  cursor: pointer;
+  font-weight: 700;
+}
+
+.escrow-chat__form button:disabled {
+  cursor: wait;
+  opacity: 0.6;
+}
+
+.escrow-chat__error {
+  margin: 0;
+  color: #9c302a;
+  font-size: 0.78rem;
+}
+
+.visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}

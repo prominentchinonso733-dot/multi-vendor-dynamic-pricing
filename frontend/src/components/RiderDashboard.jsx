@@ -205,7 +205,7 @@ export default function RiderDashboard() {
         ACCEPTED: "accepted",
         PICKED_UP: "picked up",
         IN_TRANSIT: "in transit",
-        DELIVERED: "delivered and escrow released",
+        DELIVERED: "delivered; awaiting customer confirmation",
       }[status];
       setNotice(`Order ${order.paymentReference} ${noticeStatus}.`);
     } catch (updateError) {

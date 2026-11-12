@@ -8,7 +8,10 @@ const VerificationDocument = require("../models/VerificationDocument");
 const PlatformCommissionEntry = require("../models/PlatformCommissionEntry");
 const authenticateToken = require("../middleware/authenticateToken");
 const { SELLER_ROLE_VALUES } = require("../services/roles");
-const { decryptDocument } = require("../services/verificationDocuments");
+const {
+  decryptDocument,
+  decryptSensitiveValue,
+} = require("../services/verificationDocuments");
 const { emitFeaturedUpdate } = require("../services/realtime");
 
 const router = express.Router();
@@ -120,7 +123,9 @@ router.get("/overview", async (req, res) => {
 router.get("/verification/pending", async (_req, res) => {
   try {
     const users = await User.find({ "verification.status": "PENDING" })
-      .select("name email role createdAt verification")
+      .select(
+        "name email role createdAt verification vendorDetails.verificationDocuments vendorDetails.verificationData.cacLast4 +vendorDetails.verificationData.cacRegistrationNumber",
+      )
       .sort({ "verification.submittedAt": 1 })
       .lean();
     const documents = await VerificationDocument.find({
@@ -131,18 +136,45 @@ router.get("/verification/pending", async (_req, res) => {
     const usersWithDocument = new Set(
       documents.map((document) => document.userId.toString()),
     );
-    return res.json({
-      success: true,
-      users: users.map((user) => ({
+    const pendingUsers = users.map((user) => {
+      const verificationData = user.vendorDetails?.verificationData;
+      const cacRegistrationNumber = verificationData?.cacRegistrationNumber
+        ? decryptSensitiveValue(
+            verificationData.cacRegistrationNumber,
+            user._id,
+            "vendor-cac",
+          )
+        : "";
+      return {
         ...user,
         verification: {
           ...user.verification,
           documentAvailable: usersWithDocument.has(user._id.toString()),
         },
-      })),
+        ...(user.vendorDetails && {
+          vendorDetails: {
+            verificationDocuments:
+              user.vendorDetails.verificationDocuments || [],
+            verificationData: {
+              ...(cacRegistrationNumber && { cacRegistrationNumber }),
+              cacLast4: verificationData?.cacLast4 || "",
+            },
+          },
+        }),
+      };
+    });
+    return res.json({
+      success: true,
+      users: pendingUsers,
     });
 
   } catch (error) {
+    if (error.code === "DOCUMENT_ENCRYPTION_KEY_INVALID") {
+      return res.status(503).json({
+        success: false,
+        message: "Secure vendor verification access is not configured.",
+      });
+    }
     console.error("Pending identity reviews could not be loaded:", error);
     return res.status(500).json({
       success: false,
@@ -297,11 +329,27 @@ router.get("/verification/:userId/document", async (req, res) => {
       });
     }
 
-    const document = await VerificationDocument.findOne({ userId });
-    if (!document) {
+    const storedDocument = await VerificationDocument.findOne({ userId });
+    if (!storedDocument) {
       return res.status(404).json({
         success: false,
         message: "Pending identity document not found.",
+      });
+    }
+    const requestedType =
+      typeof req.query.documentType === "string"
+        ? req.query.documentType
+        : "GOVERNMENT_ID";
+    const tier2Document = storedDocument.documents?.find(
+      (entry) => entry.documentType === requestedType,
+    );
+    const document = storedDocument.documents?.length
+      ? tier2Document
+      : storedDocument;
+    if (!document.contentType || !document.encryptedContent) {
+      return res.status(404).json({
+        success: false,
+        message: "The requested verification document was not found.",
       });
     }
 
@@ -328,12 +376,12 @@ router.get("/verification/:userId/document", async (req, res) => {
         message: "The stored identity document has an unsupported file type.",
       });
     }
-    document.lastAccessedAt = new Date();
-    document.lastAccessedBy = req.user._id;
-    await document.save();
+    storedDocument.lastAccessedAt = new Date();
+    storedDocument.lastAccessedBy = req.user._id;
+    await storedDocument.save();
     res.set({
       "Cache-Control": "private, no-store",
-      "Content-Disposition": `attachment; filename="verification-document.${extension}"`,
+      "Content-Disposition": `attachment; filename="verification-${requestedType.toLowerCase()}.${extension}"`,
       "Content-Type": document.contentType,
       "X-Content-Type-Options": "nosniff",
     });
@@ -577,7 +625,7 @@ router.patch("/orders/:orderId/rider", async (req, res) => {
     }
     const order = await EscrowContract.findOne({
       _id: orderId,
-      status: { $in: ["FUNDS_LOCKED", "LOCKED"] },
+      status: { $in: ["HELD_IN_ESCROW", "FUNDS_LOCKED", "LOCKED"] },
       deliveryStatus: "PENDING",
     });
     if (!order) {

@@ -11,12 +11,29 @@ const verificationDocumentSchema = new mongoose.Schema(
     contentType: {
       type: String,
       enum: ["application/pdf", "image/jpeg", "image/png"],
-      required: true,
     },
-    encryptedContent: { type: Buffer, required: true },
-    iv: { type: Buffer, required: true },
-    authTag: { type: Buffer, required: true },
+    encryptedContent: { type: Buffer },
+    iv: { type: Buffer },
+    authTag: { type: Buffer },
     keyVersion: { type: Number, required: true, default: 1 },
+    documents: [
+      {
+        documentType: {
+          type: String,
+          enum: ["CAC_DOCUMENT", "BANK_STATEMENT", "GOVERNMENT_ID"],
+          required: true,
+        },
+        contentType: {
+          type: String,
+          enum: ["application/pdf", "image/jpeg", "image/png"],
+          required: true,
+        },
+        encryptedContent: { type: Buffer, required: true },
+        iv: { type: Buffer, required: true },
+        authTag: { type: Buffer, required: true },
+        keyVersion: { type: Number, required: true, default: 1 },
+      },
+    ],
     lastAccessedAt: Date,
     lastAccessedBy: { type: mongoose.Schema.Types.ObjectId, ref: "User" },
   },

@@ -62,9 +62,14 @@ export default function Navbar({
               Cart <span>{cartCount}</span>
             </button>
             {!role ? (
-              <Link className="site-nav__primary" to="/account">
-                Sign in / Register
-              </Link>
+              <>
+                <Link className="site-nav__link" to="/account?mode=login">
+                  Sign In
+                </Link>
+                <Link className="site-nav__primary" to="/account?mode=register">
+                  Register
+                </Link>
+              </>
             ) : (
               <>
                 <button

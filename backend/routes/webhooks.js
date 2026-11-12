@@ -395,7 +395,7 @@ router.post("/paystack", async (req, res) => {
         });
     }
 
-    if (contract.status === "FUNDS_LOCKED") {
+    if (["HELD_IN_ESCROW", "FUNDS_LOCKED", "LOCKED"].includes(contract.status)) {
       return res.status(200).json({ received: true, alreadyProcessed: true });
     }
     if (contract.status !== "PAYMENT_PENDING") {

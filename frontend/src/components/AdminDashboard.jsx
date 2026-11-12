@@ -4,6 +4,8 @@ import { useLocation } from "react-router-dom";
 import {
   AlertCircle,
   CheckCircle2,
+  Eye,
+  EyeOff,
   RefreshCw,
   ShieldCheck,
   Users,
@@ -11,6 +13,7 @@ import {
 import { Link } from "react-router-dom";
 import { getApiErrorMessage } from "../api";
 import { adminService } from "../services/adminService";
+import { normalizeRole } from "../services/roleRoutes";
 import "./AdminDashboard.css";
 
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
@@ -100,6 +103,7 @@ export default function AdminDashboard() {
     email: "",
     password: "",
   });
+  const [showRiderPassword, setShowRiderPassword] = useState(false);
 
   useEffect(() => {
     if (
@@ -165,7 +169,9 @@ export default function AdminDashboard() {
   const users = overview?.users || [];
   const orders = overview?.orders || [];
   const riders = users.filter((user) => user.role === "DELIVERY_PARTNER");
-  const displayedVendors = users.filter((user) => user.role === "SELLER");
+  const displayedVendors = users.filter(
+    (user) => normalizeRole(user.role) === "SELLER",
+  );
   const displayedAccounts = users.filter(
     (user) => user.role !== "DELIVERY_PARTNER",
   );
@@ -216,12 +222,13 @@ export default function AdminDashboard() {
       `Identity request ${decision === "APPROVE" ? "approved" : "rejected"}.`,
     );
 
-  const downloadIdentityDocument = async (user) => {
-    setDownloadingDocumentUserId(user._id);
+  const downloadIdentityDocument = async (user, documentType) => {
+    const requestId = `${user._id}:${documentType}`;
+    setDownloadingDocumentUserId(requestId);
     setError("");
     try {
       const { blob, contentType } =
-        await adminService.downloadVerificationDocument(user._id);
+        await adminService.downloadVerificationDocument(user._id, documentType);
       const extension =
         contentType === "application/pdf"
           ? "pdf"
@@ -231,7 +238,7 @@ export default function AdminDashboard() {
       const url = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = url;
-      link.download = `verification-${user._id}.${extension}`;
+      link.download = `verification-${user._id}-${documentType}.${extension}`;
       link.click();
       URL.revokeObjectURL(url);
     } catch (downloadError) {
@@ -530,7 +537,9 @@ export default function AdminDashboard() {
                         aria-label={`Assign delivery partner for ${order.paymentReference}`}
                         disabled={
                           pendingAction === `assign-${order._id}` ||
-                          !["FUNDS_LOCKED", "LOCKED"].includes(order.status) ||
+                          !["HELD_IN_ESCROW", "FUNDS_LOCKED", "LOCKED"].includes(
+                            order.status,
+                          ) ||
                           (order.deliveryStatus || "PENDING") !== "PENDING"
                         }
                         onChange={(event) =>
@@ -627,21 +636,54 @@ export default function AdminDashboard() {
                   <dt>Document type</dt>
                   <dd>{displayStatus(user.verification?.documentType)}</dd>
                 </div>
+                {user.vendorDetails?.verificationData?.cacRegistrationNumber && (
+                  <div>
+                    <dt>CAC registration number</dt>
+                    <dd>
+                      {user.vendorDetails.verificationData.cacRegistrationNumber}
+                    </dd>
+                  </div>
+                )}
               </dl>
-              <button
-                disabled={
-                  !user.verification?.documentAvailable ||
-                  downloadingDocumentUserId === user._id
-                }
-                onClick={() => downloadIdentityDocument(user)}
-                type="button"
-              >
-                {downloadingDocumentUserId === user._id
-                  ? "Preparing secure download..."
-                  : user.verification?.documentAvailable
+              {user.vendorDetails?.verificationDocuments?.length ? (
+                <div className="admin-dashboard__document-list">
+                  {user.vendorDetails.verificationDocuments.map((document) => {
+                    const requestId = `${user._id}:${document.documentType}`;
+                    return (
+                      <button
+                        disabled={downloadingDocumentUserId === requestId}
+                        key={document.documentType}
+                        onClick={() =>
+                          downloadIdentityDocument(user, document.documentType)
+                        }
+                        type="button"
+                      >
+                        {downloadingDocumentUserId === requestId
+                          ? "Preparing secure download..."
+                          : `Download ${displayStatus(document.documentType)}`}
+                      </button>
+                    );
+                  })}
+                </div>
+              ) : (
+                <button
+                  disabled={
+                    !user.verification?.documentAvailable ||
+                    downloadingDocumentUserId === `${user._id}:${user.verification?.documentType || "GOVERNMENT_ID"}`
+                  }
+                  onClick={() =>
+                    downloadIdentityDocument(
+                      user,
+                      user.verification?.documentType || "GOVERNMENT_ID",
+                    )
+                  }
+                  type="button"
+                >
+                  {user.verification?.documentAvailable
                     ? "Download identity document"
                     : "Identity document unavailable"}
-              </button>
+                </button>
+              )}
               <label>
                 Review note (optional)
                 <input
@@ -861,19 +903,36 @@ export default function AdminDashboard() {
                 </label>
                 <label>
                   Temporary password (12+ characters)
-                  <input
-                    autoComplete="new-password"
-                    minLength={12}
-                    onChange={(event) =>
-                      setRiderDraft({
-                        ...riderDraft,
-                        password: event.target.value,
-                      })
-                    }
-                    required
-                    type="password"
-                    value={riderDraft.password}
-                  />
+                  <span className="admin-dashboard__password">
+                    <input
+                      autoComplete="new-password"
+                      minLength={12}
+                      onChange={(event) =>
+                        setRiderDraft({
+                          ...riderDraft,
+                          password: event.target.value,
+                        })
+                      }
+                      required
+                      type={showRiderPassword ? "text" : "password"}
+                      value={riderDraft.password}
+                    />
+                    <button
+                      aria-label={
+                        showRiderPassword ? "Hide password" : "Show password"
+                      }
+                      onClick={() =>
+                        setShowRiderPassword((visible) => !visible)
+                      }
+                      type="button"
+                    >
+                      {showRiderPassword ? (
+                        <EyeOff aria-hidden="true" size={16} />
+                      ) : (
+                        <Eye aria-hidden="true" size={16} />
+                      )}
+                    </button>
+                  </span>
                 </label>
                 <button
                   disabled={pendingAction === "create-rider"}

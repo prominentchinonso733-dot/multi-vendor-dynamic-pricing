@@ -12,6 +12,7 @@ const {
   SUPPORTED_CONTENT_TYPES,
   detectContentType,
   encryptDocument,
+  encryptSensitiveValue,
 } = require("../services/verificationDocuments");
 const { VENDOR_TIER_PRICES_USD } = require("../services/vendorTiers");
 const {
@@ -119,8 +120,24 @@ const toPublicUser = (user) => ({
 
 router.post("/register", async (req, res) => {
   try {
-    const { name, email, password, phone, role, businessName, vendorTier } =
-      req.body;
+    const {
+      name,
+      email,
+      password,
+      phone,
+      role,
+      businessName,
+      vendorTier,
+      ninNumber,
+      bvnNumber,
+      safetyConsent,
+      locationPermissionGranted,
+      governmentIdType,
+      governmentIdNumber,
+      emergencyContactName,
+      emergencyContactPhone,
+      vehicleLicensePlate,
+    } = req.body;
     const normalizedRole = normalizeRole(role || "BUYER");
 
     if (!["BUYER", "SELLER", "DELIVERY_PARTNER"].includes(normalizedRole)) {
@@ -150,14 +167,60 @@ router.post("/register", async (req, res) => {
       });
     }
     if (
-      normalizedRole === "DELIVERY_PARTNER" &&
+      ["SELLER", "DELIVERY_PARTNER"].includes(normalizedRole) &&
       (typeof phone !== "string" ||
         phone.trim().length < 7 ||
         phone.trim().length > 30)
     ) {
       return res.status(400).json({
-        msg: "A valid phone number is required for delivery partner registration.",
+        msg: "A valid phone number is required for this registration.",
       });
+    }
+    if (normalizedRole === "SELLER" &&
+      (typeof businessName !== "string" ||
+        businessName.trim().length < 2 ||
+        businessName.trim().length > 100)
+    ) {
+      return res.status(400).json({
+        msg: "A business name between 2 and 100 characters is required.",
+      });
+    }
+    if (
+      normalizedRole === "SELLER" &&
+      (!/^\d{11}$/.test(String(ninNumber || "")) ||
+        !/^\d{11}$/.test(String(bvnNumber || "")))
+    ) {
+      return res.status(400).json({
+        msg: "An 11-digit NIN and 11-digit BVN are required for vendor registration.",
+      });
+    }
+    if (normalizedRole === "DELIVERY_PARTNER") {
+      if (safetyConsent !== true || locationPermissionGranted !== true) {
+        return res.status(400).json({
+          msg: "Rider safety consent and location permission are required.",
+        });
+      }
+      if (
+        !["NIN", "BVN", "DRIVERS_LICENSE", "PASSPORT", "VOTER_CARD"].includes(
+          governmentIdType,
+        ) ||
+        typeof governmentIdNumber !== "string" ||
+        governmentIdNumber.trim().length < 6 ||
+        governmentIdNumber.trim().length > 40 ||
+        typeof emergencyContactName !== "string" ||
+        emergencyContactName.trim().length < 2 ||
+        emergencyContactName.trim().length > 120 ||
+        typeof emergencyContactPhone !== "string" ||
+        emergencyContactPhone.trim().length < 7 ||
+        emergencyContactPhone.trim().length > 30 ||
+        typeof vehicleLicensePlate !== "string" ||
+        vehicleLicensePlate.trim().length < 2 ||
+        vehicleLicensePlate.trim().length > 20
+      ) {
+        return res.status(400).json({
+          msg: "Complete the required rider identity, emergency contact, and vehicle details.",
+        });
+      }
     }
     if (
       normalizedRole === "SELLER" &&
@@ -183,7 +246,7 @@ router.post("/register", async (req, res) => {
       password: hashedPassword,
       role: normalizedRole,
       accountStatus: "ACTIVE",
-      ...(normalizedRole === "DELIVERY_PARTNER" && { phone: phone.trim() }),
+      ...(normalizedRole !== "BUYER" && { phone: phone.trim() }),
       vendorDetails:
         normalizedRole === "SELLER"
           ? {
@@ -192,7 +255,61 @@ router.post("/register", async (req, res) => {
               subscriptionStatus: "INACTIVE",
             }
           : {},
+      ...(normalizedRole === "DELIVERY_PARTNER" && {
+        riderDetails: {
+          governmentIdType,
+          safetyConsentAt: new Date(),
+          locationPermissionGrantedAt: new Date(),
+        },
+      }),
     });
+    if (normalizedRole === "DELIVERY_PARTNER") {
+      user.riderDetails.governmentIdNumber = encryptSensitiveValue(
+        governmentIdNumber.trim(),
+        user._id,
+        "rider-government-id",
+      );
+      user.riderDetails.governmentIdLast4 = governmentIdNumber
+        .trim()
+        .slice(-4);
+      user.riderDetails.emergencyContactName = encryptSensitiveValue(
+        emergencyContactName.trim(),
+        user._id,
+        "rider-emergency-contact-name",
+      );
+      user.riderDetails.emergencyContactPhone = encryptSensitiveValue(
+        emergencyContactPhone.trim(),
+        user._id,
+        "rider-emergency-contact-phone",
+      );
+      user.riderDetails.vehicleLicensePlate = encryptSensitiveValue(
+        vehicleLicensePlate.trim().toUpperCase(),
+        user._id,
+        "rider-vehicle-license-plate",
+      );
+    }
+    if (normalizedRole === "SELLER") {
+      user.set(
+        "vendorDetails.verificationData.legalName",
+        name.trim(),
+      );
+      user.set(
+        "vendorDetails.verificationData.ninNumber",
+        encryptSensitiveValue(ninNumber, user._id, "vendor-nin"),
+      );
+      user.set(
+        "vendorDetails.verificationData.ninLast4",
+        ninNumber.slice(-4),
+      );
+      user.set(
+        "vendorDetails.verificationData.bvnNumber",
+        encryptSensitiveValue(bvnNumber, user._id, "vendor-bvn"),
+      );
+      user.set(
+        "vendorDetails.verificationData.bvnLast4",
+        bvnNumber.slice(-4),
+      );
+    }
 
     await user.save();
     const token = issueToken(user);
@@ -202,6 +319,12 @@ router.post("/register", async (req, res) => {
       user: toPublicUser(user),
     });
   } catch (err) {
+    if (err.code === "DOCUMENT_ENCRYPTION_KEY_INVALID") {
+      return res.status(503).json({
+        success: false,
+        msg: "Secure identity storage is not configured.",
+      });
+    }
     res.status(500).json({ error: err.message });
   }
 });
@@ -417,7 +540,7 @@ router.get("/profile", authenticateToken, async (req, res) => {
   try {
     const user = await User.findById(req.user._id)
       .select(
-        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.isVendor vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.payoutDetails.bankName vendorDetails.payoutDetails.bankCode vendorDetails.payoutDetails.accountName vendorDetails.payoutDetails.accountLast4 verification",
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.businessName vendorDetails.isVendor vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.bvnLast4 vendorDetails.verificationData.cacLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.verificationDocuments vendorDetails.payoutDetails.bankName vendorDetails.payoutDetails.bankCode vendorDetails.payoutDetails.accountName vendorDetails.payoutDetails.accountLast4 verification",
       )
       .lean();
     if (!user || !hasVendorAccess(user)) {
@@ -447,8 +570,20 @@ router.get("/profile", authenticateToken, async (req, res) => {
         tier1Verification: {
           legalName: user.vendorDetails?.verificationData?.legalName || "",
           ninLast4: user.vendorDetails?.verificationData?.ninLast4 || "",
+          bvnLast4: user.vendorDetails?.verificationData?.bvnLast4 || "",
           ninVerifiedAt:
             user.vendorDetails?.verificationData?.ninVerifiedAt || null,
+        },
+        tier2Verification: {
+          cacLast4:
+            user.vendorDetails?.verificationData?.cacLast4 || "",
+          documents: (user.vendorDetails?.verificationDocuments || []).map(
+            ({ documentType, contentType, submittedAt }) => ({
+              documentType,
+              contentType,
+              submittedAt,
+            }),
+          ),
         },
         payoutDetails: user.vendorDetails?.payoutDetails?.bankCode
           ? {
@@ -534,7 +669,7 @@ router.put("/profile", authenticateToken, async (req, res) => {
       { new: true, runValidators: true },
     )
       .select(
-        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.payoutDetails.bankName vendorDetails.payoutDetails.bankCode vendorDetails.payoutDetails.accountName vendorDetails.payoutDetails.accountLast4 verification",
+        "name email role storeName storeLogo storeBanner storeDescription vendorDetails.tier vendorDetails.subscriptionStatus vendorDetails.tier1Verified vendorDetails.verificationData.legalName vendorDetails.verificationData.ninLast4 vendorDetails.verificationData.bvnLast4 vendorDetails.verificationData.cacLast4 vendorDetails.verificationData.ninVerifiedAt vendorDetails.verificationDocuments vendorDetails.payoutDetails.bankName vendorDetails.payoutDetails.bankCode vendorDetails.payoutDetails.accountName vendorDetails.payoutDetails.accountLast4 verification",
       )
       .lean();
     if (!user) {
@@ -564,8 +699,20 @@ router.put("/profile", authenticateToken, async (req, res) => {
         tier1Verification: {
           legalName: user.vendorDetails?.verificationData?.legalName || "",
           ninLast4: user.vendorDetails?.verificationData?.ninLast4 || "",
+          bvnLast4: user.vendorDetails?.verificationData?.bvnLast4 || "",
           ninVerifiedAt:
             user.vendorDetails?.verificationData?.ninVerifiedAt || null,
+        },
+        tier2Verification: {
+          cacLast4:
+            user.vendorDetails?.verificationData?.cacLast4 || "",
+          documents: (user.vendorDetails?.verificationDocuments || []).map(
+            ({ documentType, contentType, submittedAt }) => ({
+              documentType,
+              contentType,
+              submittedAt,
+            }),
+          ),
         },
         payoutDetails: user.vendorDetails?.payoutDetails?.bankCode
           ? {

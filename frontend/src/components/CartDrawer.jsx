@@ -151,7 +151,7 @@ export default function CartDrawer({
               );
             }
 
-            setCheckoutMessage("Payment verified. Funds are locked in escrow.");
+            setCheckoutMessage("Payment verified. Funds are held in escrow.");
             onPaymentVerified?.(verifyData.contract);
           } catch (error) {
             setCheckoutMessage(

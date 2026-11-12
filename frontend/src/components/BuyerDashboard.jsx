@@ -9,6 +9,7 @@ import DisputeReasonDialog, { DisputeReasonNote } from "./DisputeReasonDialog";
 import "./BuyerDashboard.css";
 import { API_BASE_URL } from "../api";
 import { useAuth } from "../context/AuthContext";
+import EscrowChat from "./EscrowChat";
 
 const ESCROW_API = `${API_BASE_URL}/escrow`;
 const currencyFormatter = new Intl.NumberFormat("en-NG", {
@@ -41,6 +42,7 @@ const completedStatuses = new Set([
 const statusClassNames = {
   LOCKED: "buyer-dashboard__status--locked",
   FUNDS_LOCKED: "buyer-dashboard__status--locked",
+  HELD_IN_ESCROW: "buyer-dashboard__status--locked",
   IN_DISPUTE: "buyer-dashboard__status--disputed",
   RELEASED: "buyer-dashboard__status--released",
   COMPLETED: "buyer-dashboard__status--released",
@@ -343,7 +345,9 @@ export default function BuyerDashboard({
                     )}
                   </td>
                   <td className="buyer-dashboard__actions">
-                    {["LOCKED", "FUNDS_LOCKED"].includes(order.status) && (
+                    {["LOCKED", "FUNDS_LOCKED", "HELD_IN_ESCROW"].includes(
+                      order.status,
+                    ) && (
                       <>
                         {getFulfillmentStatuses(order).every(
                           (fulfillment) => fulfillment.status === "DELIVERED",
@@ -390,6 +394,7 @@ export default function BuyerDashboard({
                         Under review
                       </span>
                     )}
+                    <EscrowChat contractId={order._id} />
                   </td>
                 </tr>
               ))

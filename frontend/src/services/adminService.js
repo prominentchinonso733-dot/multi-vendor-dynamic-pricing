@@ -11,10 +11,10 @@ export const adminService = {
     return data.users;
   },
 
-  async downloadVerificationDocument(userId) {
+  async downloadVerificationDocument(userId, documentType) {
     const response = await api.get(
       `/admin/verification/${encodeURIComponent(userId)}/document`,
-      { responseType: "blob" },
+      { params: documentType ? { documentType } : undefined, responseType: "blob" },
     );
     return {
       blob: response.data,

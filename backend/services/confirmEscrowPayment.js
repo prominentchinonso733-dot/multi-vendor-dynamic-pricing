@@ -27,7 +27,7 @@ const confirmEscrowPayment = async (contractId, paymentReference) => {
             { paymentExpiresAt: { $gt: new Date() } },
           ],
         },
-        { $set: { status: "FUNDS_LOCKED" } },
+        { $set: { status: "HELD_IN_ESCROW" } },
         { new: true, session, runValidators: true },
       );
       if (!contract) return;

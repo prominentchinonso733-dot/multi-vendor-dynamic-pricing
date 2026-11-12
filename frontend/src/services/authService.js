@@ -43,6 +43,15 @@ export const authService = {
     return data.verification;
   },
 
+  async submitVendorTier2Verification(details) {
+    const { data } = await api.post(
+      "/vendor/verification/tier-2",
+      details,
+      { headers: { "Content-Type": "multipart/form-data" } },
+    );
+    return data.verification;
+  },
+
   async saveVendorPayoutBank(details) {
     const { data } = await api.post("/vendor/save-payout-bank", details);
     return data.payoutDetails;

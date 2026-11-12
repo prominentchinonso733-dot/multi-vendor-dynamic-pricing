@@ -12,7 +12,6 @@ const {
   getEligibleVendorFilter,
   getVendorTier,
   isTier2VerifiedVendor,
-  isVendorEligibleToSell,
 } = require("../services/vendorTiers");
 const { SELLER_ROLE_VALUES, isSellerRole } = require("../services/roles");
 const {
@@ -498,15 +497,17 @@ router.get("/store/:vendorId", async (req, res) => {
     if (
       !vendor ||
       !isSellerRole(vendor.role) ||
-      vendor.accountStatus === "SUSPENDED" ||
-      !isVendorEligibleToSell(vendor)
+      vendor.accountStatus === "SUSPENDED"
     ) {
       return res
         .status(404)
         .json({ success: false, message: "Vendor store not found." });
     }
 
-    const products = await Product.find({ vendor: vendor._id })
+    const products = await Product.find({
+      vendor: vendor._id,
+      ...publishedProductFilter,
+    })
       .sort({ createdAt: -1 })
       .lean();
 

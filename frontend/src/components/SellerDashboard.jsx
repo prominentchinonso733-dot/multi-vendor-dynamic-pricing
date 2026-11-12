@@ -1,6 +1,8 @@
 import { useEffect, useState } from "react";
 import {
   AlertCircle,
+  Eye,
+  EyeOff,
   RefreshCw,
 } from "lucide-react";
 import { useNavigate } from "react-router-dom";
@@ -31,6 +33,7 @@ const statusClassNames = {
   CLOSED: "seller-dashboard__status--released",
   LOCKED: "seller-dashboard__status--locked",
   FUNDS_LOCKED: "seller-dashboard__status--locked",
+  HELD_IN_ESCROW: "seller-dashboard__status--locked",
   IN_DISPUTE: "seller-dashboard__status--disputed",
   REFUNDED: "seller-dashboard__status--refunded",
 };
@@ -56,6 +59,7 @@ export default function SellerDashboard() {
   const [pendingContractId, setPendingContractId] = useState(null);
   const [adminEmail, setAdminEmail] = useState("");
   const [adminPassword, setAdminPassword] = useState("");
+  const [showAdminPassword, setShowAdminPassword] = useState(false);
   const [authPending, setAuthPending] = useState(false);
   const [refreshVersion, setRefreshVersion] = useState(0);
 
@@ -278,13 +282,28 @@ export default function SellerDashboard() {
             </label>
             <label>
               Password
-              <input
-                autoComplete="current-password"
-                onChange={(event) => setAdminPassword(event.target.value)}
-                required
-                type="password"
-                value={adminPassword}
-              />
+              <span className="seller-dashboard__password">
+                <input
+                  autoComplete="current-password"
+                  onChange={(event) => setAdminPassword(event.target.value)}
+                  required
+                  type={showAdminPassword ? "text" : "password"}
+                  value={adminPassword}
+                />
+                <button
+                  aria-label={
+                    showAdminPassword ? "Hide password" : "Show password"
+                  }
+                  onClick={() => setShowAdminPassword((visible) => !visible)}
+                  type="button"
+                >
+                  {showAdminPassword ? (
+                    <EyeOff aria-hidden="true" size={16} />
+                  ) : (
+                    <Eye aria-hidden="true" size={16} />
+                  )}
+                </button>
+              </span>
             </label>
             <button
               className="seller-dashboard__resolve-release"

@@ -8,10 +8,10 @@ import { getRoleHomeRoute } from "../services/roleRoutes";
 import { authService } from "../services/authService";
 import "./AccountAuth.css";
 
-const AccountAuth = ({ role }) => {
+const AccountAuth = ({ role, initialMode = "login" }) => {
   const { login, register } = useAuth();
   const navigate = useNavigate();
-  const [mode, setMode] = useState("login");
+  const [mode, setMode] = useState(initialMode);
   const [name, setName] = useState("");
   const [businessName, setBusinessName] = useState("");
   const [email, setEmail] = useState("");
@@ -22,9 +22,20 @@ const AccountAuth = ({ role }) => {
   const [banks, setBanks] = useState([]);
   const [bankCode, setBankCode] = useState("");
   const [ninNumber, setNinNumber] = useState("");
+  const [bvnNumber, setBvnNumber] = useState("");
+  const [cacRegistrationNumber, setCacRegistrationNumber] = useState("");
   const [bankAccountNumber, setBankAccountNumber] = useState("");
   const [documentType, setDocumentType] = useState("NIN");
-  const [documentFile, setDocumentFile] = useState(null);
+  const [bankStatementFile, setBankStatementFile] = useState(null);
+  const [governmentIdFile, setGovernmentIdFile] = useState(null);
+  const [governmentIdType, setGovernmentIdType] = useState("DRIVERS_LICENSE");
+  const [governmentIdNumber, setGovernmentIdNumber] = useState("");
+  const [emergencyContactName, setEmergencyContactName] = useState("");
+  const [emergencyContactPhone, setEmergencyContactPhone] = useState("");
+  const [vehicleLicensePlate, setVehicleLicensePlate] = useState("");
+  const [riderSafetyConsent, setRiderSafetyConsent] = useState(false);
+  const [locationPermissionGranted, setLocationPermissionGranted] =
+    useState(false);
   const [error, setError] = useState("");
   const [isPending, setIsPending] = useState(false);
   const isBuyer = role === "BUYER";
@@ -50,6 +61,33 @@ const AccountAuth = ({ role }) => {
     return () => controller.abort();
   }, [isRegistering, role, vendorTier]);
 
+  useEffect(() => {
+    setMode(initialMode);
+  }, [initialMode]);
+
+  const requestRiderLocationPermission = () =>
+    new Promise((resolve, reject) => {
+      if (!navigator.geolocation) {
+        reject(
+          new Error("Location permission is not available in this browser."),
+        );
+        return;
+      }
+      navigator.geolocation.getCurrentPosition(
+        () => {
+          setLocationPermissionGranted(true);
+          resolve();
+        },
+        () =>
+          reject(
+            new Error(
+              "Location permission is required for rider registration.",
+            ),
+          ),
+        { maximumAge: 0, timeout: 10000, enableHighAccuracy: false },
+      );
+    });
+
   const submit = async (event) => {
     event.preventDefault();
     setError("");
@@ -58,13 +96,35 @@ const AccountAuth = ({ role }) => {
     try {
       let authenticatedUser;
       if (isRegistering) {
+        let riderLocationGranted = locationPermissionGranted;
+        if (role === "DELIVERY_PARTNER") {
+          if (!riderSafetyConsent) {
+            throw new Error(
+              "Accept the contacts and location safety prompt to continue.",
+            );
+          }
+          if (!locationPermissionGranted) {
+            await requestRiderLocationPermission();
+            riderLocationGranted = true;
+          }
+        }
         authenticatedUser = await register({
           name,
           email,
           password,
           role,
-          ...(role === "DELIVERY_PARTNER" && { phone }),
+          ...(role === "SELLER" && { ninNumber, bvnNumber }),
+          ...(role !== "BUYER" && { phone }),
           ...(role === "SELLER" && { businessName, vendorTier }),
+          ...(role === "DELIVERY_PARTNER" && {
+            safetyConsent: riderSafetyConsent,
+            locationPermissionGranted: riderLocationGranted,
+            governmentIdType,
+            governmentIdNumber,
+            emergencyContactName,
+            emergencyContactPhone,
+            vehicleLicensePlate,
+          }),
         });
         if (role === "SELLER") {
           const paymentPath = "/vendor/dashboard?section=store-settings";
@@ -74,6 +134,7 @@ const AccountAuth = ({ role }) => {
               await authService.verifyTier1Vendor({
                 fullLegalName: name,
                 ninNumber,
+                bvnNumber,
                 bankCode,
                 accountNumber: bankAccountNumber,
               });
@@ -85,9 +146,11 @@ const AccountAuth = ({ role }) => {
               });
               const verification = new FormData();
               verification.set("legalName", name);
-              verification.set("documentType", documentType);
-              verification.set("document", documentFile);
-              await authService.submitVerificationRequest(verification);
+              verification.set("cacRegistrationNumber", cacRegistrationNumber);
+              verification.set("governmentIdType", documentType);
+              verification.set("bankStatement", bankStatementFile);
+              verification.set("governmentId", governmentIdFile);
+              await authService.submitVendorTier2Verification(verification);
             }
             navigate(paymentPath, { replace: true });
           } catch (verificationError) {
@@ -106,9 +169,7 @@ const AccountAuth = ({ role }) => {
       } else {
         authenticatedUser = await login(
           { email, password },
-          {
-            ...(role !== "DELIVERY_PARTNER" && { expectedRole: role }),
-          },
+          { expectedRole: role },
         );
       }
       const destination =
@@ -221,21 +282,109 @@ const AccountAuth = ({ role }) => {
           </label>
         )}
         {isRegistering && role === "DELIVERY_PARTNER" && (
-          <label style={{ display: "grid", gap: "0.35rem" }}>
-            Phone number
-            <input
-              autoComplete="tel"
-              maxLength={30}
-              minLength={7}
-              onChange={(event) => setPhone(event.target.value)}
-              required
-              type="tel"
-              value={phone}
-            />
-          </label>
+          <>
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              Phone number
+              <input
+                autoComplete="tel"
+                maxLength={30}
+                minLength={7}
+                onChange={(event) => setPhone(event.target.value)}
+                required
+                type="tel"
+                value={phone}
+              />
+            </label>
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              Driver&apos;s License / Government ID type
+              <select
+                onChange={(event) => setGovernmentIdType(event.target.value)}
+                value={governmentIdType}
+              >
+                <option value="DRIVERS_LICENSE">Driver&apos;s License</option>
+                <option value="NIN">NIN</option>
+                <option value="PASSPORT">Passport</option>
+                <option value="VOTER_CARD">Voter&apos;s Card</option>
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              Driver&apos;s License / Government ID Number
+              <input
+                autoComplete="off"
+                maxLength={40}
+                minLength={6}
+                onChange={(event) => setGovernmentIdNumber(event.target.value)}
+                required
+                value={governmentIdNumber}
+              />
+            </label>
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              Emergency contact name
+              <input
+                autoComplete="off"
+                maxLength={120}
+                minLength={2}
+                onChange={(event) => setEmergencyContactName(event.target.value)}
+                required
+                value={emergencyContactName}
+              />
+            </label>
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              Emergency contact phone
+              <input
+                autoComplete="tel"
+                maxLength={30}
+                minLength={7}
+                onChange={(event) => setEmergencyContactPhone(event.target.value)}
+                required
+                type="tel"
+                value={emergencyContactPhone}
+              />
+            </label>
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              Vehicle license plate number
+              <input
+                autoComplete="off"
+                maxLength={20}
+                minLength={2}
+                onChange={(event) => setVehicleLicensePlate(event.target.value)}
+                required
+                value={vehicleLicensePlate}
+              />
+            </label>
+            <label className="account-auth__consent">
+              <input
+                checked={riderSafetyConsent}
+                onChange={(event) =>
+                  setRiderSafetyConsent(event.target.checked)
+                }
+                required
+                type="checkbox"
+              />
+              <span>
+                Allow app to access contacts &amp; location for identity
+                verification and safety audit. Location permission is requested
+                once during registration; your coordinates are not stored.
+                Browsers do not provide general address-book access, so enter
+                one trusted emergency contact above.
+              </span>
+            </label>
+          </>
         )}
         {isRegistering && role === "SELLER" && (
           <>
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              Phone number
+              <input
+                autoComplete="tel"
+                maxLength={30}
+                minLength={7}
+                onChange={(event) => setPhone(event.target.value)}
+                required
+                type="tel"
+                value={phone}
+              />
+            </label>
             <label style={{ display: "grid", gap: "0.35rem" }}>
               Store or business name
               <input
@@ -251,7 +400,8 @@ const AccountAuth = ({ role }) => {
               <select
                 onChange={(event) => {
                   setVendorTier(event.target.value);
-                  setDocumentFile(null);
+                  setBankStatementFile(null);
+                  setGovernmentIdFile(null);
                   setError("");
                 }}
                 value={vendorTier}
@@ -260,115 +410,119 @@ const AccountAuth = ({ role }) => {
                 <option value="TIER_2">Tier 2 Verified — $10/month</option>
               </select>
             </label>
-            {vendorTier === "TIER_1" ? (
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              11-digit NIN
+              <input
+                autoComplete="off"
+                inputMode="numeric"
+                maxLength={11}
+                minLength={11}
+                onChange={(event) =>
+                  setNinNumber(event.target.value.replace(/\D/g, "").slice(0, 11))
+                }
+                pattern="\d{11}"
+                required
+                value={ninNumber}
+              />
+            </label>
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              11-digit BVN
+              <input
+                autoComplete="off"
+                inputMode="numeric"
+                maxLength={11}
+                minLength={11}
+                onChange={(event) =>
+                  setBvnNumber(event.target.value.replace(/\D/g, "").slice(0, 11))
+                }
+                pattern="\d{11}"
+                required
+                value={bvnNumber}
+              />
+            </label>
+            {vendorTier === "TIER_2" && (
               <>
                 <label style={{ display: "grid", gap: "0.35rem" }}>
-                  11-digit NIN
+                  CAC Registration Number
                   <input
                     autoComplete="off"
-                    inputMode="numeric"
-                    maxLength={11}
-                    minLength={11}
+                    maxLength={80}
                     onChange={(event) =>
-                      setNinNumber(event.target.value.replace(/\D/g, "").slice(0, 11))
+                      setCacRegistrationNumber(event.target.value)
                     }
-                    pattern="\d{11}"
                     required
-                    value={ninNumber}
+                    value={cacRegistrationNumber}
                   />
                 </label>
                 <label style={{ display: "grid", gap: "0.35rem" }}>
-                  Bank Name
-                  <select
-                    onChange={(event) => setBankCode(event.target.value)}
-                    required
-                    value={bankCode}
-                  >
-                    <option value="">Select payout bank</option>
-                    {banks.map((bank) => (
-                      <option key={bank.code} value={bank.code}>
-                        {bank.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label style={{ display: "grid", gap: "0.35rem" }}>
-                  Payout Account Number
-                  <input
-                    autoComplete="off"
-                    inputMode="numeric"
-                    maxLength={10}
-                    minLength={10}
-                    onChange={(event) =>
-                      setBankAccountNumber(
-                        event.target.value.replace(/\D/g, "").slice(0, 10),
-                      )
-                    }
-                    pattern="\d{10}"
-                    required
-                    value={bankAccountNumber}
-                  />
-                </label>
-              </>
-            ) : (
-              <>
-                <label style={{ display: "grid", gap: "0.35rem" }}>
-                  Document type
+                  Government ID type
                   <select
                     onChange={(event) => setDocumentType(event.target.value)}
                     value={documentType}
                   >
                     <option value="NIN">NIN</option>
                     <option value="BVN">BVN</option>
+                    <option value="DRIVERS_LICENSE">Driver&apos;s License</option>
                     <option value="PASSPORT">Passport</option>
                     <option value="VOTER_CARD">Voter&apos;s Card</option>
                   </select>
                 </label>
                 <label style={{ display: "grid", gap: "0.35rem" }}>
-                  Photo ID (PDF, JPEG, or PNG; up to 5 MB)
+                  Bank statement (PDF, JPEG, or PNG; up to 5 MB)
                   <input
                     accept="application/pdf,image/jpeg,image/png"
                     onChange={(event) =>
-                      setDocumentFile(event.target.files?.[0] || null)
+                      setBankStatementFile(event.target.files?.[0] || null)
                     }
                     required
                     type="file"
                   />
                 </label>
                 <label style={{ display: "grid", gap: "0.35rem" }}>
-                  Payout bank name
-                  <select
-                    onChange={(event) => setBankCode(event.target.value)}
-                    required
-                    value={bankCode}
-                  >
-                    <option value="">Select payout bank</option>
-                    {banks.map((bank) => (
-                      <option key={bank.code} value={bank.code}>
-                        {bank.name}
-                      </option>
-                    ))}
-                  </select>
-                </label>
-                <label style={{ display: "grid", gap: "0.35rem" }}>
-                  Payout account number
+                  Government-issued ID (PDF, JPEG, or PNG; up to 5 MB)
                   <input
-                    autoComplete="off"
-                    inputMode="numeric"
-                    maxLength={10}
-                    minLength={10}
+                    accept="application/pdf,image/jpeg,image/png"
                     onChange={(event) =>
-                      setBankAccountNumber(
-                        event.target.value.replace(/\D/g, "").slice(0, 10),
-                      )
+                      setGovernmentIdFile(event.target.files?.[0] || null)
                     }
-                    pattern="\d{10}"
                     required
-                    value={bankAccountNumber}
+                    type="file"
                   />
                 </label>
               </>
             )}
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              Payout bank name
+              <select
+                onChange={(event) => setBankCode(event.target.value)}
+                required
+                value={bankCode}
+              >
+                <option value="">Select payout bank</option>
+                {banks.map((bank) => (
+                  <option key={bank.code} value={bank.code}>
+                    {bank.name}
+                  </option>
+                ))}
+              </select>
+            </label>
+            <label style={{ display: "grid", gap: "0.35rem" }}>
+              Payout account number
+              <input
+                autoComplete="off"
+                inputMode="numeric"
+                maxLength={10}
+                minLength={10}
+                onChange={(event) =>
+                  setBankAccountNumber(
+                    event.target.value.replace(/\D/g, "").slice(0, 10),
+                  )
+                }
+                pattern="\d{10}"
+                required
+                value={bankAccountNumber}
+              />
+            </label>
             <p>After registering, you can activate the selected monthly vendor plan from your dashboard.</p>
           </>
         )}
@@ -453,6 +607,7 @@ const AccountAuth = ({ role }) => {
 
 AccountAuth.propTypes = {
   role: PropTypes.oneOf(["BUYER", "SELLER", "ADMIN", "DELIVERY_PARTNER"]).isRequired,
+  initialMode: PropTypes.oneOf(["login", "register"]),
 };
 
 export default AccountAuth;

@@ -11,8 +11,10 @@ const UserSchema = new mongoose.Schema(
       enum: [
         "BUYER",
         "SELLER",
+        "seller",
         "VENDOR",
         "vendor",
+        "ROLE_SELLER",
         "ROLE_VENDOR",
         "ADMIN",
         "DELIVERY_PARTNER",
@@ -57,8 +59,27 @@ const UserSchema = new mongoose.Schema(
         legalName: { type: String, trim: true, maxlength: 120 },
         ninNumber: { type: String, select: false },
         ninLast4: { type: String, select: false },
+        bvnNumber: { type: String, select: false },
+        bvnLast4: { type: String, select: false },
+        cacRegistrationNumber: { type: String, select: false },
+        cacLast4: { type: String, select: false },
         ninVerifiedAt: { type: Date },
       },
+      verificationDocuments: [
+        {
+          documentType: {
+            type: String,
+            enum: ["CAC_DOCUMENT", "BANK_STATEMENT", "GOVERNMENT_ID"],
+            required: true,
+          },
+          contentType: {
+            type: String,
+            enum: ["application/pdf", "image/jpeg", "image/png"],
+            required: true,
+          },
+          submittedAt: { type: Date, required: true },
+        },
+      ],
       payoutDetails: {
         bankName: { type: String, trim: true, maxlength: 100 },
         bankCode: { type: String, trim: true, maxlength: 20 },
@@ -98,6 +119,19 @@ const UserSchema = new mongoose.Schema(
       },
       isVerified: { type: Boolean, default: false },
       commissionRate: { type: Number, default: 0.1 }, // Default 10% platform fee
+    },
+    riderDetails: {
+      governmentIdType: {
+        type: String,
+        enum: ["NIN", "BVN", "DRIVERS_LICENSE", "PASSPORT", "VOTER_CARD"],
+      },
+      governmentIdNumber: { type: String, select: false },
+      governmentIdLast4: { type: String, select: false },
+      emergencyContactName: { type: String, select: false },
+      emergencyContactPhone: { type: String, select: false },
+      vehicleLicensePlate: { type: String, select: false },
+      safetyConsentAt: Date,
+      locationPermissionGrantedAt: Date,
     },
   },
   { timestamps: true },

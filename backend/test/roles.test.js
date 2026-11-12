@@ -12,6 +12,8 @@ test("normalizes seller and vendor role aliases to one access role", () => {
     assert.equal(isSellerRole(role), true);
   }
   assert.equal(normalizeRole("ROLE_VENDOR"), "SELLER");
+  assert.equal(normalizeRole("ROLE_SELLER"), "SELLER");
+  assert.equal(normalizeRole("seller"), "SELLER");
   assert.equal(isSellerRole("BUYER"), false);
   assert.equal(isSellerRole("ADMIN"), false);
 });

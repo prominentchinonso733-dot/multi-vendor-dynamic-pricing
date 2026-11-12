@@ -1,0 +1,102 @@
+.account-entry {
+  width: min(100% - 2rem, 56rem);
+  margin: clamp(1.5rem, 5vh, 3.5rem) auto;
+  padding: clamp(1.5rem, 5vw, 2.75rem);
+  border: 1px solid #e4ebe6;
+  border-radius: 1.25rem;
+  background: #fff;
+  box-shadow: 0 20px 55px rgb(26 56 41 / 10%);
+  color: #20352f;
+}
+
+.account-entry__eyebrow {
+  margin: 0;
+  color: #176f5d;
+  font-size: 0.72rem;
+  font-weight: 800;
+  letter-spacing: 0.12em;
+}
+
+.account-entry h1 {
+  margin: 0.65rem 0 0.5rem;
+  font-size: clamp(1.65rem, 5vw, 2.1rem);
+}
+
+.account-entry > p:not(.account-entry__eyebrow) {
+  color: #65756d;
+}
+
+.account-entry__mode,
+.account-entry__roles {
+  display: grid;
+  gap: 0.85rem;
+}
+
+.account-entry__mode {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  margin: 1.5rem 0;
+}
+
+.account-entry__mode button,
+.account-entry__role {
+  border: 1px solid #d5e0d9;
+  border-radius: 0.75rem;
+  background: #fff;
+  color: #20352f;
+  cursor: pointer;
+  text-align: left;
+}
+
+.account-entry__mode button {
+  padding: 0.75rem 1rem;
+  font-weight: 750;
+  text-align: center;
+}
+
+.account-entry__mode button[aria-pressed="true"] {
+  border-color: #176f5d;
+  background: #edf7f3;
+  color: #176f5d;
+}
+
+.account-entry__roles {
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+}
+
+.account-entry__role {
+  display: grid;
+  gap: 0.65rem;
+  min-height: 10rem;
+  padding: 1.1rem;
+}
+
+.account-entry__role:hover,
+.account-entry__role:focus-visible {
+  border-color: #31826e;
+  outline: 3px solid rgb(49 130 110 / 14%);
+}
+
+.account-entry__role strong {
+  font-size: 1.05rem;
+}
+
+.account-entry__role span {
+  color: #65756d;
+  line-height: 1.45;
+}
+
+.account-entry__role .account-entry__continue {
+  align-self: end;
+  color: #176f5d;
+  font-weight: 750;
+}
+
+@media (max-width: 700px) {
+  .account-entry__roles {
+    grid-template-columns: 1fr;
+  }
+
+  .account-entry__role {
+    min-height: auto;
+  }
+}

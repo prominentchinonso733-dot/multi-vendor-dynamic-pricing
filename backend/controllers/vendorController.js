@@ -1,14 +1,20 @@
 const express = require("express");
 const https = require("https");
 const { randomUUID } = require("crypto");
+const multer = require("multer");
+const mongoose = require("mongoose");
 const User = require("../models/User");
+const VerificationDocument = require("../models/VerificationDocument");
 const VendorWallet = require("../models/VendorWallet");
 const VendorWithdrawal = require("../models/VendorWithdrawal");
 const PaystackPlan = require("../models/PaystackPlan");
 const authenticateToken = require("../middleware/authenticateToken");
 const {
   decryptSensitiveValue,
+  detectContentType,
   encryptSensitiveValue,
+  encryptDocument,
+  SUPPORTED_CONTENT_TYPES,
 } = require("../services/verificationDocuments");
 const {
   CURRENCY,
@@ -27,6 +33,42 @@ const {
 const { SELLER_ROLE_VALUES, isSellerRole } = require("../services/roles");
 
 const router = express.Router();
+
+const uploadTier2Documents = multer({
+  storage: multer.memoryStorage(),
+  limits: { fileSize: 5 * 1024 * 1024, files: 2, fields: 4, fieldSize: 2048 },
+  fileFilter: (_req, file, callback) => {
+    if (!SUPPORTED_CONTENT_TYPES.has(file.mimetype)) {
+      const error = new Error("Upload PDF, JPEG, or PNG verification documents.");
+      error.code = "INVALID_DOCUMENT_TYPE";
+      return callback(error);
+    }
+    return callback(null, true);
+  },
+}).fields([
+  { name: "bankStatement", maxCount: 1 },
+  { name: "governmentId", maxCount: 1 },
+]);
+
+const parseTier2Documents = (req, res, next) => {
+  uploadTier2Documents(req, res, (error) => {
+    if (!error) return next();
+    if (error.code === "LIMIT_FILE_SIZE") {
+      return res.status(400).json({
+        success: false,
+        message: "Each verification document must be 5 MB or smaller.",
+      });
+    }
+    if (error.code === "INVALID_DOCUMENT_TYPE" || error instanceof multer.MulterError) {
+      return res.status(400).json({ success: false, message: error.message });
+    }
+    console.error("Vendor verification documents could not be parsed:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to process the verification document uploads.",
+    });
+  });
+};
 
 const requireSeller = (req, res, next) => {
   if (!isSellerRole(req.user.role)) {
@@ -622,6 +664,184 @@ router.get("/banks", async (_req, res) => {
 });
 
 router.post(
+  "/verification/tier-2",
+  authenticateToken,
+  requireSeller,
+  parseTier2Documents,
+  async (req, res) => {
+    const legalName =
+      typeof req.body?.legalName === "string" ? req.body.legalName.trim() : "";
+    const cacRegistrationNumber =
+      typeof req.body?.cacRegistrationNumber === "string"
+        ? req.body.cacRegistrationNumber.trim()
+        : "";
+    const governmentIdType = req.body?.governmentIdType;
+    const bankStatement = req.files?.bankStatement?.[0];
+    const governmentId = req.files?.governmentId?.[0];
+    const clearUploadedFiles = () => {
+      for (const file of [bankStatement, governmentId]) {
+        if (Buffer.isBuffer(file?.buffer)) file.buffer.fill(0);
+      }
+    };
+    if (legalName.length < 2 || legalName.length > 120) {
+      clearUploadedFiles();
+      return res.status(400).json({
+        success: false,
+        message: "Full legal name must be between 2 and 120 characters.",
+      });
+    }
+    if (cacRegistrationNumber.length < 3 || cacRegistrationNumber.length > 80) {
+      clearUploadedFiles();
+      return res.status(400).json({
+        success: false,
+        message: "Enter a valid CAC registration number.",
+      });
+    }
+    if (
+      !["NIN", "BVN", "DRIVERS_LICENSE", "PASSPORT", "VOTER_CARD"].includes(
+        governmentIdType,
+      )
+    ) {
+      clearUploadedFiles();
+      return res.status(400).json({
+        success: false,
+        message: "Choose a supported government-issued ID type.",
+      });
+    }
+    if (!bankStatement || !governmentId) {
+      clearUploadedFiles();
+      return res.status(400).json({
+        success: false,
+        message: "A bank statement and government-issued ID are required.",
+      });
+    }
+    if (
+      detectContentType(bankStatement.buffer) !== bankStatement.mimetype ||
+      detectContentType(governmentId.buffer) !== governmentId.mimetype
+    ) {
+      clearUploadedFiles();
+      return res.status(400).json({
+        success: false,
+        message: "An uploaded file does not match its declared file type.",
+      });
+    }
+
+    const userId = req.user._id || req.user.id;
+    let encryptedDocuments;
+    try {
+      encryptedDocuments = [
+        {
+          documentType: "BANK_STATEMENT",
+          ...encryptDocument(bankStatement.buffer, userId),
+        },
+        {
+          documentType: "GOVERNMENT_ID",
+          ...encryptDocument(governmentId.buffer, userId),
+        },
+      ];
+    } catch (error) {
+      if (error.code === "DOCUMENT_ENCRYPTION_KEY_INVALID") {
+        return res.status(503).json({
+          success: false,
+          message: "Secure identity document storage is not configured.",
+        });
+      }
+      return res.status(400).json({
+        success: false,
+        message: "Unable to encrypt the verification documents.",
+      });
+    } finally {
+      clearUploadedFiles();
+    }
+
+    const session = await mongoose.startSession();
+    let verification;
+    try {
+      await session.withTransaction(async () => {
+        const seller = await User.findOne({
+          _id: userId,
+          role: { $in: SELLER_ROLE_VALUES },
+          accountStatus: { $ne: "SUSPENDED" },
+          "vendorDetails.tier": "TIER_2",
+          "vendorDetails.payoutDetails.bankCode": { $exists: true, $ne: "" },
+          "verification.status": { $nin: ["PENDING", "VERIFIED"] },
+        }).session(session);
+        if (!seller) {
+          const error = new Error(
+            "An active Tier 2 vendor with a saved payout bank is required.",
+          );
+          error.statusCode = 409;
+          throw error;
+        }
+
+        const submittedAt = new Date();
+        const cacCiphertext = encryptSensitiveValue(
+          cacRegistrationNumber,
+          userId,
+          "vendor-cac",
+        );
+        seller.verification = {
+          ...(seller.verification?.toObject?.() || seller.verification || {}),
+          tier: "TIER_2",
+          status: "PENDING",
+          legalName,
+          documentType: governmentIdType,
+          submittedAt,
+          reviewedAt: undefined,
+          reviewedBy: undefined,
+          reviewNote: "",
+        };
+        seller.vendorDetails.verificationData.cacRegistrationNumber =
+          cacCiphertext;
+        seller.vendorDetails.verificationData.cacLast4 =
+          cacRegistrationNumber.slice(-4);
+        seller.vendorDetails.verificationDocuments = encryptedDocuments.map(
+          (document) => ({
+            documentType: document.documentType,
+            contentType: document.contentType,
+            submittedAt,
+          }),
+        );
+        await seller.save({ session });
+
+        await VerificationDocument.findOneAndUpdate(
+          { userId: seller._id },
+          { $set: { userId: seller._id, documents: encryptedDocuments } },
+          { upsert: true, new: true, runValidators: true, session },
+        );
+        verification = {
+          tier: seller.verification.tier,
+          status: seller.verification.status,
+          legalName: seller.verification.legalName,
+          documentType: seller.verification.documentType,
+          submittedAt: seller.verification.submittedAt,
+          documents: seller.vendorDetails.verificationDocuments,
+        };
+      });
+      return res.status(202).json({
+        success: true,
+        message: "Tier 2 vendor verification submitted for review.",
+        verification,
+      });
+    } catch (error) {
+      if (error.statusCode) {
+        return res.status(error.statusCode).json({
+          success: false,
+          message: error.message,
+        });
+      }
+      console.error("Tier 2 vendor verification could not be saved:", error);
+      return res.status(500).json({
+        success: false,
+        message: "Unable to save Tier 2 vendor verification.",
+      });
+    } finally {
+      await session.endSession();
+    }
+  },
+);
+
+router.post(
   "/verify-tier1",
   authenticateToken,
   requireSeller,
@@ -632,6 +852,8 @@ router.post(
         : "";
     const ninNumber =
       typeof req.body?.ninNumber === "string" ? req.body.ninNumber.trim() : "";
+    const bvnNumber =
+      typeof req.body?.bvnNumber === "string" ? req.body.bvnNumber.trim() : "";
     const bankCode =
       typeof req.body?.bankCode === "string" ? req.body.bankCode.trim() : "";
     const accountNumber =
@@ -650,6 +872,12 @@ router.post(
         message: "NIN must contain exactly 11 digits.",
       });
     }
+    if (!/^\d{11}$/.test(bvnNumber)) {
+      return res.status(400).json({
+        success: false,
+        message: "BVN must contain exactly 11 digits.",
+      });
+    }
     try {
       const { selectedBank, accountName } = await resolvePayoutDetails(
         bankCode,
@@ -661,6 +889,11 @@ router.post(
         ninNumber,
         userId,
         "vendor-nin",
+      );
+      const bvnCiphertext = encryptSensitiveValue(
+        bvnNumber,
+        userId,
+        "vendor-bvn",
       );
       const accountCiphertext = encryptSensitiveValue(
         accountNumber,
@@ -681,6 +914,8 @@ router.post(
             "vendorDetails.verificationData.legalName": legalName,
             "vendorDetails.verificationData.ninNumber": ninCiphertext,
             "vendorDetails.verificationData.ninLast4": ninNumber.slice(-4),
+            "vendorDetails.verificationData.bvnNumber": bvnCiphertext,
+            "vendorDetails.verificationData.bvnLast4": bvnNumber.slice(-4),
             "vendorDetails.verificationData.ninVerifiedAt": verifiedAt,
             "vendorDetails.payoutDetails.bankName": selectedBank.name,
             "vendorDetails.payoutDetails.bankCode": String(selectedBank.code),
@@ -706,7 +941,7 @@ router.post(
       return res.json({
         success: true,
         message:
-          "Tier 1 verification complete. NIN format was checked only; no NIMC validation was performed.",
+          "Tier 1 details saved. NIN and BVN formats were checked only; neither identifier was validated with its issuing authority.",
         verification: {
           tier1Verified: true,
           legalName,

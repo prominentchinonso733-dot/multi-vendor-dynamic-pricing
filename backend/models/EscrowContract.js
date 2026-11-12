@@ -117,6 +117,7 @@ const escrowContractSchema = new mongoose.Schema(
       type: String,
       enum: [
         "PAYMENT_PENDING",
+        "HELD_IN_ESCROW",
         "LOCKED",
         "FUNDS_LOCKED",
         "DISPATCHED",

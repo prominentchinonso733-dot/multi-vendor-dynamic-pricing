@@ -6,6 +6,7 @@ const multer = require("multer");
 const https = require("https");
 const mongoose = require("mongoose");
 const EscrowContract = require("../models/EscrowContract");
+const EscrowMessage = require("../models/EscrowMessage");
 const Product = require("../models/Product");
 const User = require("../models/User");
 const VendorWallet = require("../models/VendorWallet");
@@ -18,6 +19,7 @@ const calculateCurrentPrice = require("../services/dynamicPricing");
 const isValidDeliveryProof = require("../services/deliveryProof");
 const { getCheckoutEligibleVendorFilter } = require("../services/vendorTiers");
 const { SELLER_ROLE_VALUES, isSellerRole } = require("../services/roles");
+const { emitEscrowMessage } = require("../services/realtime");
 const {
   creditPending,
   getWalletForUpdate,
@@ -35,6 +37,7 @@ const {
 
 const RIDER_DELIVERY_FEE = 1500;
 const MAX_DELIVERY_PROOF_SIZE = 1024 * 1024;
+const HELD_ESCROW_STATUSES = ["HELD_IN_ESCROW", "FUNDS_LOCKED", "LOCKED"];
 const deliveryProofUpload = multer({
   storage: multer.memoryStorage(),
   limits: { fileSize: MAX_DELIVERY_PROOF_SIZE, files: 1 },
@@ -72,6 +75,7 @@ const parseDeliveryProof = (req, res, next) => {
 };
 
 const committedStatuses = [
+  "HELD_IN_ESCROW",
   "FUNDS_LOCKED",
   "LOCKED",
   "DISPATCHED",
@@ -158,6 +162,31 @@ const createReceipt = (contract, finalizedAt, status = "RELEASED") => ({
   })),
 });
 
+const getEscrowParticipantRole = (contract, userId, role) => {
+  if (
+    role === "BUYER" &&
+    contract.buyerId.toString() === String(userId)
+  ) {
+    return "BUYER";
+  }
+  if (
+    isSellerRole(role) &&
+    contract.sellerIds.some((sellerId) => sellerId.toString() === String(userId))
+  ) {
+    return "SELLER";
+  }
+  return null;
+};
+
+const serializeEscrowMessage = (message) => ({
+  id: message._id.toString(),
+  contractId: message.contractId.toString(),
+  senderId: message.senderId.toString(),
+  senderRole: message.senderRole,
+  message: message.message,
+  createdAt: message.createdAt,
+});
+
 const createLegacyVendorPayouts = async (contract, session) => {
   const sellerIds = [
     ...new Set(
@@ -219,7 +248,7 @@ const createLegacyVendorPayouts = async (contract, session) => {
 const releaseEscrowToWallets = async (
   contractId,
   filter = {},
-  allowedStatuses = ["LOCKED", "FUNDS_LOCKED"],
+  allowedStatuses = HELD_ESCROW_STATUSES,
   contractUpdates = {},
 ) => {
   const session = await mongoose.startSession();
@@ -828,7 +857,7 @@ router.post("/verify", authenticateToken, async (req, res) => {
       });
     }
 
-    if (contract.status === "FUNDS_LOCKED") {
+    if (HELD_ESCROW_STATUSES.includes(contract.status)) {
       return res.json({ success: true, contract, alreadyVerified: true });
     }
     if (contract.status !== "PAYMENT_PENDING") {
@@ -893,6 +922,98 @@ router.post("/verify", authenticateToken, async (req, res) => {
   }
 });
 
+router.get("/:contractId/messages", authenticateToken, async (req, res) => {
+  const { contractId } = req.params;
+  const userId = req.user._id || req.user.id;
+  if (!mongoose.isValidObjectId(contractId)) {
+    return res.status(400).json({
+      success: false,
+      message: "A valid escrow contract is required.",
+    });
+  }
+  try {
+    const contract = await EscrowContract.findById(contractId)
+      .select("buyerId sellerIds")
+      .lean();
+    const participantRole = contract
+      ? getEscrowParticipantRole(contract, userId, req.user.role)
+      : null;
+    if (!participantRole) {
+      return res.status(404).json({
+        success: false,
+        message: "Escrow chat not found for this account.",
+      });
+    }
+
+    const messages = await EscrowMessage.find({ contractId })
+      .sort({ createdAt: -1 })
+      .limit(100)
+      .lean();
+    return res.json({
+      success: true,
+      messages: messages.reverse().map(serializeEscrowMessage),
+    });
+  } catch (error) {
+    console.error("Escrow chat messages could not be loaded:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to load escrow chat messages.",
+    });
+  }
+});
+
+router.post("/:contractId/messages", authenticateToken, async (req, res) => {
+  const { contractId } = req.params;
+  const userId = req.user._id || req.user.id;
+  const message =
+    typeof req.body?.message === "string" ? req.body.message.trim() : "";
+  if (!mongoose.isValidObjectId(contractId)) {
+    return res.status(400).json({
+      success: false,
+      message: "A valid escrow contract is required.",
+    });
+  }
+  if (!message || message.length > 2000) {
+    return res.status(400).json({
+      success: false,
+      message: "Message must contain between 1 and 2000 characters.",
+    });
+  }
+
+  try {
+    const contract = await EscrowContract.findById(contractId)
+      .select("buyerId sellerIds")
+      .lean();
+    const senderRole = contract
+      ? getEscrowParticipantRole(contract, userId, req.user.role)
+      : null;
+    if (!senderRole) {
+      return res.status(404).json({
+        success: false,
+        message: "Escrow chat not found for this account.",
+      });
+    }
+    const savedMessage = await EscrowMessage.create({
+      contractId,
+      senderId: userId,
+      senderRole,
+      message,
+    });
+    const serializedMessage = serializeEscrowMessage(savedMessage);
+    emitEscrowMessage(serializedMessage);
+    return res.status(201).json({
+      success: true,
+      message: serializedMessage,
+    });
+  } catch (error) {
+    console.error("Escrow chat message could not be sent:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Unable to send escrow chat message.",
+    });
+  }
+});
+
 // GET /api/escrow/vendor/orders
 router.get("/vendor/orders", authenticateToken, async (req, res) => {
   try {
@@ -913,8 +1034,7 @@ router.get("/vendor/orders", authenticateToken, async (req, res) => {
       sellerIds: sellerId,
       status: {
         $in: [
-          "LOCKED",
-          "FUNDS_LOCKED",
+          ...HELD_ESCROW_STATUSES,
           "IN_DISPUTE",
           "RELEASED",
           "COMPLETED",
@@ -971,7 +1091,7 @@ router.patch(
       const contract = await EscrowContract.findOne({
         _id: contractId,
         sellerIds: sellerId,
-        status: { $in: ["LOCKED", "FUNDS_LOCKED"] },
+        status: { $in: HELD_ESCROW_STATUSES },
       });
       if (!contract) {
         return res.status(404).json({
@@ -1029,7 +1149,7 @@ router.post("/rider/seed", authenticateToken, async (req, res) => {
     await session.withTransaction(async () => {
       const activeDelivery = await EscrowContract.exists({
         deliveryPartnerId: riderId,
-        status: { $in: ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"] },
+        status: { $in: [...HELD_ESCROW_STATUSES, "DISPATCHED"] },
         deliveryStatus: { $ne: "DELIVERED" },
       }).session(session);
       if (activeDelivery) {
@@ -1171,7 +1291,7 @@ router.get("/rider/orders", authenticateToken, async (req, res) => {
 
   try {
     const filter = {
-      status: { $in: ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"] },
+      status: { $in: [...HELD_ESCROW_STATUSES, "DISPATCHED"] },
       deliveryStatus: { $ne: "DELIVERED" },
       deliveryPartnerId: { $ne: null },
     };
@@ -1279,7 +1399,7 @@ router.patch(
     try {
       const contractFilter = {
         _id: contractId,
-        status: { $in: ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"] },
+        status: { $in: [...HELD_ESCROW_STATUSES, "DISPATCHED"] },
       };
       if (isAdmin) {
         contractFilter.deliveryPartnerId = { $ne: null };
@@ -1344,33 +1464,17 @@ router.patch(
             updatedAt: completedAt,
           }),
         );
-        const completedContract = await releaseEscrowToWallets(
-          contract._id,
-          {
-            deliveryPartnerId: isAdmin
-              ? contract.deliveryPartnerId
-              : req.user._id || req.user.id,
-            deliveryStatus: contract.deliveryStatus,
-          },
-          ["FUNDS_LOCKED", "LOCKED", "DISPATCHED"],
-          {
-            deliveryStatus: "DELIVERED",
-            deliveryUpdatedAt: completedAt,
-            fulfillmentStatuses,
-            deliveryProof: `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`,
-            riderEarning: RIDER_DELIVERY_FEE,
-          },
-        );
-        if (!completedContract) {
-          return res.status(409).json({
-            success: false,
-            message: "The delivery has already been completed or changed.",
-          });
-        }
+        contract.deliveryStatus = "DELIVERED";
+        contract.deliveryUpdatedAt = completedAt;
+        contract.fulfillmentStatuses = fulfillmentStatuses;
+        contract.deliveryProof = `data:${req.file.mimetype};base64,${req.file.buffer.toString("base64")}`;
+        contract.riderEarning = RIDER_DELIVERY_FEE;
+        await contract.save();
         return res.json({
           success: true,
-          message: "Delivery marked delivered and escrow funds released.",
-          contract: completedContract,
+          message:
+            "Delivery marked delivered. Escrow remains held until the buyer confirms receipt.",
+          contract,
         });
       }
 
@@ -1459,7 +1563,7 @@ router.post("/release-funds", authenticateToken, async (req, res) => {
     const currentContract = await EscrowContract.findOne({
       _id: contractId,
       buyerId: req.user._id || req.user.id,
-      status: { $in: ["LOCKED", "FUNDS_LOCKED"] },
+      status: { $in: HELD_ESCROW_STATUSES },
     });
     if (!currentContract) {
       return res.status(404).json({
@@ -1545,7 +1649,7 @@ router.post("/dispute", authenticateToken, async (req, res) => {
       {
         _id: contractId,
         buyerId: req.user._id || req.user.id,
-        status: { $in: ["LOCKED", "FUNDS_LOCKED"] },
+        status: { $in: HELD_ESCROW_STATUSES },
       },
       {
         $set: { status: "IN_DISPUTE", disputeReason },
@@ -1705,7 +1809,7 @@ router.get("/active", authenticateToken, async (req, res) => {
     }
 
     const filter = {
-      status: { $in: ["LOCKED", "FUNDS_LOCKED", "IN_DISPUTE"] },
+      status: { $in: [...HELD_ESCROW_STATUSES, "IN_DISPUTE"] },
     };
     if (req.user.role === "BUYER") {
       const authenticatedBuyerId = req.user._id || req.user.id;

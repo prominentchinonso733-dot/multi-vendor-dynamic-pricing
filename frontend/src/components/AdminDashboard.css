@@ -288,6 +288,29 @@
   max-width: none;
 }
 
+.admin-dashboard__password {
+  position: relative;
+  display: flex;
+  width: min(100%, 30rem);
+}
+
+.admin-dashboard__password input {
+  padding-right: 2.8rem;
+}
+
+.admin-dashboard__password button {
+  position: absolute;
+  right: 0.4rem;
+  top: 50%;
+  display: grid;
+  place-items: center;
+  padding: 0.35rem;
+  border: 0;
+  background: transparent;
+  color: #536157;
+  transform: translateY(-50%);
+}
+
 .admin-dashboard__status {
   align-self: flex-start;
   border-radius: 999px;

@@ -11,6 +11,7 @@ import BuyerDashboard from "./components/BuyerDashboard";
 import AdminDashboard from "./components/AdminDashboard";
 import VendorStorefront from "./components/VendorStorefront";
 import AccountAuth from "./components/AccountAuth";
+import AccountEntry from "./components/AccountEntry";
 import VerificationPanel from "./components/VerificationPanel";
 import RiderDashboard from "./components/RiderDashboard";
 import AiSupportWidget from "./components/AiSupportWidget";
@@ -127,16 +128,6 @@ function RiderLoginRoute() {
   return <AccountAuth role="DELIVERY_PARTNER" />;
 }
 
-function BuyerLoginRoute() {
-  const { role } = useAuth();
-  if (role === "BUYER") return <Navigate to="/" replace />;
-  if (role === "ADMIN") return <Navigate to="/admin" replace />;
-  if (role === "SELLER") return <Navigate to="/vendor/dashboard" replace />;
-  if (role === "DELIVERY_PARTNER")
-    return <Navigate to="/rider/dashboard" replace />;
-  return <AccountAuth role="BUYER" />;
-}
-
 function App() {
   const { role, user, logout } = useAuth();
   const buyerId = role === "BUYER" ? user?.id : null;
@@ -242,7 +233,8 @@ function App() {
       <main className="app-main">
         <Routes>
           <Route path="/" element={<ProductList onAddToCart={addToCart} />} />
-          <Route path="/account" element={<BuyerLoginRoute />} />
+          <Route path="/account" element={<AccountEntry />} />
+          <Route path="/account/:role" element={<AccountEntry />} />
           <Route
             path="/account/verification"
             element={

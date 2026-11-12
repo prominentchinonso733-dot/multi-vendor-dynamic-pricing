@@ -26,6 +26,7 @@ export default function VendorStorefront({ onAddToCart }) {
 
   useEffect(() => {
     const controller = new AbortController();
+    const expectedVendorId = String(vendorId || "").toLowerCase();
 
     async function loadStore() {
       setLoading(true);
@@ -40,11 +41,11 @@ export default function VendorStorefront({ onAddToCart }) {
         if (
           !data?.success ||
           !data.vendor ||
-          data.vendor.id !== vendorId ||
+          String(data.vendor.id).toLowerCase() !== expectedVendorId ||
           !Array.isArray(data.products) ||
           data.products.some(
             (product) =>
-              product.vendorId !== vendorId ||
+              String(product.vendorId).toLowerCase() !== expectedVendorId ||
               typeof product.name !== "string" ||
               !Number.isFinite(product.price),
           )
